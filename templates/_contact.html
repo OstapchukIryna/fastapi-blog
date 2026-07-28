@@ -1,28 +1,34 @@
 {# Контакты одним источником. Каналы берутся из SITE в templating.py:
    незаполненный канал не рисуется вовсе, поэтому ссылки на «#» больше
-   невозможны — вместо мёртвой ссылки просто ничего нет. #}
+   невозможны — вместо мёртвой ссылки просто ничего нет.
 
-{% macro write_button(label="Write to me") %}
-    {% set target = site.telegram or ("mailto:" ~ site.email if site.email else none) %}
+   Почта идёт первой намеренно: аудитория из PRODUCT.md — нанимающие и
+   клиенты, а они живут в почте. Телеграм — предпочтение автора, а не их. #}
+
+{% macro write_button(label=none) %}
+    {% set target = ("mailto:" ~ site.email) if site.email else site.telegram %}
     {% if target %}
         <a class="btn btn-light write-btn"
            href="{{ target }}"
            {% if not target.startswith('mailto:') %}target="_blank" rel="noopener noreferrer"{% endif %}>
-            {{ label }}
+            {{ label or ("Email me" if site.email else "Message me on Telegram") }}
         </a>
     {% else %}
-        {# Честное пустое состояние: приглашение к действию, а не заглушка #}
-        <span class="cta-missing mono-label">Add telegram or email to SITE in templating.py</span>
+        {# Честное пустое состояние: рендерится только пока SITE не заполнен #}
+        <span class="cta-missing mono-label">Contact channels are not configured yet</span>
     {% endif %}
 {% endmacro %}
 
 {% macro channels() %}
-    {% if site.telegram or site.email or site.github %}
+    {# Канал, уже вынесенный в кнопку, здесь не повторяется: два соседних
+       контрола с одним адресом тратят половину точки решения впустую #}
+    {% set primary = "email" if site.email else ("telegram" if site.telegram else none) %}
+    {% if (site.telegram and primary != "telegram") or (site.email and primary != "email") or site.github %}
         <div class="channels mono-label">
-            {% if site.telegram %}
+            {% if site.telegram and primary != "telegram" %}
                 <a href="{{ site.telegram }}" target="_blank" rel="noopener noreferrer">Telegram</a>
             {% endif %}
-            {% if site.email %}<a href="mailto:{{ site.email }}">Email</a>{% endif %}
+            {% if site.email and primary != "email" %}<a href="mailto:{{ site.email }}">Email</a>{% endif %}
             {% if site.github %}
                 <a href="{{ site.github }}" target="_blank" rel="noopener noreferrer">GitHub</a>
             {% endif %}

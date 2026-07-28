@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from math import ceil
 
 from sqlalchemy import (
     Boolean,
@@ -77,6 +78,29 @@ class Post(Base):
 
     author: Mapped[User] = relationship(back_populates="posts")
     tags: Mapped[list[Tag]] = relationship(secondary=post_tags, back_populates="posts")
+
+    @property
+    def outline(self) -> list[str]:
+        """Заголовки разделов записи.
+
+        В списке записей это заменяет аннотацию: скелет рассуждения
+        показывает, как автор шёл к ответу, а аннотация — только о чём
+        текст. Оценивающему нужно первое.
+        """
+        return [
+            line.removeprefix("## ").strip()
+            for line in self.content.splitlines()
+            if line.startswith("## ")
+        ]
+
+    @property
+    def reading_minutes(self) -> int:
+        """Время чтения при 200 словах в минуту, не меньше одной.
+
+        Здесь, а не в шаблоне: та же формула была скопирована в четыре
+        шаблона и каждый раз разбирала полный текст записи.
+        """
+        return max(1, ceil(len(self.content.split()) / 200))
 
 
 def get_or_create_tags(db: Session, names: list[str]) -> list[Tag]:

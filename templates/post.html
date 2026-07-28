@@ -8,13 +8,12 @@
 {% block content %}
     <article>
         <header class="post-header">
-            {% set mins = [1, (post.content.split() | length / 200) | round(0, 'ceil') | int] | max %}
             <p class="post-meta mono-label">
                 <span>{{ post.date_posted.strftime('%d %b %Y') }}</span>
                 <span class="sep">/</span>
                 <span><a href="{{ url_for('user_posts', user_id=post.author.id) }}">{{ post.author.username }}</a></span>
                 <span class="sep">/</span>
-                <span>{{ mins }} min</span>
+                <span>{{ post.reading_minutes }} min</span>
                 {% for tag in post.tags %}
                     <span class="sep">/</span>
                     <span class="tag">{{ tag.name }}</span>
@@ -87,13 +86,12 @@
             <div class="related-grid">
                 {% for item in related %}
                     {% set rp = item.post %}
-                    {% set rmins = [1, (rp.content.split() | length / 200) | round(0, 'ceil') | int] | max %}
                     <a class="related-card" href="{{ url_for('post_page', post_id=rp.id) }}">
                         {% if item.shared %}
                             <span class="shared-tag mono-label">Also on {{ item.shared | join(', ') }}</span>
                         {% endif %}
                         <span class="headline"><span class="post-title">{{ rp.title }}</span></span>
-                        <span class="meta mono-label">{{ rp.date_posted.strftime('%d %b %Y') }} &middot; {{ rmins }} min</span>
+                        <span class="meta mono-label">{{ rp.date_posted.strftime('%d %b %Y') }} &middot; {{ rp.reading_minutes }} min</span>
                     </a>
                 {% endfor %}
             </div>

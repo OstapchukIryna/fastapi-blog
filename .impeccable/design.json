@@ -1,0 +1,447 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-28T00:00:00.000Z",
+  "title": "Design System: Called Mad",
+  "extensions": {
+    "colorMeta": {
+      "filament-amber": {
+        "role": "primary",
+        "displayName": "Filament Amber",
+        "canonical": "oklch(82.5% 0.1706 79.94)",
+        "lightThemeCounterpart": "#8f5000",
+        "note": "The only accent. Marks state and path, never surface. 9.49:1 on Ink; the light theme swaps to a burnt equivalent because warm Monokai accents measure 2.05:1 on paper. The primary button follows the theme accent via --cta-bg rather than staying amber on light.",
+        "tonalRamp": [
+          "oklch(15.0% 0.1706 79.94)",
+          "oklch(26.4% 0.1706 79.94)",
+          "oklch(37.9% 0.1706 79.94)",
+          "oklch(49.3% 0.1706 79.94)",
+          "oklch(60.7% 0.1706 79.94)",
+          "oklch(72.1% 0.1706 79.94)",
+          "oklch(83.6% 0.1706 79.94)",
+          "oklch(95.0% 0.1706 79.94)"
+        ]
+      },
+      "filament-amber-hot": {
+        "role": "primary",
+        "displayName": "Filament Amber Hot",
+        "canonical": "oklch(73.4% 0.1794 56.11)",
+        "lightThemeCounterpart": "#b36400",
+        "note": "Hover state of a solid amber fill. The button darkens rather than glows.",
+        "tonalRamp": [
+          "oklch(15.0% 0.1794 56.11)",
+          "oklch(26.4% 0.1794 56.11)",
+          "oklch(37.9% 0.1794 56.11)",
+          "oklch(49.3% 0.1794 56.11)",
+          "oklch(60.7% 0.1794 56.11)",
+          "oklch(72.1% 0.1794 56.11)",
+          "oklch(83.6% 0.1794 56.11)",
+          "oklch(95.0% 0.1794 56.11)"
+        ]
+      },
+      "amber-hairline": {
+        "role": "primary",
+        "displayName": "Amber Hairline",
+        "canonical": "rgba(255, 183, 3, 0.4)",
+        "lightThemeCounterpart": "rgba(143, 80, 0, 0.4)",
+        "note": "Borders only, never text. The warmed edge of a hovered or focused surface."
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "oklch(23.7% 0.0058 121.89)",
+        "lightThemeCounterpart": "#f8f8f2",
+        "note": "Monokai background. Page ground on dark, and the text colour printed on amber fills. In the light theme Ink and Paper trade places.",
+        "tonalRamp": [
+          "oklch(15.0% 0.0058 121.89)",
+          "oklch(26.4% 0.0058 121.89)",
+          "oklch(37.9% 0.0058 121.89)",
+          "oklch(49.3% 0.0058 121.89)",
+          "oklch(60.7% 0.0058 121.89)",
+          "oklch(72.1% 0.0058 121.89)",
+          "oklch(83.6% 0.0058 121.89)",
+          "oklch(95.0% 0.0058 121.89)"
+        ]
+      },
+      "raised-ink": {
+        "role": "neutral",
+        "displayName": "Raised Ink",
+        "canonical": "oklch(27.4% 0.0109 114.80)",
+        "lightThemeCounterpart": "#efefe4",
+        "note": "The single elevation step. Cards and panels sit on this and nothing else.",
+        "tonalRamp": [
+          "oklch(15.0% 0.0109 114.80)",
+          "oklch(26.4% 0.0109 114.80)",
+          "oklch(37.9% 0.0109 114.80)",
+          "oklch(49.3% 0.0109 114.80)",
+          "oklch(60.7% 0.0109 114.80)",
+          "oklch(72.1% 0.0109 114.80)",
+          "oklch(83.6% 0.0109 114.80)",
+          "oklch(95.0% 0.0109 114.80)"
+        ]
+      },
+      "deep-ink": {
+        "role": "neutral",
+        "displayName": "Deep Ink",
+        "canonical": "oklch(19.2% 0.0118 115.20)",
+        "lightThemeCounterpart": "#272822",
+        "note": "Modal surfaces only. Below the page ground so a dialog reads as a layer over it, not a continuation of it.",
+        "tonalRamp": [
+          "oklch(15.0% 0.0118 115.20)",
+          "oklch(26.4% 0.0118 115.20)",
+          "oklch(37.9% 0.0118 115.20)",
+          "oklch(49.3% 0.0118 115.20)",
+          "oklch(60.7% 0.0118 115.20)",
+          "oklch(72.1% 0.0118 115.20)",
+          "oklch(83.6% 0.0118 115.20)",
+          "oklch(95.0% 0.0118 115.20)"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "oklch(97.7% 0.0079 106.55)",
+        "lightThemeCounterpart": "#272822",
+        "note": "Monokai foreground. Body text on dark, page ground on light.",
+        "tonalRamp": [
+          "oklch(15.0% 0.0079 106.55)",
+          "oklch(26.4% 0.0079 106.55)",
+          "oklch(37.9% 0.0079 106.55)",
+          "oklch(49.3% 0.0079 106.55)",
+          "oklch(60.7% 0.0079 106.55)",
+          "oklch(72.1% 0.0079 106.55)",
+          "oklch(83.6% 0.0079 106.55)",
+          "oklch(95.0% 0.0079 106.55)"
+        ]
+      },
+      "bright-paper": {
+        "role": "neutral",
+        "displayName": "Bright Paper",
+        "canonical": "oklch(100.0% 0.0000 89.88)",
+        "lightThemeCounterpart": "#14150f",
+        "note": "Headings and emphasised text on dark only.",
+        "tonalRamp": [
+          "oklch(15.0% 0.0000 89.88)",
+          "oklch(26.4% 0.0000 89.88)",
+          "oklch(37.9% 0.0000 89.88)",
+          "oklch(49.3% 0.0000 89.88)",
+          "oklch(60.7% 0.0000 89.88)",
+          "oklch(72.1% 0.0000 89.88)",
+          "oklch(83.6% 0.0000 89.88)",
+          "oklch(95.0% 0.0000 89.88)"
+        ]
+      },
+      "muted-sand": {
+        "role": "neutral",
+        "displayName": "Muted Sand",
+        "canonical": "oklch(69.8% 0.0275 94.85)",
+        "lightThemeCounterpart": "#75715e",
+        "note": "Secondary text. Monokai's native comment #75715e measures 3.38:1 on Ink and was lightened to 6.17:1; on paper the native value works as-is at 4.6:1. Against Raised Ink, where it actually appears, it measures 5.54:1.",
+        "tonalRamp": [
+          "oklch(15.0% 0.0275 94.85)",
+          "oklch(26.4% 0.0275 94.85)",
+          "oklch(37.9% 0.0275 94.85)",
+          "oklch(49.3% 0.0275 94.85)",
+          "oklch(60.7% 0.0275 94.85)",
+          "oklch(72.1% 0.0275 94.85)",
+          "oklch(83.6% 0.0275 94.85)",
+          "oklch(95.0% 0.0275 94.85)"
+        ]
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "oklch(35.7% 0.0184 103.00)",
+        "lightThemeCounterpart": "#cfcfc0",
+        "note": "Every border and divider in the system. Half of how depth is expressed.",
+        "tonalRamp": [
+          "oklch(15.0% 0.0184 103.00)",
+          "oklch(26.4% 0.0184 103.00)",
+          "oklch(37.9% 0.0184 103.00)",
+          "oklch(49.3% 0.0184 103.00)",
+          "oklch(60.7% 0.0184 103.00)",
+          "oklch(72.1% 0.0184 103.00)",
+          "oklch(83.6% 0.0184 103.00)",
+          "oklch(95.0% 0.0184 103.00)"
+        ]
+      },
+      "signal-rose": {
+        "role": "tertiary",
+        "displayName": "Signal Rose",
+        "canonical": "oklch(70.6% 0.1936 8.45)",
+        "lightThemeCounterpart": "#c4003f",
+        "note": "Destruction and error only. Monokai's pink #f92672 measures 4.38:1 on Ink and was lightened to 5.77:1.",
+        "tonalRamp": [
+          "oklch(15.0% 0.1936 8.45)",
+          "oklch(26.4% 0.1936 8.45)",
+          "oklch(37.9% 0.1936 8.45)",
+          "oklch(49.3% 0.1936 8.45)",
+          "oklch(60.7% 0.1936 8.45)",
+          "oklch(72.1% 0.1936 8.45)",
+          "oklch(83.6% 0.1936 8.45)",
+          "oklch(95.0% 0.1936 8.45)"
+        ]
+      },
+      "signal-rose-deep": {
+        "role": "tertiary",
+        "displayName": "Signal Rose Deep",
+        "canonical": "oklch(53.9% 0.2074 11.71)",
+        "lightThemeCounterpart": "#8a002c",
+        "note": "Pressed and hover fill under Signal Rose; the label lightens to Paper on it.",
+        "tonalRamp": [
+          "oklch(15.0% 0.2074 11.71)",
+          "oklch(26.4% 0.2074 11.71)",
+          "oklch(37.9% 0.2074 11.71)",
+          "oklch(49.3% 0.2074 11.71)",
+          "oklch(60.7% 0.2074 11.71)",
+          "oklch(72.1% 0.2074 11.71)",
+          "oklch(83.6% 0.2074 11.71)",
+          "oklch(95.0% 0.2074 11.71)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Page mastheads. One per page, and only where the page names itself."
+      },
+      "voice": {
+        "displayName": "Voice",
+        "purpose": "The author speaking in first person at display size. Serif, not grotesque — real italics carry emphasis so no colour is spent on it."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Post titles on their own page."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Lead post heading; 1.25rem for archive rows."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "All prose, capped at 68ch."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Every service string: dates, counts, tags, nav, eyebrows, field labels, table headers, buttons."
+      }
+    },
+    "motion": [
+      {
+        "name": "state",
+        "value": "0.2s ease",
+        "purpose": "The default. Colour, border-colour and transform responses to hover or focus."
+      },
+      {
+        "name": "wipe",
+        "value": "0.28s ease",
+        "purpose": "Only the post-title underline, which draws rather than fades."
+      },
+      {
+        "name": "reduced",
+        "value": "0.01ms",
+        "purpose": "Every transition and animation collapses under prefers-reduced-motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "stack",
+        "value": "575.98px"
+      },
+      {
+        "name": "nav-expand",
+        "value": "768px"
+      }
+    ],
+    "measure": [
+      {
+        "name": "column",
+        "value": "760px",
+        "purpose": "The single centred container width."
+      },
+      {
+        "name": "prose",
+        "value": "68ch",
+        "purpose": "Post body cap; decides readability more than any other value."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one call to action. Solid amber, set in the service voice rather than the display face.",
+      "html": "<button class=\"ds-btn-primary\">Write to me</button>",
+      "css": ".ds-btn-primary { background: var(--accent, #ffb703); color: #1e1f1c; font-family: var(--font-mono, 'JetBrains Mono', ui-monospace, monospace); font-size: 0.75rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.09em; padding: 0.6rem 1.25rem; border: 1px solid var(--accent, #ffb703); border-radius: 0.5rem; cursor: pointer; transition: background-color 0.2s ease, border-color 0.2s ease; } .ds-btn-primary:hover { background: var(--accent-hot, #fb8500); border-color: var(--accent-hot, #fb8500); } .ds-btn-primary:focus-visible { outline: 2px solid var(--accent, #ffb703); outline-offset: 3px; } .ds-btn-primary:disabled { opacity: 0.45; cursor: default; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Record actions such as pin and delete. Outlined, quiet, warms toward the foreground on hover.",
+      "html": "<button class=\"ds-btn-ghost\">Pin</button>",
+      "css": ".ds-btn-ghost { background: none; color: var(--bs-secondary-color, #a39e8b); font-family: var(--font-mono, 'JetBrains Mono', ui-monospace, monospace); font-size: 0.75rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.09em; padding: 0.5rem 1.15rem; border: 1px solid var(--bs-border-color, #3e3d32); border-radius: 0.5rem; cursor: pointer; transition: color 0.2s ease, border-color 0.2s ease; } .ds-btn-ghost:hover { color: var(--bs-emphasis-color, #ffffff); border-color: var(--bs-secondary-color, #a39e8b); } .ds-btn-ghost:focus-visible { outline: 2px solid var(--accent, #ffb703); outline-offset: 3px; }"
+    },
+    {
+      "name": "Ghost Button, State On",
+      "kind": "button",
+      "refersTo": "button-ghost-active",
+      "description": "The same control when the state it toggles is on. It shows a state, not just an action.",
+      "html": "<button class=\"ds-btn-ghost-on\">Unpin</button>",
+      "css": ".ds-btn-ghost-on { background: none; color: var(--accent, #ffb703); font-family: var(--font-mono, 'JetBrains Mono', ui-monospace, monospace); font-size: 0.75rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.09em; padding: 0.5rem 1.15rem; border: 1px solid rgba(255, 183, 3, 0.4); border-radius: 0.5rem; cursor: pointer; transition: color 0.2s ease, border-color 0.2s ease; } .ds-btn-ghost-on:focus-visible { outline: 2px solid var(--accent, #ffb703); outline-offset: 3px; }"
+    },
+    {
+      "name": "Destructive Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Delete only. Signal Rose is the sole sanctioned second hue.",
+      "html": "<button class=\"ds-btn-danger\">Delete post</button>",
+      "css": ".ds-btn-danger { background: var(--danger, #ff6188); color: #1e1f1c; font-family: var(--bs-body-font-family, 'Newsreader', Georgia, serif); font-size: 1rem; padding: 0.5rem 1rem; border: 1px solid var(--danger, #ff6188); border-radius: 0.5rem; cursor: pointer; transition: background-color 0.2s ease, color 0.2s ease; } .ds-btn-danger:hover { background: var(--danger-hover, #c9134e); border-color: var(--danger-hover, #c9134e); color: #f8f8f2; } .ds-btn-danger:focus-visible { outline: 2px solid var(--accent, #ffb703); outline-offset: 3px; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input-text",
+      "description": "Recessed rather than raised: the field is darker than the surface it sits on. Focus warms the border and removes the framework glow.",
+      "html": "<label class=\"ds-field-label\" for=\"ds-title\">Title</label><input class=\"ds-input\" id=\"ds-title\" type=\"text\" value=\"Threads didn't make it faster\">",
+      "css": ".ds-field-label { display: block; margin-bottom: 0.5rem; font-family: var(--font-mono, 'JetBrains Mono', ui-monospace, monospace); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--bs-secondary-color, #a39e8b); } .ds-input { width: 100%; background: var(--bs-body-bg, #1e1f1c); color: var(--bs-body-color, #f8f8f2); font-family: var(--bs-body-font-family, 'Newsreader', Georgia, serif); font-size: 1rem; padding: 0.5rem 0.75rem; border: 1px solid var(--bs-border-color, #3e3d32); border-radius: 0.5rem; transition: border-color 0.2s ease; } .ds-input:focus { outline: none; border-color: rgba(255, 183, 3, 0.4); } .ds-input.is-invalid { border-color: var(--danger, #ff6188); }"
+    },
+    {
+      "name": "Tag Chip",
+      "kind": "chip",
+      "refersTo": "chip-tag",
+      "description": "Navigation, not selection. There is no selected variant.",
+      "html": "<a class=\"ds-chip\" href=\"#\">#python</a>",
+      "css": ".ds-chip { display: inline-block; color: var(--bs-secondary-color, #a39e8b); font-family: var(--font-mono, 'JetBrains Mono', ui-monospace, monospace); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.09em; text-decoration: none; padding: 0.35rem 0.7rem; border: 1px solid var(--bs-border-color, #3e3d32); border-radius: 0.5rem; transition: color 0.2s ease, border-color 0.2s ease; } .ds-chip:hover { color: var(--accent, #ffb703); border-color: rgba(255, 183, 3, 0.4); } .ds-chip:focus-visible { outline: 2px solid var(--accent, #ffb703); outline-offset: 3px; }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card-surface",
+      "description": "The single elevation step: raised ground plus a hairline. No shadow, ever. The border warms on hover.",
+      "html": "<article class=\"ds-card\"><p class=\"ds-card-meta\">26 Jul 2026 / 2 min</p><h3 class=\"ds-card-title\">I replaced pip, black and mypy in one afternoon</h3><p class=\"ds-card-body\">uv, ruff and pyrefly in place of four older tools.</p></article>",
+      "css": ".ds-card { background: var(--bs-tertiary-bg, #272822); border: 1px solid var(--bs-border-color, #3e3d32); border-radius: 0.5rem; padding: 2rem; transition: border-color 0.2s ease; } .ds-card:hover { border-color: rgba(255, 183, 3, 0.4); } .ds-card-meta { margin: 0 0 0.7rem; font-family: var(--font-mono, 'JetBrains Mono', ui-monospace, monospace); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--bs-secondary-color, #a39e8b); } .ds-card-title { margin: 0 0 0.75rem; font-family: var(--font-display, 'Space Grotesk', system-ui, sans-serif); font-weight: 700; font-size: 1.5rem; line-height: 1.2; letter-spacing: -0.025em; color: var(--bs-emphasis-color, #ffffff); } .ds-card-body { margin: 0; font-family: var(--bs-body-font-family, 'Newsreader', Georgia, serif); font-size: 1.0625rem; line-height: 1.7; color: var(--bs-secondary-color, #a39e8b); }"
+    },
+    {
+      "name": "Now Panel",
+      "kind": "custom",
+      "refersTo": "panel-now",
+      "description": "The signature component. Present-tense status with the primary contact action attached, marked by its amber Now label rather than a coloured edge. The date is hand-maintained, never generated.",
+      "html": "<section class=\"ds-now\"><div class=\"ds-now-head\"><span class=\"ds-now-title\">Now</span><span class=\"ds-now-date\">Updated 28 Jul 2026</span></div><dl class=\"ds-now-rows\"><dt>Building</dt><dd>This blog — FastAPI, SQLAlchemy, Jinja2</dd><dt>Next</dt><dd>JWT auth, file uploads, pagination</dd></dl></section>",
+      "css": ".ds-now { background: var(--bs-tertiary-bg, #272822); border: 1px solid var(--bs-border-color, #3e3d32); border-radius: 0.5rem; padding: 1.5rem 1.75rem; } .ds-now-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; padding-bottom: 1rem; margin-bottom: 1.15rem; border-bottom: 1px solid var(--bs-border-color, #3e3d32); font-family: var(--font-mono, 'JetBrains Mono', ui-monospace, monospace); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.09em; } .ds-now-title { color: var(--accent, #ffb703); } .ds-now-date { color: var(--bs-secondary-color, #a39e8b); } .ds-now-rows { display: grid; grid-template-columns: minmax(76px, auto) 1fr; gap: 0.7rem 1.5rem; margin: 0; } .ds-now-rows dt { font-family: var(--font-mono, 'JetBrains Mono', ui-monospace, monospace); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--bs-secondary-color, #a39e8b); } .ds-now-rows dd { margin: 0; font-family: var(--bs-body-font-family, 'Newsreader', Georgia, serif); font-size: 1.0625rem; color: var(--bs-body-color, #f8f8f2); }"
+    },
+    {
+      "name": "Title Wipe Link",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "The only motion that draws rather than fades: an amber underline grown from 0% to 100% width on hover. text-decoration is suppressed or a second line renders over it.",
+      "html": "<h2 class=\"ds-wipe-wrap\"><a class=\"ds-wipe\" href=\"#\">Why you can't filter a window function in WHERE</a></h2>",
+      "css": ".ds-wipe-wrap { margin: 0; font-family: var(--font-display, 'Space Grotesk', system-ui, sans-serif); font-weight: 700; font-size: 1.5rem; line-height: 1.2; letter-spacing: -0.025em; } .ds-wipe { display: inline; text-decoration: none; color: var(--bs-emphasis-color, #ffffff); background-image: linear-gradient(var(--accent, #ffb703), var(--accent, #ffb703)); background-repeat: no-repeat; background-position: 0 100%; background-size: 0% 2px; transition: background-size 0.28s ease; } .ds-wipe-wrap:hover .ds-wipe, .ds-wipe:focus-visible { background-size: 100% 2px; }"
+    },
+    {
+      "name": "Navigation",
+      "kind": "nav",
+      "refersTo": null,
+      "description": "Fixed, translucent, blurred. Label typography; the active section takes the accent, and the author-only action is outlined rather than filled.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-brand\" href=\"#\">called_mad</a><a class=\"ds-nav-link ds-nav-active\" href=\"#\">Posts</a><a class=\"ds-nav-link\" href=\"#\">Topics</a><a class=\"ds-nav-link ds-nav-write\" href=\"#\">Write</a></nav>",
+      "css": ".ds-nav { display: flex; align-items: center; gap: 1.25rem; padding: 0.6rem 1rem; background: rgba(30, 31, 28, 0.85); backdrop-filter: blur(10px); border-bottom: 1px solid var(--bs-border-color, #3e3d32); } .ds-nav-brand { font-family: var(--font-mono, 'JetBrains Mono', ui-monospace, monospace); font-size: 0.8rem; font-weight: 500; letter-spacing: 0.04em; color: #f8f8f2; text-decoration: none; } .ds-nav-link { font-family: var(--font-mono, 'JetBrains Mono', ui-monospace, monospace); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.09em; color: #a39e8b; text-decoration: none; transition: color 0.2s ease; } .ds-nav-link:hover { color: #f8f8f2; } .ds-nav-active { color: var(--accent, #ffb703); } .ds-nav-write { padding: 0.35rem 0.7rem; border: 1px solid rgba(255, 255, 255, 0.22); border-radius: 0.5rem; } .ds-nav-write:hover { color: var(--accent, #ffb703); border-color: var(--accent, #ffb703); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Lit Terminal",
+    "overview": "Monokai is a code editor theme, and this site wears it on purpose. The ground is the editor's background, the text is its foreground, and the one accent is the warm highlight a syntax theme reserves for the thing that matters. But an editor is built for scanning code in short bursts, and this surface has to hold long prose. So the palette stays and the typography changes: an editorial serif is laid into the editor's dark, given a 68-character measure and a 1.7 line height, until the environment a backend engineer actually lives in becomes somewhere you can read a two-thousand-word post-mortem without leaving.\n\nEverything is flat. There is not a single box-shadow in the system — depth comes from a hairline border and a change of ground, never from a simulated light source. Elements are quiet at rest and answer only when touched, in 200ms, on colour or border. Nothing animates on its own, nothing floats, nothing pulses for attention.\n\nThe restraint is the argument. This site is a work sample for a backend engineer, so a decorative flourish that cannot be justified costs more than it adds. One accent, two themes, three typefaces, no shadows, and every contrast ratio written into the stylesheet next to the value it justifies.",
+    "keyCharacteristics": [
+      "One accent colour, used as a signal rather than as decoration",
+      "Zero shadows; depth is border and ground only",
+      "Editorial serif for prose and for the author's voice, geometric sans for names, monospace for every service string",
+      "Dark is the canonical theme; light is a fully maintained alternative",
+      "Motion is confirmation, never entertainment"
+    ],
+    "rules": [
+      {
+        "name": "The Single Filament Rule",
+        "body": "There is one accent. If a design needs a second hue to separate two things, the hierarchy is wrong — fix it with weight, position, or ground instead. The only sanctioned exception is Signal Rose, and only for destruction and error.",
+        "section": "colors"
+      },
+      {
+        "name": "The Token-Only Rule",
+        "body": "Colour exists exclusively as a custom property in :root and the [data-bs-theme] blocks. A hex literal inside a component or a template is a defect, because it is the one thing that cannot follow a theme switch.",
+        "section": "colors"
+      },
+      {
+        "name": "The Measured Contrast Rule",
+        "body": "Monokai heritage never outranks legibility. When a native value fails, it is adjusted and the resulting ratio is written into the stylesheet as a comment next to it. A colour without a recorded ratio has not been checked.",
+        "section": "colors"
+      },
+      {
+        "name": "The Voice-Is-Serif Rule",
+        "body": "Wherever the page speaks in the first person at large size, it speaks in Newsreader, not Space Grotesk. The grotesque names things; the serif says them. This is a system rule, not a one-off for the hero.",
+        "section": "typography"
+      },
+      {
+        "name": "The Mono-Label Rule",
+        "body": "Every service string is .mono-label: monospace, 0.72rem, uppercase, 0.09em tracking. Metadata is not body text set smaller, and it never competes with prose for the same visual channel.",
+        "section": "typography"
+      },
+      {
+        "name": "The 760 Rule",
+        "body": "The column is 760px and prose is 68ch. Widening either to fill a large screen is a regression, not a fix.",
+        "section": "layout"
+      },
+      {
+        "name": "The Hairline-Over-Box Rule",
+        "body": "A list is divided by a rule, not wrapped in cards. Reach for a card only when the thing inside it is a discrete object that can be acted on.",
+        "section": "layout"
+      },
+      {
+        "name": "The No-Shadow Rule",
+        "body": "Surfaces are flat, always. If something needs to feel raised, change its ground and give it a hairline. A drop shadow anywhere in this system is a defect.",
+        "section": "elevation"
+      },
+      {
+        "name": "The One-Step Rule",
+        "body": "There is one elevation step, not a ramp. A card inside a card is a sign the composition is wrong.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Named-State Rule",
+        "body": "When a block is the current, leading or failing one, say so in a word set in the accent, and let the raised ground and the hairline do the rest. Do not mark it with a coloured edge, a glow, or a tinted fill.",
+        "section": "shapes"
+      },
+      {
+        "name": "The One Border Rule",
+        "body": "1px Hairline, all four sides. The pull quote is the only exception in the system, and adding a second one needs a reason written down here.",
+        "section": "shapes"
+      },
+      {
+        "name": "The One Ramp Rule",
+        "body": "A literal font-size in a component is a defect. If a step is missing, add it to the ramp and to the scale table; do not solve it locally.",
+        "section": "typography"
+      }
+    ],
+    "dos": [
+      "Do put every colour in :root / [data-bs-theme] and reference the token.",
+      "Do record the contrast ratio in a comment whenever a colour is chosen or adjusted, the way #a39e8b (6.17) and #ff6188 (5.77) already are.",
+      "Do set every service string — dates, counts, tags, nav, buttons, field labels — in .mono-label.",
+      "Do use Newsreader whenever the page speaks in first person at large size.",
+      "Do keep prose at 68ch and the column at 760px.",
+      "Do express depth with a hairline and a change of ground.",
+      "Do keep transitions at 200ms on colour, border-colour or transform, and keep the prefers-reduced-motion block honoured.",
+      "Do verify both themes; light is a maintained alternative, not a fallback.",
+      "Do name a block's state in a word set in the accent, and let the raised ground and the hairline carry the rest.",
+      "Do take every size from the type ramp; a literal font-size is a defect."
+    ],
+    "donts": [
+      "Don't add a box-shadow. There are none, and that is the system.",
+      "Don't put a thick coloured border down one side of a card. It is the most recognisable tell of a generated interface, and the accent label already says what the edge would.",
+      "Don't introduce a second accent hue. Signal Rose is for destruction and error only.",
+      "Don't hardcode a hex value in a component or a template.",
+      "Don't nest a card inside a card; there is one elevation step.",
+      "Don't animate anything on its own — no autoplay, no pulse, no bounce, no slide. Motion answers an action.",
+      "Don't show progress, freshness or state the system has not actually measured. The reading bar starts at zero and the Now date is hand-set on purpose.",
+      "Don't reach for developer-portfolio clichés: terminal window mockups, typing animations, matrix rain, a hello world hero. The palette already says where this author works; acting it out is costume.",
+      "Don't drift toward a generic SaaS landing page — gradient hero, pastel illustrations, large rounded cards floating on shadows.",
+      "Don't leave anything looking like untouched Bootstrap: default blue buttons, default shadows, default radii."
+    ]
+  }
+}
