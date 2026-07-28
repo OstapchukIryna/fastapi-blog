@@ -101,14 +101,13 @@ def all_topics(db: Session) -> list[tuple[str, int]]:
     Один запрос с группировкой вместо загрузки всех тегов и подсчёта
     их записей в Python — считать умеет база.
     """
-    return list(
-        db.execute(
-            select(models.Tag.name, func.count(models.Post.id))
-            .join(models.Tag.posts)
-            .group_by(models.Tag.id)
-            .order_by(func.count(models.Post.id).desc(), models.Tag.name)
-        ).all()
-    )
+    rows = db.execute(
+        select(models.Tag.name, func.count(models.Post.id))
+        .join(models.Tag.posts)
+        .group_by(models.Tag.id)
+        .order_by(func.count(models.Post.id).desc(), models.Tag.name)
+    ).all()
+    return [(name, count) for name, count in rows]
 
 
 def arrange(items: Sequence[models.Post]) -> dict:
