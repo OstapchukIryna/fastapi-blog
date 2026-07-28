@@ -1,0 +1,45 @@
+{% extends "layout.html" %}
+{% block content %}
+    <div class="auth-page">
+        <header class="masthead">
+            <span class="eyebrow mono-label">Account</span>
+            <h1 class="masthead-title auth-title">Sign in</h1>
+            <p class="masthead-tagline">
+                One-author blog — this form is here for when real auth ships.
+            </p>
+        </header>
+
+        <form class="auth-form content-section">
+            <div class="mb-3">
+                <label class="form-label mono-label" for="username">Username</label>
+                <input class="form-control"
+                       type="text"
+                       id="username"
+                       name="username"
+                       autocomplete="username">
+            </div>
+            <div class="mb-4">
+                <label class="form-label mono-label" for="password">Password</label>
+                <input class="form-control"
+                       type="password"
+                       id="password"
+                       name="password"
+                       autocomplete="current-password">
+            </div>
+            {# Не подключено: JWT-авторизация ещё впереди по курсу.
+               Кнопка выключена явно, а не спрятана — чтобы форма
+               не выглядела сломанной, а честно говорила "рано". #}
+            <button class="btn btn-light w-100"
+                    type="submit"
+                    disabled
+                    title="Not wired up yet — arrives with JWT auth">Sign in</button>
+            <p class="auth-note mono-label">Not wired up yet — arrives with JWT auth.</p>
+        </form>
+
+        <p class="mt-4">
+            <a class="back-link mono-label" href="/">
+                <span class="arrow">&larr;</span> All posts
+            </a>
+        </p>
+    </div>
+{% endblock content %}

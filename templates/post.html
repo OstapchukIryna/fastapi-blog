@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% import "_contact.html" as contact %}
 
 {% block reading_progress %}
     <div class="reading-progress" id="reading-progress"></div>
@@ -51,6 +52,10 @@
             </div>
         {% endif %}
 
+        {# Конец статьи — момент наибольшего доверия читателя, поэтому
+           именно здесь стоит призыв написать. Приглашение к возражению,
+           а не к «подписке»: оно честно для блога про собственные ошибки
+           и не давит на читателя. #}
         <div class="author-byline">
             <img class="avatar"
                  src="{{ post.author.image_path }}"
@@ -58,7 +63,7 @@
                  width="64"
                  height="64"
                  loading="lazy">
-            <div>
+            <div class="byline-body">
                 <span class="eyebrow mono-label">Written by</span>
                 <div class="name">
                     <a href="{{ url_for('user_posts', user_id=post.author.id) }}">{{ post.author.username }}</a>
@@ -67,10 +72,10 @@
                     Learning backend Python in public — FastAPI, async, and databases.
                     This blog is the practice project.
                 </p>
-                <div class="author-links mono-label">
-                    <a href="#">GitHub</a>
-                    <a href="#">Telegram</a>
-                    <a href="#">Email</a>
+                <p class="byline-invite">Ran into this too, or got a different answer? Write to me.</p>
+                <div class="byline-actions">
+                    {{ contact.write_button() }}
+                    {{ contact.channels() }}
                 </div>
             </div>
         </div>
