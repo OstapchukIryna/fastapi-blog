@@ -16,12 +16,15 @@
         <meta name="description" content="Notes on Python backend work — what broke, why, and what I understood afterwards.">
         <meta name="author" content="Called Mad">
 
+        {# Пустые og:url и og:image убраны намеренно: пустой тег ломает
+           превью сильнее, чем его отсутствие — источник обязан выбрать
+           запасной вариант сам. Вернуть, когда появятся домен и картинка. #}
         <!-- Open Graph -->
-        <meta property="og:title" content="Called Mad">
+        <meta property="og:title" content="{{ title ~ ' — ' ~ site.handle if title else site.handle }}">
         <meta property="og:type" content="website">
-        <meta property="og:url" content="">
-        <meta property="og:image" content="">
-        <meta property="og:image:alt" content="">
+        <meta property="og:description"
+              content="Notes on Python backend work — what broke, why, and what I understood afterwards.">
+        <meta name="twitter:card" content="summary">
 
         <!-- Fonts: Space Grotesk (display) / Newsreader (body) / JetBrains Mono (utility) -->
         <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -78,14 +81,16 @@
                                {% if path.startswith('/about') %}aria-current="page"{% endif %}
                                href="{{ url_for('about') }}">About</a>
                         </div>
-                        {# Регистрация на личном блоге — действие для одного человека,
-                           поэтому это текстовая ссылка, а не две крупные кнопки. #}
+                        {# «Sign in» убран из меню: он вёл на форму, honestly
+                           подписанную «ещё не подключено», и занимал точку
+                           выбора у аудитории, которой вход не нужен вовсе.
+                           Страница /login осталась — на неё просто нет ссылки
+                           до появления JWT. #}
                         <div class="navbar-nav align-items-md-center">
                             {% if is_author %}
                                 <a class="nav-link nav-write{{ ' active' if path.startswith('/posts/new') }}"
                                    href="{{ url_for('new_post') }}">Write</a>
                             {% endif %}
-                            <a class="nav-link" href="{{ url_for('login') }}">Sign in</a>
                             <div class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle"
                                    href="#"
