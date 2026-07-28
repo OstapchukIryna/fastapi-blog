@@ -1,0 +1,30 @@
+{% extends "layout.html" %}
+{% block content %}
+    <header class="masthead">
+        <span class="eyebrow mono-label">Index</span>
+        <h1 class="masthead-title">Topics</h1>
+        <p class="masthead-tagline">
+            Everything written here, grouped by what it's about.
+        </p>
+    </header>
+
+    {% for name, count in topics %}
+        <a class="topic-row" href="{{ url_for('get_tag', tag=name) }}">
+            <span class="name">{{ name }}</span>
+            <span class="count mono-label">
+                {{ count }} post{{ '' if count == 1 else 's' }}
+            </span>
+        </a>
+    {% else %}
+        <div class="empty-state">
+            <p class="mono-label mb-2">No topics yet</p>
+            <p class="mb-0">Tags appear here once posts are published.</p>
+        </div>
+    {% endfor %}
+
+    <p class="mt-5">
+        <a class="back-link mono-label" href="/">
+            <span class="arrow">&larr;</span> All posts
+        </a>
+    </p>
+{% endblock content %}

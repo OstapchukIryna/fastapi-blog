@@ -1,72 +1,177 @@
+"""Наполнение базы демонстрационными записями.
+
+Запуск:
+    uv run python seed.py
+    uv run python seed.py --reset    # снести таблицы и создать заново
+
+Скрипт идемпотентен: повторный запуск ничего не дублирует.
+"""
+
+import sys
+from datetime import UTC, datetime
 from pathlib import Path
+
+import bcrypt
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+import models
+from database import Base, engine
 
 CONTENT_DIR = Path(__file__).parent / "content"
 
+AUTHOR = {
+    "username": "called_mad",
+    "email": "hello@example.com",
+    "password": "change-me-please",  # TODO: не для боевого окружения
+}
 
-def load(slug: str) -> str:
-    return (CONTENT_DIR / f"{slug}.md").read_text(encoding="utf-8")
-
-
-posts: list[dict] = [
+# Метаданные здесь, тексты в content/*.md — правится в редакторе
+# как обычный markdown, а не внутри строкового литерала
+POSTS = [
     {
-        "id": 5,
-        "author": "called_mad",
+        "slug": "modern-python-tooling",
         "title": "I replaced pip, black and mypy in one afternoon",
-        "date_posted": "26 Jul 2026",
-        "tags": ["tooling", "python"],
         "summary": (
             "uv, ruff and pyrefly in place of four older tools — what the "
             "switch actually changed, and where the old ones still matter."
         ),
-        "content": load("modern-python-tooling"),
+        "tags": ["tooling", "python"],
+        "date": datetime(2026, 7, 26, 10, 0, tzinfo=UTC),
     },
     {
-        "id": 4,
-        "author": "called_mad",
+        "slug": "pydantic-validators",
         "title": "The Pydantic validator mistake that returns None",
-        "date_posted": "22 Jul 2026",
-        "tags": ["pydantic", "python"],
         "summary": (
             "A validator that forgets to return does not fail loudly. It "
             "quietly sets the field to None."
         ),
-        "content": load("pydantic-validators"),
+        "tags": ["pydantic", "python"],
+        "date": datetime(2026, 7, 22, 9, 30, tzinfo=UTC),
     },
     {
-        "id": 3,
-        "author": "called_mad",
+        "slug": "threads-vs-processes",
         "title": "Threads didn't make it faster. Processes did.",
-        "date_posted": "18 Jul 2026",
-        "tags": ["async", "python"],
         "summary": (
             "Twelve images, two halves of one script, and two opposite "
             "results from the same tool. The GIL explains both."
         ),
-        "content": load("threads-vs-processes"),
+        "tags": ["async", "python"],
+        "date": datetime(2026, 7, 18, 18, 15, tzinfo=UTC),
         "pinned": True,
     },
     {
-        "id": 2,
-        "author": "called_mad",
+        "slug": "window-functions-cte",
         "title": "Why you can't filter a window function in WHERE",
-        "date_posted": "12 Jul 2026",
-        "tags": ["sql"],
         "summary": (
             "The column exists four lines above the error. The problem is "
             "not where it is, but when it is evaluated."
         ),
-        "content": load("window-functions-cte"),
+        "tags": ["sql"],
+        "date": datetime(2026, 7, 12, 14, 0, tzinfo=UTC),
     },
     {
-        "id": 1,
-        "author": "called_mad",
+        "slug": "dict-resize",
         "title": "What actually happens when a dict resizes",
-        "date_posted": "5 Jul 2026",
-        "tags": ["python", "internals"],
         "summary": (
             "Two-thirds full, powers of two, and one unlucky insert that "
             "pays for rehashing the entire table."
         ),
-        "content": load("dict-resize"),
+        "tags": ["python", "internals"],
+        "date": datetime(2026, 7, 5, 11, 45, tzinfo=UTC),
     },
 ]
+
+
+def load_content(slug: str) -> str:
+    path = CONTENT_DIR / f"{slug}.md"
+    if not path.exists():
+        raise FileNotFoundError(f"no file {path}")
+    return path.read_text(encoding="utf-8")
+
+
+def get_or_create_author(db: Session) -> models.User:
+    user = (
+        db.execute(
+            select(models.User).where(models.User.username == AUTHOR["username"])
+        )
+        .scalars()
+        .first()
+    )
+
+    if user is not None:
+        return user
+
+    user = models.User(
+        username=AUTHOR["username"],
+        email=AUTHOR["email"],
+        password_hash=bcrypt.hashpw(
+            AUTHOR["password"].encode(), bcrypt.gensalt()
+        ).decode(),
+    )
+    db.add(user)
+    db.flush()  # чтобы получить user.id до коммита
+    return user
+
+
+def get_or_create_tags(db: Session, names: list[str]) -> list[models.Tag]:
+    """Один запрос на всю пачку вместо запроса на каждое имя."""
+    if not names:
+        return []
+
+    existing = (
+        db.execute(select(models.Tag).where(models.Tag.name.in_(names))).scalars().all()
+    )
+    by_name = {tag.name: tag for tag in existing}
+
+    for name in names:
+        if name not in by_name:
+            tag = models.Tag(name=name)
+            db.add(tag)
+            by_name[name] = tag
+
+    return [by_name[name] for name in names]
+
+
+def seed() -> None:
+    with Session(engine) as db:
+        author = get_or_create_author(db)
+
+        created = 0
+        for item in POSTS:
+            # Идемпотентность по заголовку: колонки slug в модели нет,
+            # а заголовки здесь уникальны
+            exists = (
+                db.execute(
+                    select(models.Post).where(models.Post.title == item["title"])
+                )
+                .scalars()
+                .first()
+            )
+            if exists is not None:
+                continue
+
+            db.add(
+                models.Post(
+                    title=item["title"],
+                    summary=item["summary"],
+                    content=load_content(item["slug"]),
+                    date_posted=item["date"],
+                    is_pinned=item.get("pinned", False),
+                    author=author,
+                    tags=get_or_create_tags(db, item["tags"]),
+                )
+            )
+            created += 1
+
+        db.commit()
+        print(f"author: {author.username}, added posts: {created}")
+
+
+if __name__ == "__main__":
+    if "--reset" in sys.argv:
+        Base.metadata.drop_all(bind=engine)
+        print("tables dropped")
+
+    Base.metadata.create_all(bind=engine)
+    seed()

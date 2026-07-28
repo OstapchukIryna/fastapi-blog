@@ -1,26 +1,63 @@
-from pydantic import BaseModel, ConfigDict, Field
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-class PostBase(BaseModel):
-    author: str = Field(min_length=3, max_length=50)
-    title: str = Field(min_length=1, max_length=100)
-    summary: str = Field(min_length=1, max_length=250)
-
-    tags: list[str] = Field(default_factory=list)
+class UserCreate(BaseModel):
+    username: str = Field(min_length=3, max_length=50)
+    email: str = Field(min_length=3, max_length=120)
+    password: str = Field(min_length=8, max_length=128)
 
 
-class PostCreate(PostBase):
-    content: str = Field(min_length=1)
+class UserResponse(BaseModel):
+    """Пароль сюда не входит намеренно: response_model отсекает всё,
+    чего нет в схеме, поэтому хеш физически не попадёт в ответ."""
 
-
-class PostSummary(PostBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    date_posted: str
+    username: str
+    email: str
+    image_path: str
 
 
-class PostResponse(PostSummary):
-    # We need the body only there
+class PostCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=100)
+    summary: str = Field(min_length=1, max_length=250)
+    content: str = Field(min_length=1)
+    user_id: int
+    tags: list[str] = Field(default_factory=list)
+
+    @field_validator("tags")
+    @classmethod
+    def normalise_tags(cls, value: list[str]) -> list[str]:
+        cleaned = [t.strip().lower() for t in value if t.strip()]
+        # dict.fromkeys вместо set: убирает дубли, сохраняя порядок
+        return list(dict.fromkeys(cleaned))
+
+
+class PostResponse(BaseModel):
+    """Ответ API для списка. Без content: выдача из десяти записей
+    иначе тащит десять полных статей ради заголовков."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    title: str
+    summary: str
+    date_posted: datetime
+    is_pinned: bool
+    tags: list[str]
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def flatten_tags(cls, value):
+        # mode="before" получает список объектов Tag из связи.
+        # Наружу отдаём плоские строки: клиенту не нужна форма [{"name": ...}]
+        return [t.name if hasattr(t, "name") else t for t in value]
+
+
+class PostDetail(PostResponse):
+    """Ответ API для одной записи. Тело есть только здесь."""
 
     content: str

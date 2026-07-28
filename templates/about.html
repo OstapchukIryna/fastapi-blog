@@ -1,0 +1,63 @@
+{% extends "layout.html" %}
+{% block content %}
+    <header class="masthead">
+        <span class="eyebrow mono-label">About</span>
+        <h1 class="masthead-title">Called Mad</h1>
+        <p class="masthead-tagline">
+            Backend in Python, written down while I'm still learning it.
+        </p>
+    </header>
+
+    <div class="about-intro">
+        <img class="avatar"
+             src="{{ url_for('static', path='profile_pics/avatar-256.jpg') }}"
+             alt="Called Mad"
+             width="112"
+             height="112">
+        <div class="post-body">
+            <p>
+                I write about the things that didn't work the first time — the GIL
+                refusing to speed anything up, a validator quietly returning
+                <code>None</code>, a query that couldn't see its own column. Every
+                post here started as something I got wrong.
+            </p>
+            <p>
+                Notes are kept in public partly because writing an explanation is
+                the fastest way to find out whether I actually understood something,
+                and partly because the version of me from two months ago would have
+                found them useful.
+            </p>
+        </div>
+    </div>
+
+    {# Не «навыки», а конкретный инструментарий: список умений про себя
+       ничего не доказывает, список инструментов хотя бы проверяем #}
+    <dl class="spec-list mono-label">
+        <dt>Language</dt>
+        <dd>Python</dd>
+
+        <dt>Backend</dt>
+        <dd>FastAPI, SQLAlchemy, Pydantic</dd>
+
+        <dt>Data</dt>
+        <dd>MySQL, pandas, NumPy</dd>
+
+        <dt>Tooling</dt>
+        <dd>uv, ruff, pyrefly, pytest, Docker</dd>
+
+        <dt>This site</dt>
+        <dd>FastAPI, Jinja2, SQLAlchemy — source on GitHub</dd>
+    </dl>
+
+    <div class="author-links mono-label">
+        <a href="#">GitHub</a>
+        <a href="#">Telegram</a>
+        <a href="#">Email</a>
+    </div>
+
+    <p class="mt-5">
+        <a class="back-link mono-label" href="/">
+            <span class="arrow">&larr;</span> All posts
+        </a>
+    </p>
+{% endblock content %}

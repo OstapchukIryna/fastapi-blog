@@ -1,0 +1,54 @@
+{% extends "layout.html" %}
+{% block content %}
+    <header class="author-masthead">
+        <img class="avatar"
+             src="{{ user.image_path }}"
+             alt="{{ user.username }}"
+             width="88"
+             height="88"
+             loading="lazy">
+        <div>
+            <span class="eyebrow mono-label">Posts by</span>
+            <h1>{{ user.username }}</h1>
+            <p class="count mono-label">
+                {{ posts | length }} post{{ '' if posts | length == 1 else 's' }}
+            </p>
+        </div>
+    </header>
+
+    {# Однородный список без ведущей карточки: сюда приходят просматривать
+       написанное автором, а не выбирать, с чего начать #}
+    {% for post in posts %}
+        {% set mins = [1, (post.content.split() | length / 200) | round(0, 'ceil') | int] | max %}
+        <article class="archive-item">
+            <p class="post-meta mono-label">
+                <span>{{ post.date_posted.strftime('%d %b %Y') }}</span>
+                <span class="sep">/</span>
+                <span>{{ mins }} min</span>
+            </p>
+            <h2>
+                <a class="post-title stretched"
+                   href="{{ url_for('post_page', post_id=post.id) }}">{{ post.title }}</a>
+            </h2>
+            <p class="post-excerpt">{{ post.summary }}</p>
+            {% if post.tags %}
+                <div class="card-tags mono-label">
+                    {% for tag in post.tags %}
+                        <a href="{{ url_for('get_tag', tag=tag.name) }}">#{{ tag.name }}</a>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </article>
+    {% else %}
+        <div class="empty-state">
+            <p class="mono-label mb-2">Nothing here yet</p>
+            <p class="mb-0">{{ user.username }} hasn't published anything.</p>
+        </div>
+    {% endfor %}
+
+    <p class="mt-5">
+        <a class="back-link mono-label" href="/">
+            <span class="arrow">&larr;</span> All posts
+        </a>
+    </p>
+{% endblock content %}

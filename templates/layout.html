@@ -10,10 +10,9 @@
         {% if title %}
             <title>Called Mad — {{ title }}</title>
         {% else %}
-            <title>Called Mad — notes on Python backend learning path</title>
+            <title>Called Mad — notes on Python backend work</title>
         {% endif %}
-        <meta name="description"
-              content="Notes on Python backend work — what broke, why, and what I understood afterwards.">
+        <meta name="description" content="Notes on Python backend work — what broke, why, and what I understood afterwards.">
         <meta name="author" content="Called Mad">
 
         <!-- Open Graph -->
@@ -36,27 +35,17 @@
               crossorigin="anonymous">
 
         <!-- Stylesheet -->
-        <link rel="stylesheet"
-              type="text/css"
-              href="{{ url_for('static', path='css/main.css') }}">
+        <link rel="stylesheet" type="text/css" href="/static/css/main.css">
 
         <meta name="theme-color" content="#1e1f1c">
 
-        <link rel="icon"
-              href="{{ url_for('static', path='icons/favicon.ico') }}"
-              sizes="any">
-        <link rel="icon"
-              href="{{ url_for('static', path='icons/icon.svg') }}"
-              type="image/svg+xml">
-        <link rel="apple-touch-icon"
-              sizes="180x180"
-              href="{{ url_for('static', path='icons/icon.png') }}">
-        <link rel="manifest"
-              href="{{ url_for('static', path='site.webmanifest') }}">
+        <link rel="icon" href="/static/icons/favicon.ico" sizes="any">
+        <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
+        <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/icon.png">
+        <link rel="manifest" href="/static/site.webmanifest">
     </head>
     <body class="d-flex flex-column min-vh-100">
-        {% block reading_progress %}
-        {% endblock reading_progress %}
+        {% block reading_progress %}{% endblock reading_progress %}
         <header class="site-header">
             <nav class="navbar navbar-expand-md bg-steel fixed-top"
                  data-bs-theme="dark">
@@ -72,20 +61,33 @@
                         <span class="navbar-toggler-icon"></span>
                     </button>
                     <div class="collapse navbar-collapse" id="navbarToggle">
+                        {# active вычисляется из пути, а не прописан в разметке:
+                           иначе «Posts» горит на всех страницах сразу #}
                         <div class="navbar-nav me-auto">
-                            <a class="nav-link active" aria-current="page" href="/">Posts</a>
-                            <a class="nav-link" href="{{ url_for('about') }}">About</a>
+                            {% set path = request.url.path %}
+                            <a class="nav-link{{ ' active' if path in ('/', '/posts') }}"
+                               {% if path in ('/', '/posts') %}aria-current="page"{% endif %}
+                               href="/">Posts</a>
+                            <a class="nav-link{{ ' active' if path.startswith('/tags') }}"
+                               {% if path.startswith('/tags') %}aria-current="page"{% endif %}
+                               href="{{ url_for('tags_index') }}">Topics</a>
+                            <a class="nav-link{{ ' active' if path.startswith('/about') }}"
+                               {% if path.startswith('/about') %}aria-current="page"{% endif %}
+                               href="{{ url_for('about') }}">About</a>
                         </div>
+                        {# Регистрация на личном блоге — действие для одного человека,
+                           поэтому это текстовая ссылка, а не две крупные кнопки. #}
                         <div class="navbar-nav align-items-md-center">
-                            <a class="nav-link" href="{{ url_for('login') }}">Sign in</a>
+                            <a class="nav-link" href="#">Sign in</a>
                             <div class="nav-item dropdown">
-                                <button class="nav-link dropdown-toggle btn btn-link"
-                                        type="button"
-                                        id="bd-theme"
-                                        data-bs-toggle="dropdown"
-                                        aria-expanded="false">
+                                <a class="nav-link dropdown-toggle"
+                                   href="#"
+                                   role="button"
+                                   id="bd-theme"
+                                   data-bs-toggle="dropdown"
+                                   aria-expanded="false">
                                     <span id="bd-theme-text">Auto</span>
-                                </button>
+                                </a>
                                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="bd-theme">
                                     <li>
                                         <button class="dropdown-item" type="button" data-bs-theme-value="light">Light</button>
@@ -134,11 +136,7 @@
                 }
                 localStorage.setItem('theme', theme);
 
-                const themeText = {
-                    light: 'Light',
-                    dark: 'Dark',
-                    auto: 'Auto'
-                };
+                const themeText = { light: 'Light', dark: 'Dark', auto: 'Auto' };
                 document.getElementById('bd-theme-text').textContent = themeText[theme];
             };
 
@@ -146,11 +144,13 @@
                 button.addEventListener('click', () => setTheme(button.getAttribute('data-bs-theme-value')));
             });
 
+            // Тёмная по умолчанию; data-bs-theme в <html> уже стоит, вспышки светлого не будет
             setTheme(localStorage.getItem('theme') || 'dark');
         </script>
 
         <script>
-            // Reading progress bar: на странице поста есть элемент с id="reading-progress",
+            // Индикатор чтения. Есть только на странице записи —
+            // на остальных элемента нет и обработчики не вешаются.
             const progressBar = document.getElementById('reading-progress');
             if (progressBar) {
                 const updateProgress = () => {
@@ -159,9 +159,7 @@
                     progressBar.style.transform = `scaleX(${Math.min(ratio, 1)})`;
                 };
                 updateProgress();
-                window.addEventListener('scroll', updateProgress, {
-                    passive: true
-                });
+                window.addEventListener('scroll', updateProgress, { passive: true });
                 window.addEventListener('resize', updateProgress);
             }
         </script>

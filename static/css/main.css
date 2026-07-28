@@ -188,6 +188,73 @@ h4 {
     color: var(--bs-secondary-color);
 }
 
+/* --- Страница всех тем ---------------------------------------- */
+
+.topic-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.25rem 0;
+    color: inherit;
+    text-decoration: none;
+    border-top: 1px solid var(--bs-border-color);
+    transition: transform 0.2s ease;
+}
+
+.topic-row:hover,
+.topic-row:focus-visible {
+    color: inherit;
+    transform: translateX(6px);
+}
+
+.topic-row .name {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.2rem;
+    color: var(--bs-emphasis-color);
+}
+
+.topic-row .count {
+    color: var(--bs-secondary-color);
+}
+
+/* --- Шапка авторской страницы --------------------------------- */
+
+.author-masthead {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 4rem 0 2.5rem;
+    margin-bottom: 2.5rem;
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.author-masthead .avatar {
+    width: 88px;
+    height: 88px;
+}
+
+.author-masthead h1 {
+    font-size: clamp(1.9rem, 6vw, 2.6rem);
+    letter-spacing: -0.035em;
+    margin-bottom: 0.35rem;
+}
+
+.author-masthead .count {
+    margin: 0;
+    color: var(--bs-secondary-color);
+}
+
+@media (max-width: 575.98px) {
+    .author-masthead {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1.1rem;
+        padding-top: 3rem;
+    }
+}
+
 /* --- Метаданные записи -------------------------------------- */
 
 .post-meta {
@@ -204,6 +271,15 @@ h4 {
 
 /* --- Заголовки записей -------------------------------------- */
 
+/* Специфичность поднята намеренно: заголовок стал ссылкой, и правило
+   Bootstrap `a { text-decoration: underline }` иначе рисует вторую
+   линию поверх той, что дорисовывается через background-image */
+.post-title,
+.lead-post h2 a,
+.archive-item h2 a {
+    text-decoration: none;
+}
+
 .post-title {
     display: inline;
     color: var(--bs-emphasis-color);
@@ -215,10 +291,19 @@ h4 {
 }
 
 .lead-post:hover .post-title,
-.lead-post:focus-visible .post-title,
+.lead-post:focus-within .post-title,
 .archive-item:hover .post-title,
-.archive-item:focus-visible .post-title {
+.archive-item:focus-within .post-title {
     background-size: 100% 2px;
+}
+
+/* Перекрытие растягивает область клика заголовка на всю карточку.
+   z-index: 0 — чтобы теги с z-index: 1 остались доступны поверх него */
+.stretched::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
 }
 
 .post-excerpt {
@@ -226,12 +311,33 @@ h4 {
     margin-bottom: 0;
 }
 
+/* Теги внутри карточки — свои ссылки, поэтому поверх перекрытия */
+.card-tags {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.85rem;
+    margin-top: 1rem;
+}
+
+.card-tags a {
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--bs-secondary-color);
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.card-tags a:hover,
+.card-tags a:focus-visible {
+    color: var(--link);
+}
+
 /* --- Ведущая запись ----------------------------------------- */
 
 .lead-post {
-    display: block;
-    text-decoration: none;
-    color: inherit;
+    position: relative;
     padding: 2rem;
     margin-bottom: 3.5rem;
     background-color: var(--bs-tertiary-bg);
@@ -241,8 +347,7 @@ h4 {
 }
 
 .lead-post:hover,
-.lead-post:focus-visible {
-    color: inherit;
+.lead-post:focus-within {
     border-color: var(--hairline-accent);
 }
 
@@ -300,17 +405,14 @@ h4 {
 /* --- Архив -------------------------------------------------- */
 
 .archive-item {
-    display: block;
+    position: relative;
     padding: 1.6rem 0;
-    text-decoration: none;
-    color: inherit;
     border-top: 1px solid var(--bs-border-color);
     transition: transform 0.2s ease;
 }
 
 .archive-item:hover,
-.archive-item:focus-visible {
-    color: inherit;
+.archive-item:focus-within {
     transform: translateX(6px);
 }
 
@@ -622,8 +724,19 @@ h4 {
 .author-byline .name {
     font-family: var(--font-display);
     font-weight: 700;
-    color: var(--bs-emphasis-color);
     line-height: 1.3;
+}
+
+.author-byline .name a,
+.post-meta a {
+    color: var(--bs-emphasis-color);
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.author-byline .name a:hover,
+.post-meta a:hover {
+    color: var(--link);
 }
 
 
@@ -726,6 +839,62 @@ h4 {
 
 .back-link:hover .arrow {
     transform: translateX(-3px);
+}
+
+/* --- Страница About ------------------------------------------- */
+
+.about-intro {
+    display: flex;
+    align-items: flex-start;
+    gap: 2rem;
+}
+
+.about-intro .avatar {
+    width: 112px;
+    height: 112px;
+    flex-shrink: 0;
+}
+
+.about-intro .post-body {
+    max-width: 58ch;
+}
+
+/* Список инструментов таблицей: два столбца сканируются
+   заметно быстрее, чем перечисление через запятую в абзаце */
+.spec-list {
+    display: grid;
+    grid-template-columns: minmax(96px, auto) 1fr;
+    gap: 0.8rem 1.75rem;
+    margin: 3rem 0 2rem;
+    padding-top: 1.75rem;
+    border-top: 1px solid var(--bs-border-color);
+}
+
+.spec-list dt {
+    color: var(--bs-secondary-color);
+}
+
+.spec-list dd {
+    margin: 0;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--bs-body-color);
+}
+
+@media (max-width: 575.98px) {
+    .about-intro {
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .spec-list {
+        grid-template-columns: 1fr;
+        gap: 0.25rem 0;
+    }
+
+    .spec-list dd {
+        margin-bottom: 1rem;
+    }
 }
 
 /* --- Страница ошибки ------------------------------------------

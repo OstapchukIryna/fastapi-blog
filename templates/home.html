@@ -5,27 +5,22 @@
         <header class="masthead">
             <span class="eyebrow mono-label">Tagged</span>
             <h1 class="masthead-title">#{{ filter_tag }}</h1>
-            <p class="masthead-tagline">{{ posts | length }} post{{ '' if posts | length == 1 else 's' }}.</p>
+            <p class="masthead-tagline">
+                {{ (rest | length) + (1 if lead else 0) }} post{{ '' if ((rest | length) + (1 if lead else 0)) == 1 else 's' }}.
+            </p>
         </header>
     {% else %}
         <header class="masthead">
             <h1 class="masthead-title">
-                Called
-                <br>
-                Mad
+                Called<br>Mad
             </h1>
-            <p class="masthead-tagline">Notes on Python backend work — what broke, why, and what I understood afterwards.</p>
-            {# Строка состояния: реальные данные о том, над чем идёт работа.
-               Правится руками или прокидывается из роутера. #}
+            <p class="masthead-tagline">
+                Notes on Python backend work — what broke, why, and what I understood afterwards.
+            </p>
+            {# Правится руками: это состояние работы, а не данные из базы #}
             <dl class="now-strip mono-label">
                 <dt>Now</dt>
-                <dd>
-                    FastAPI · async · SQLAlchemy
-                </dd>
-                <dt>Updated</dt>
-                <dd>
-                    July 2026
-                </dd>
+                <dd>FastAPI · async · SQLAlchemy</dd>
             </dl>
         </header>
     {% endif %}
@@ -33,40 +28,62 @@
     {% if lead %}
         {% set lead_mins = [1, (lead.content.split() | length / 200) | round(0, 'ceil') | int] | max %}
 
-        <a class="lead-post{% if pinned %} is-pinned{% endif %}"
-           href="{{ url_for('get_post', post_id=lead.id) }}">
+        {# article, а не a: внутри есть свои ссылки на теги, а вложенные
+           ссылки в HTML недопустимы. Область клика по карточке
+           сохраняется через перекрытие на заголовке. #}
+        <article class="lead-post{% if pinned %} is-pinned{% endif %}">
             {% if pinned %}
                 {# Метка обязательна: без неё старая запись в верхнем слоте
                    читается как самая свежая #}
                 <span class="pin-label mono-label">Pinned</span>
             {% endif %}
             <p class="post-meta mono-label">
-                <span>{{ lead.date_posted }}</span>
+                <span>{{ lead.date_posted.strftime('%d %b %Y') }}</span>
                 <span class="sep">/</span>
-                <span>{{ lead.author }}</span>
+                <span>{{ lead.author.username }}</span>
                 <span class="sep">/</span>
                 <span>{{ lead_mins }} min</span>
             </p>
-            <h2><span class="post-title">{{ lead.title }}</span></h2>
+            <h2>
+                <a class="post-title stretched"
+                   href="{{ url_for('post_page', post_id=lead.id) }}">{{ lead.title }}</a>
+            </h2>
             <p class="post-excerpt">{{ lead.summary }}</p>
+            {% if lead.tags %}
+                <div class="card-tags mono-label">
+                    {% for tag in lead.tags %}
+                        <a href="{{ url_for('get_tag', tag=tag.name) }}">#{{ tag.name }}</a>
+                    {% endfor %}
+                </div>
+            {% endif %}
             <span class="read-more mono-label">Read <span class="arrow">&rarr;</span></span>
-        </a>
+        </article>
 
         {% if rest %}
+            {# Под закреплённой записью идёт самая свежая, поэтому «Archive» там был бы неверен #}
             <p class="section-rule mono-label">{{ 'Latest' if pinned else 'Archive' }}</p>
 
             {% for post in rest %}
                 {% set mins = [1, (post.content.split() | length / 200) | round(0, 'ceil') | int] | max %}
-                <a class="archive-item"
-                   href="{{ url_for('post_page', post_id=post.id) }}">
+                <article class="archive-item">
                     <p class="post-meta mono-label">
-                        <span>{{ post.date_posted }}</span>
+                        <span>{{ post.date_posted.strftime('%d %b %Y') }}</span>
                         <span class="sep">/</span>
                         <span>{{ mins }} min</span>
                     </p>
-                    <h2><span class="post-title">{{ post.title }}</span></h2>
+                    <h2>
+                        <a class="post-title stretched"
+                           href="{{ url_for('post_page', post_id=post.id) }}">{{ post.title }}</a>
+                    </h2>
                     <p class="post-excerpt">{{ post.summary }}</p>
-                </a>
+                    {% if post.tags %}
+                        <div class="card-tags mono-label">
+                            {% for tag in post.tags %}
+                                <a href="{{ url_for('get_tag', tag=tag.name) }}">#{{ tag.name }}</a>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </article>
             {% endfor %}
         {% endif %}
     {% else %}
