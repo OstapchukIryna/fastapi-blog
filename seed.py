@@ -10,6 +10,7 @@
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import NotRequired, TypedDict
 
 import bcrypt
 from sqlalchemy import select
@@ -27,9 +28,19 @@ AUTHOR = {
     "password": "change-me-please",  # TODO: не для боевого окружения
 }
 
+
+class PostSeed(TypedDict):
+    slug: str
+    title: str
+    summary: str
+    tags: list[str]
+    date: datetime
+    pinned: NotRequired[bool]
+
+
 # Метаданные здесь, тексты в content/*.md — правится в редакторе
 # как обычный markdown, а не внутри строкового литерала
-POSTS = [
+POSTS: list[PostSeed] = [
     {
         "slug": "modern-python-tooling",
         "title": "I replaced pip, black and mypy in one afternoon",

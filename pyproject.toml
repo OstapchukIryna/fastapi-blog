@@ -12,10 +12,12 @@ dependencies = [
 ]
 
 [tool.pyrefly]
-project-includes = [
-    "**/*.py*",
-    "**/*.ipynb",
-]
+project-includes = ["**/*.py"]
+project-excludes = [".venv/**", "**/__pycache__/**"]
 
 [dependency-groups]
-dev = ["djlint>=1.42.3"]
+dev = [
+    "djlint>=1.42.3",
+    "pyrefly>=1.1.0",
+    "ruff>=0.16.0",
+]
