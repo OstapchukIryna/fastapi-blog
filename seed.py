@@ -10,6 +10,7 @@
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import NotRequired, TypedDict
 
 import bcrypt
 from sqlalchemy import select
@@ -17,6 +18,7 @@ from sqlalchemy.orm import Session
 
 import models
 from database import Base, engine
+from models import get_or_create_tags
 
 CONTENT_DIR = Path(__file__).parent / "content"
 
@@ -26,9 +28,19 @@ AUTHOR = {
     "password": "change-me-please",  # TODO: не для боевого окружения
 }
 
+
+class PostSeed(TypedDict):
+    slug: str
+    title: str
+    summary: str
+    tags: list[str]
+    date: datetime
+    pinned: NotRequired[bool]
+
+
 # Метаданные здесь, тексты в content/*.md — правится в редакторе
 # как обычный markdown, а не внутри строкового литерала
-POSTS = [
+POSTS: list[PostSeed] = [
     {
         "slug": "modern-python-tooling",
         "title": "I replaced pip, black and mypy in one afternoon",
@@ -112,25 +124,6 @@ def get_or_create_author(db: Session) -> models.User:
     db.add(user)
     db.flush()  # чтобы получить user.id до коммита
     return user
-
-
-def get_or_create_tags(db: Session, names: list[str]) -> list[models.Tag]:
-    """Один запрос на всю пачку вместо запроса на каждое имя."""
-    if not names:
-        return []
-
-    existing = (
-        db.execute(select(models.Tag).where(models.Tag.name.in_(names))).scalars().all()
-    )
-    by_name = {tag.name: tag for tag in existing}
-
-    for name in names:
-        if name not in by_name:
-            tag = models.Tag(name=name)
-            db.add(tag)
-            by_name[name] = tag
-
-    return [by_name[name] for name in names]
 
 
 def seed() -> None:
