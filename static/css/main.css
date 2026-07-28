@@ -166,26 +166,129 @@ h4 {
     margin-bottom: 2.25rem;
 }
 
-/* Строка «сейчас» — единственный акцентный элемент шапки.
-   Содержит реальное состояние работы, а не декорацию. */
-.now-strip {
+/* --- Герой главной ------------------------------------------
+   Ведёт человек, а не название блога: незнакомцу «Called Mad»
+   не говорит ничего, а лицо, род занятий и текущая работа —
+   говорят. Панель Now здесь же служит точкой контакта. */
+
+.hero {
+    padding: 3.5rem 0 3rem;
+    border-bottom: 1px solid var(--bs-border-color);
+    margin-bottom: 3rem;
+}
+
+.hero-identity {
+    display: flex;
+    align-items: center;
+    gap: 1.1rem;
+    margin-bottom: 2.25rem;
+}
+
+.hero-avatar {
+    width: 72px;
+    height: 72px;
+}
+
+.hero-handle {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: var(--bs-emphasis-color);
+}
+
+.hero-name {
+    margin: 0.2rem 0 0;
+    color: var(--bs-secondary-color);
+}
+
+/* Тезис набран основным шрифтом текста в крупном кегле, а не
+   гротеском заголовков: страница должна звучать как человек,
+   который говорит, а не как бренд, который объявляет. */
+.hero-statement {
+    margin: 0 0 2.5rem;
+    font-size: clamp(2rem, 5.6vw, 3.15rem);
+    line-height: 1.14;
+    letter-spacing: -0.02em;
+    color: var(--bs-emphasis-color);
+    text-wrap: balance;
+}
+
+.hero-statement em {
+    font-style: italic;
+}
+
+/* --- Панель «сейчас» -----------------------------------------
+   Реальное состояние работы, правится руками вместе с датой.
+   Левая линейка — тот же приём, что у закреплённой записи
+   и цитат, а не новый. */
+
+.now-panel {
+    padding: 1.5rem 1.75rem;
+    background-color: var(--bs-tertiary-bg);
+    border: 1px solid var(--bs-border-color);
+    border-left: 2px solid var(--accent);
+    border-radius: var(--bs-border-radius);
+}
+
+.now-head {
     display: flex;
     flex-wrap: wrap;
+    justify-content: space-between;
     align-items: baseline;
-    gap: 0.4rem 1.25rem;
-    margin: 0;
-    padding-left: 1rem;
-    border-left: 2px solid var(--accent);
+    gap: 0.35rem 1rem;
+    padding-bottom: 1rem;
+    margin-bottom: 1.15rem;
+    border-bottom: 1px solid var(--bs-border-color);
 }
 
-.now-strip dt {
+.now-title {
     color: var(--link);
-    font-weight: 500;
 }
 
-.now-strip dd {
-    margin: 0;
+.now-date {
     color: var(--bs-secondary-color);
+}
+
+.now-rows {
+    display: grid;
+    grid-template-columns: minmax(76px, auto) 1fr;
+    gap: 0.7rem 1.5rem;
+    margin: 0;
+}
+
+.now-rows dt {
+    color: var(--bs-secondary-color);
+}
+
+.now-rows dd {
+    margin: 0;
+    color: var(--bs-body-color);
+}
+
+/* Ссылка на исходник набрана моношрифтом: это путь к репозиторию,
+   а не фраза — пусть и выглядит как путь */
+.now-source {
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    text-decoration: none;
+    border-bottom: 1px solid var(--hairline-accent);
+}
+
+.now-source:hover,
+.now-source:focus-visible {
+    border-bottom-color: currentcolor;
+}
+
+.now-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem 1.5rem;
+    margin-top: 1.75rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--bs-border-color);
 }
 
 /* --- Страница всех тем ---------------------------------------- */
@@ -577,21 +680,79 @@ h4 {
     color: var(--bs-secondary-color);
 }
 
-.author-links {
+/* --- Контакты -------------------------------------------------
+   Один набор правил на все точки контакта: герой, конец записи,
+   страница About, подвал. Незаполненный канал шаблон не рисует,
+   поэтому ссылки в никуда здесь невозможны. */
+
+.channels {
     display: flex;
     flex-wrap: wrap;
     gap: 1.1rem;
 }
 
-.author-links a {
+.channels a {
     color: var(--bs-secondary-color);
     text-decoration: none;
     transition: color 0.2s ease;
 }
 
-.author-links a:hover,
-.author-links a:focus-visible {
+.channels a:hover,
+.channels a:focus-visible {
     color: var(--link);
+}
+
+/* Кнопка говорит служебным голосом сайта — тем же моноширинным
+   капслоком, что метки и навигация */
+.write-btn {
+    padding: 0.6rem 1.25rem;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+}
+
+.cta-missing {
+    color: var(--bs-secondary-color);
+}
+
+/* Подпись автора: приглашение возразить, а не «подпишитесь».
+   Для блога про собственные ошибки это единственный честный
+   повод написать — и он не давит на читателя. */
+.byline-body {
+    min-width: 0;
+}
+
+.byline-invite {
+    margin: 0 0 1.2rem;
+    font-size: 1.02rem;
+    color: var(--bs-emphasis-color);
+}
+
+.byline-actions,
+.contact-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.9rem 1.5rem;
+}
+
+/* Границы заданы целиком, а не поверх .content-section: та объявлена
+   ниже по файлу и её shorthand `border` затирал бы левую линейку */
+.contact-block {
+    padding: 2rem;
+    margin-top: 3rem;
+    background-color: var(--bs-tertiary-bg);
+    border: 1px solid var(--bs-border-color);
+    border-left: 2px solid var(--accent);
+    border-radius: var(--bs-border-radius);
+}
+
+.contact-lead {
+    max-width: 52ch;
+    margin: 0.5rem 0 1.5rem;
+    font-size: 1.08rem;
 }
 
 /* --- Действия автора ------------------------------------------
@@ -711,12 +872,13 @@ h4 {
     border-color: var(--hairline-accent);
 }
 
-/* Обесцвечивание принудительное: акцент должен остаться
-   единственным цветом на странице при любой загруженной фотографии */
+/* Обесцвечивание принудительное: акцент должен остаться единственным
+   цветом на странице при любой загруженной фотографии. Но не
+   затемняем: лицо автора — точка доверия, приглушать его нечем. */
 .avatar {
     border-radius: 50%;
     object-fit: cover;
-    filter: grayscale(1) brightness(0.9) contrast(1.08);
+    filter: grayscale(1) contrast(1.05);
     border: 1px solid var(--bs-border-color);
     flex-shrink: 0;
 }
@@ -841,6 +1003,39 @@ h4 {
     transform: translateX(-3px);
 }
 
+/* --- Страница входа -------------------------------------------- */
+
+.auth-page {
+    max-width: 26rem;
+    margin-inline: auto;
+}
+
+.auth-title {
+    font-size: clamp(2rem, 8vw, 2.75rem);
+}
+
+.auth-form {
+    padding: 2rem;
+}
+
+.auth-form .form-control {
+    background-color: var(--bs-body-bg);
+    border-color: var(--bs-border-color);
+    color: var(--bs-body-color);
+}
+
+.auth-form .form-control:focus {
+    background-color: var(--bs-body-bg);
+    border-color: var(--hairline-accent);
+    box-shadow: none;
+}
+
+.auth-note {
+    margin: 1rem 0 0;
+    text-align: center;
+    color: var(--bs-secondary-color);
+}
+
 /* --- Страница About ------------------------------------------- */
 
 .about-intro {
@@ -953,6 +1148,12 @@ h4 {
     --bs-btn-hover-bg: var(--accent-hot);
     --bs-btn-hover-border-color: var(--accent-hot);
     --bs-btn-hover-color: #1e1f1c;
+    /* Без этого Bootstrap красит disabled в свой стандартный
+       светло-серый — единственный не-акцентный цвет на странице */
+    --bs-btn-disabled-bg: var(--accent);
+    --bs-btn-disabled-border-color: var(--accent);
+    --bs-btn-disabled-color: #1e1f1c;
+    --bs-btn-disabled-opacity: 0.45;
 }
 
 .btn-outline-light {
@@ -1003,5 +1204,48 @@ h4 {
 
     .lead-post {
         padding: 1.5rem;
+    }
+
+    .hero {
+        padding-top: 2.5rem;
+    }
+
+    .now-panel,
+    .contact-block {
+        padding: 1.35rem;
+    }
+
+    /* В одну колонку метка встаёт над значением: два столбца на
+       узком экране режут строку «This blog — FastAPI, SQLAlchemy» */
+    .now-rows {
+        grid-template-columns: 1fr;
+        gap: 0.2rem 0;
+    }
+
+    .now-rows dd {
+        margin-bottom: 0.9rem;
+    }
+
+    .now-rows dd:last-child {
+        margin-bottom: 0;
+    }
+
+    /* Аватар рядом с текстом съедает треть узкого экрана — тот же
+       перенос в столбец, что у шапки автора и блока About */
+    .author-byline {
+        flex-direction: column;
+        gap: 1.1rem;
+    }
+
+    /* Кнопка во всю ширину: на телефоне это основная цель касания */
+    .now-foot,
+    .byline-actions,
+    .contact-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .write-btn {
+        text-align: center;
     }
 }

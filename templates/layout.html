@@ -1,5 +1,6 @@
 {# Базовый шаблон. Сайдбар убран: на индексе он занимал треть ширины
    заглушками. Ширину теперь держит .container через --measure. #}
+{% import "_contact.html" as contact %}
 <!DOCTYPE html>
 <html lang="en" data-bs-theme="dark">
     <head>
@@ -25,7 +26,9 @@
         <!-- Fonts: Space Grotesk (display) / Newsreader (body) / JetBrains Mono (utility) -->
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Newsreader:opsz,wght@6..72,400;6..72,600&family=JetBrains+Mono:wght@400;500&display=swap"
+        {# Курсив Newsreader добавлен намеренно: в герое им выделено
+           «didn't work» — акцент без ещё одного цвета на странице #}
+        <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=JetBrains+Mono:wght@400;500&display=swap"
               rel="stylesheet">
 
         <!-- Bootstrap CSS -->
@@ -78,7 +81,7 @@
                         {# Регистрация на личном блоге — действие для одного человека,
                            поэтому это текстовая ссылка, а не две крупные кнопки. #}
                         <div class="navbar-nav align-items-md-center">
-                            <a class="nav-link" href="#">Sign in</a>
+                            <a class="nav-link" href="{{ url_for('login') }}">Sign in</a>
                             <div class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle"
                                    href="#"
@@ -111,10 +114,12 @@
             {% endblock content %}
         </main>
 
+        {# Контакты в подвале: последний экран любой страницы — всё ещё
+           точка выхода, и на ней должен быть способ написать #}
         <footer class="site-footer mt-5 py-4">
-            <div class="container d-flex flex-wrap justify-content-between gap-2">
-                <span class="mono-label">© <span id="year"></span> Called Mad</span>
-                <span class="mono-label">Built with FastAPI</span>
+            <div class="container d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <span class="mono-label">© <span id="year"></span> {{ site.handle }}</span>
+                {{ contact.channels() }}
             </div>
         </footer>
 

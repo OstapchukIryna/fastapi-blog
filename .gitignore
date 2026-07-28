@@ -11,3 +11,6 @@ wheels/
 # Virtual environments
 .venv
 .env
+
+# Локальные настройки инструментов и git-worktree'ы
+.claude/
