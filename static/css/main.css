@@ -144,6 +144,20 @@ h4 {
     color: var(--accent) !important;
 }
 
+/* Вход в редактор — единственное действие автора в навигации.
+   Обведён, а не покрашен: он не соперничает с разделами сайта. */
+.navbar-nav .nav-link.nav-write {
+    padding-inline: 0.7rem;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: var(--bs-border-radius);
+}
+
+.navbar-nav .nav-link.nav-write:hover,
+.navbar-nav .nav-link.nav-write:focus-visible {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
 /* --- Шапка блога -------------------------------------------- */
 
 .masthead {
@@ -1018,22 +1032,176 @@ h4 {
     padding: 2rem;
 }
 
-.auth-form .form-control {
+.auth-note {
+    margin: 1rem 0 0;
+    text-align: center;
+    color: var(--bs-secondary-color);
+}
+
+/* --- Поля ввода ------------------------------------------------
+   Общие для всех форм сайта: вход и редактор записи. Поле темнее
+   поверхности, на которой лежит, — так видно, куда можно писать. */
+
+.form-control {
     background-color: var(--bs-body-bg);
     border-color: var(--bs-border-color);
     color: var(--bs-body-color);
 }
 
-.auth-form .form-control:focus {
+.form-control:focus {
     background-color: var(--bs-body-bg);
     border-color: var(--hairline-accent);
     box-shadow: none;
+    color: var(--bs-body-color);
 }
 
-.auth-note {
-    margin: 1rem 0 0;
-    text-align: center;
+.form-control::placeholder {
     color: var(--bs-secondary-color);
+    opacity: 0.7;
+}
+
+/* Иконку Bootstrap внутри поля убираем: она сдвигает текст и
+   дублирует подпись с ошибкой под полем */
+.form-control.is-invalid {
+    border-color: var(--danger);
+    background-image: none;
+    padding-right: 0.75rem;
+}
+
+.form-control.is-invalid:focus {
+    border-color: var(--danger);
+    box-shadow: none;
+}
+
+/* --- Редактор записи -------------------------------------------- */
+
+.form-masthead {
+    padding-bottom: 2rem;
+    margin-bottom: 2.5rem;
+}
+
+.form-title {
+    font-size: clamp(2rem, 6vw, 2.9rem);
+}
+
+.post-form .field {
+    margin-bottom: 1.75rem;
+}
+
+.form-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--bs-secondary-color);
+}
+
+.field-hint {
+    margin: 0.5rem 0 0;
+    color: var(--bs-secondary-color);
+}
+
+.field-error {
+    margin: 0.5rem 0 0;
+    color: var(--danger);
+}
+
+/* Текст записи — это markdown, то есть код: моноширинный шрифт и
+   вертикальный ресайз, чтобы длинную статью было где писать */
+.content-input {
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    line-height: 1.6;
+    resize: vertical;
+    min-height: 20rem;
+}
+
+.form-summary {
+    padding: 1rem 1.25rem;
+    margin-bottom: 2rem;
+    background-color: var(--bs-tertiary-bg);
+    border: 1px solid var(--bs-border-color);
+    border-left: 2px solid var(--danger);
+    border-radius: var(--bs-border-radius);
+}
+
+.form-summary .mono-label {
+    display: block;
+    margin-bottom: 0.3rem;
+    color: var(--danger);
+}
+
+.form-summary p {
+    margin: 0;
+    color: var(--bs-secondary-color);
+}
+
+.form-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem 1.75rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--bs-border-color);
+}
+
+/* --- Действия над записью ---------------------------------------
+   Не поля формы, а операции над самой записью: у каждой свой адрес
+   и своё последствие, поэтому они вне формы и разделены линейками. */
+
+.record-actions {
+    margin-top: 3.5rem;
+}
+
+.record-action {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem 1.5rem;
+    padding: 1.5rem 0;
+    border-top: 1px solid var(--bs-border-color);
+}
+
+.record-action-name {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 700;
+    color: var(--bs-emphasis-color);
+}
+
+.record-action-note {
+    margin: 0.3rem 0 0;
+    color: var(--bs-secondary-color);
+}
+
+.record-btn {
+    padding: 0.5rem 1.15rem;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--bs-secondary-color);
+    background: none;
+    border: 1px solid var(--bs-border-color);
+}
+
+.record-btn:hover,
+.record-btn:focus-visible {
+    color: var(--bs-emphasis-color);
+    border-color: var(--bs-secondary-color);
+}
+
+/* Закреплённая запись — состояние, а не действие: кнопка светится
+   акцентом, пока закрепление стоит */
+.record-btn.is-active {
+    color: var(--link);
+    border-color: var(--hairline-accent);
+}
+
+.record-btn.is-danger:hover,
+.record-btn.is-danger:focus-visible {
+    color: var(--danger);
+    border-color: var(--danger);
 }
 
 /* --- Страница About ------------------------------------------- */
