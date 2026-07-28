@@ -31,14 +31,12 @@
 
         {# Служебная панель автора. Стоит после текста, но до тегов
            и блока автора: это управление записью, а не содержимое.
-           is_author появится вместе с авторизацией — пока None,
-           и в Jinja это просто ложь, без ошибки. #}
+           Здесь только вход в правку — закрепление и удаление живут
+           на странице правки, чтобы читальный экран оставался
+           читальным, а опасное действие не соседствовало с текстом. #}
         {% if is_author %}
             <div class="post-actions mono-label">
-                <a href="#">Edit</a>
-                <button type="button" data-bs-toggle="modal" data-bs-target="#deleteModal">
-                    Delete
-                </button>
+                <a href="{{ url_for('edit_post', post_id=post.id) }}">Edit</a>
             </div>
         {% endif %}
 
@@ -108,39 +106,4 @@
         </a>
     </p>
 
-    {% if is_author %}
-        <div class="modal fade"
-             id="deleteModal"
-             tabindex="-1"
-             aria-labelledby="deleteModalLabel"
-             aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h2 class="modal-title" id="deleteModalLabel">Delete this post?</h2>
-                        <button type="button"
-                                class="btn-close"
-                                data-bs-dismiss="modal"
-                                aria-label="Close"></button>
-                    </div>
-                    {# method="post" обязателен: удаление по GET сработает
-                       от прелоада ссылки браузером или обхода краулером #}
-                    <form action="{{ url_for('delete_post', post_id=post.id) }}" method="post">
-                        <div class="modal-body">
-                            <p class="mb-0">
-                                <strong>{{ post.title }}</strong> will be removed
-                                permanently. This cannot be undone.
-                            </p>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button"
-                                    class="btn btn-outline-secondary"
-                                    data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" class="btn btn-danger">Delete post</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    {% endif %}
 {% endblock content %}

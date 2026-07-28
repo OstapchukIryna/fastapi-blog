@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any
 
 import markdown
+from fastapi import Request
 from fastapi.templating import Jinja2Templates
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -26,7 +27,20 @@ SITE = {
     "repo_label": "OstapchukIryna/fastapi-blog",
 }
 
-templates = Jinja2Templates(directory=TEMPLATES_DIR)
+
+def author_flag(request: Request) -> dict[str, Any]:
+    """Права автора для шаблонов.
+
+    Процессор контекста, а не глобальная переменная, именно потому,
+    что ответ обязан зависеть от запроса. Пока прав нет ни у кого и
+    значение захардкожено — но когда появится JWT, правится только
+    тело этой функции, а не каждый роут и шаблон.
+    """
+    # TODO: заменить реальной проверкой пользователя из запроса
+    return {"is_author": True}
+
+
+templates = Jinja2Templates(directory=TEMPLATES_DIR, context_processors=[author_flag])
 
 # Именно globals, а не context_processors: макросы из _contact.html
 # подключаются через {% import %} и контекст запроса не видят, а
