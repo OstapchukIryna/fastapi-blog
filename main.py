@@ -2,10 +2,11 @@ from collections.abc import Sequence
 from typing import Annotated
 
 import bcrypt
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, Form, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import func, select
+from pydantic import ValidationError
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
@@ -16,6 +17,7 @@ from models import get_or_create_tags
 from schemas import (
     PostCreate,
     PostDetail,
+    PostForm,
     PostResponse,
     TagCount,
     UserCreate,
@@ -117,6 +119,74 @@ def all_topics(db: Session) -> list[tuple[str, int]]:
     return [(name, count) for name, count in rows]
 
 
+def current_author(db: Session) -> models.User:
+    """Автор, от имени которого создаётся запись.
+
+    В блоге один пользователь, поэтому берётся первый по id. С
+    появлением JWT здесь будет пользователь из токена — это второе и
+    последнее место, завязанное на «автор всегда один».
+    """
+    author = db.execute(select(models.User).order_by(models.User.id)).scalars().first()
+    if author is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No author in the database. Run: uv run python seed.py",
+        )
+    return author
+
+
+def split_tags(raw: str) -> list[str]:
+    """«python, async» → ['python', 'async'].
+
+    Приведение к нижнему регистру и снятие дублей делает PostForm —
+    здесь только разбор строки на части.
+    """
+    return [part for part in (chunk.strip() for chunk in raw.split(",")) if part]
+
+
+def form_errors(exception: ValidationError) -> dict[str, str]:
+    """Ошибки Pydantic в вид «поле → сообщение».
+
+    По одной на поле: показывать три сообщения про один и тот же ввод
+    бессмысленно, а первое обычно и есть причина. Формулировки свои:
+    «String should have at least 1 character» — голос валидатора, а
+    человеку нужно знать, что поле обязательно.
+    """
+    errors: dict[str, str] = {}
+    for error in exception.errors():
+        field = str(error["loc"][0]) if error["loc"] else "form"
+        context = error.get("ctx", {})
+        kind = error["type"]
+
+        if kind == "string_too_short" and context.get("min_length") == 1:
+            message = "Required."
+        elif kind == "string_too_short":
+            message = f"At least {context['min_length']} characters."
+        elif kind == "string_too_long":
+            message = f"At most {context['max_length']} characters."
+        else:
+            message = error["msg"]
+
+        errors.setdefault(field, message)
+    return errors
+
+
+def set_pinned(db: Session, post: models.Post, pinned: bool) -> None:
+    """Закрепление одно на весь блог.
+
+    Ведущая запись на главной ровно одна, поэтому закрепление новой
+    снимает предыдущее. Без этого вторая закреплённая запись молча
+    теряет метку и выглядит обычной — arrange() берёт только первую.
+    """
+    if pinned:
+        db.execute(
+            update(models.Post)
+            .where(models.Post.id != post.id, models.Post.is_pinned.is_(True))
+            .values(is_pinned=False)
+        )
+    post.is_pinned = pinned
+
+
 def arrange(items: Sequence[models.Post]) -> dict:
     """Раскладывает список на ведущую запись и остальные.
 
@@ -143,6 +213,165 @@ def home(request: Request, db: DbSession):
     )
 
 
+def render_post_form(
+    request: Request,
+    *,
+    mode: str,
+    values: dict[str, str],
+    errors: dict[str, str] | None = None,
+    post: models.Post | None = None,
+    status_code: int = status.HTTP_200_OK,
+):
+    """Одна форма на создание и правку.
+
+    Введённое всегда возвращается в поля: терять набранный текст из-за
+    того, что заголовок оказался на символ длиннее, недопустимо.
+    """
+    return templates.TemplateResponse(
+        request,
+        "post_form.html",
+        {
+            "mode": mode,
+            "values": values,
+            "errors": errors or {},
+            "post": post,
+            "title": "New post" if mode == "new" else "Edit post",
+        },
+        status_code=status_code,
+    )
+
+
+# Объявлено до /posts/{post_id}: FastAPI разбирает маршруты в порядке
+# регистрации, и «new» иначе попадёт в post_id: int и даст 422
+@app.get("/posts/new", include_in_schema=False, name="new_post")
+def new_post_form(request: Request):
+    return render_post_form(
+        request,
+        mode="new",
+        values={"title": "", "summary": "", "content": "", "tags": ""},
+    )
+
+
+@app.post("/posts/new", include_in_schema=False, name="create_post_page")
+def create_post_page(
+    request: Request,
+    db: DbSession,
+    title: Annotated[str, Form()] = "",
+    summary: Annotated[str, Form()] = "",
+    content: Annotated[str, Form()] = "",
+    tags: Annotated[str, Form()] = "",
+):
+    values = {"title": title, "summary": summary, "content": content, "tags": tags}
+    try:
+        data = PostForm(
+            title=title, summary=summary, content=content, tags=split_tags(tags)
+        )
+    except ValidationError as exception:
+        return render_post_form(
+            request,
+            mode="new",
+            values=values,
+            errors=form_errors(exception),
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        )
+
+    post = models.Post(
+        title=data.title,
+        summary=data.summary,
+        content=data.content,
+        author=current_author(db),
+        tags=get_or_create_tags(db, data.tags),
+    )
+    db.add(post)
+    db.commit()
+    db.refresh(post)
+    return RedirectResponse(
+        request.url_for("post_page", post_id=post.id),
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@app.get("/posts/{post_id}/edit", include_in_schema=False, name="edit_post")
+def edit_post_form(request: Request, post_id: int, db: DbSession):
+    post = db.execute(posts_query().where(models.Post.id == post_id)).scalars().first()
+    if post is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Post not found"
+        )
+
+    return render_post_form(
+        request,
+        mode="edit",
+        post=post,
+        values={
+            "title": post.title,
+            "summary": post.summary,
+            "content": post.content,
+            "tags": ", ".join(tag.name for tag in post.tags),
+        },
+    )
+
+
+@app.post("/posts/{post_id}/edit", include_in_schema=False, name="update_post")
+def update_post(
+    request: Request,
+    post_id: int,
+    db: DbSession,
+    title: Annotated[str, Form()] = "",
+    summary: Annotated[str, Form()] = "",
+    content: Annotated[str, Form()] = "",
+    tags: Annotated[str, Form()] = "",
+):
+    post = db.execute(posts_query().where(models.Post.id == post_id)).scalars().first()
+    if post is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Post not found"
+        )
+
+    values = {"title": title, "summary": summary, "content": content, "tags": tags}
+    try:
+        data = PostForm(
+            title=title, summary=summary, content=content, tags=split_tags(tags)
+        )
+    except ValidationError as exception:
+        return render_post_form(
+            request,
+            mode="edit",
+            post=post,
+            values=values,
+            errors=form_errors(exception),
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        )
+
+    post.title = data.title
+    post.summary = data.summary
+    post.content = data.content
+    post.tags = get_or_create_tags(db, data.tags)
+    db.commit()
+    return RedirectResponse(
+        request.url_for("post_page", post_id=post.id),
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+# Отдельное действие, а не поле формы: закрепление — один щелчок, из-за
+# него не должно требоваться сохранять всю запись
+@app.post("/posts/{post_id}/pin", include_in_schema=False, name="toggle_pin")
+def toggle_pin(request: Request, post_id: int, db: DbSession):
+    post = db.get(models.Post, post_id)
+    if post is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Post not found"
+        )
+
+    set_pinned(db, post, not post.is_pinned)
+    db.commit()
+    return RedirectResponse(
+        request.url_for("edit_post", post_id=post_id),
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
 @app.get("/posts/{post_id}", include_in_schema=False, name="post_page")
 def post_page(request: Request, post_id: int, db: DbSession):
     post = db.execute(posts_query().where(models.Post.id == post_id)).scalars().first()
@@ -160,7 +389,6 @@ def post_page(request: Request, post_id: int, db: DbSession):
             "related": related,
             "related_label": related_label,
             "title": post.title,
-            "is_author": True,  # TODO: заменить реальной проверкой при авторизации
         },
     )
 

@@ -81,6 +81,10 @@
                         {# Регистрация на личном блоге — действие для одного человека,
                            поэтому это текстовая ссылка, а не две крупные кнопки. #}
                         <div class="navbar-nav align-items-md-center">
+                            {% if is_author %}
+                                <a class="nav-link nav-write{{ ' active' if path.startswith('/posts/new') }}"
+                                   href="{{ url_for('new_post') }}">Write</a>
+                            {% endif %}
                             <a class="nav-link" href="{{ url_for('login') }}">Sign in</a>
                             <div class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle"

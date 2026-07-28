@@ -21,11 +21,13 @@ class UserResponse(BaseModel):
     image_path: str
 
 
-class PostCreate(BaseModel):
+class PostForm(BaseModel):
+    """Поля, которые вводит человек. HTML-форма и API проверяются
+    одним и тем же кодом, поэтому правила не могут разойтись."""
+
     title: str = Field(min_length=1, max_length=100)
     summary: str = Field(min_length=1, max_length=250)
     content: str = Field(min_length=1)
-    user_id: int
     tags: list[str] = Field(default_factory=list)
 
     @field_validator("tags")
@@ -34,6 +36,13 @@ class PostCreate(BaseModel):
         cleaned = [t.strip().lower() for t in value if t.strip()]
         # dict.fromkeys вместо set: убирает дубли, сохраняя порядок
         return list(dict.fromkeys(cleaned))
+
+
+class PostCreate(PostForm):
+    """То же плюс автор: в API его передаёт клиент, а в форме он
+    берётся из сессии, поэтому в PostForm ему не место."""
+
+    user_id: int
 
 
 class PostResponse(BaseModel):
