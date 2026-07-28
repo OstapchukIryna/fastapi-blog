@@ -1,0 +1,166 @@
+{% extends "layout.html" %}
+{% block content %}
+    {# Одна форма на создание и правку: поля совпадают полностью,
+       различаются только заголовок, адрес отправки и подпись кнопки. #}
+    {% set editing = mode == "edit" %}
+
+    <header class="masthead form-masthead">
+        <span class="eyebrow mono-label">{{ "Edit" if editing else "New" }}</span>
+        <h1 class="masthead-title form-title">
+            {{ "Edit post" if editing else "Write a post" }}
+        </h1>
+        {% if editing %}
+            <p class="masthead-tagline">
+                Published {{ post.date_posted.strftime('%d %b %Y') }}.
+            </p>
+        {% endif %}
+    </header>
+
+    {% if errors %}
+        {# Сводка вверху нужна, когда ошибочное поле уехало за экран:
+           ниже то же сообщение стоит у самого поля. #}
+        <div class="form-summary" role="alert">
+            <span class="mono-label">Not saved</span>
+            <p>Check the highlighted {{ "field" if errors | length == 1 else "fields" }} below.</p>
+        </div>
+    {% endif %}
+
+    <form class="post-form"
+          method="post"
+          action="{{ url_for('update_post', post_id=post.id) if editing else url_for('create_post_page') }}">
+        <div class="field">
+            <label class="form-label mono-label" for="title">Title</label>
+            <input class="form-control{{ ' is-invalid' if errors.title }}"
+                   type="text"
+                   id="title"
+                   name="title"
+                   maxlength="100"
+                   value="{{ values.title }}"
+                   {% if errors.title %}aria-describedby="title-error"{% endif %}
+                   autofocus>
+            {% if errors.title %}
+                <p class="field-error mono-label" id="title-error">{{ errors.title }}</p>
+            {% endif %}
+        </div>
+
+        <div class="field">
+            <label class="form-label mono-label" for="summary">Summary</label>
+            <textarea class="form-control{{ ' is-invalid' if errors.summary }}"
+                      id="summary"
+                      name="summary"
+                      rows="2"
+                      maxlength="250"
+                      {% if errors.summary %}aria-describedby="summary-error"{% endif %}>{{ values.summary }}</textarea>
+            {% if errors.summary %}
+                <p class="field-error mono-label" id="summary-error">{{ errors.summary }}</p>
+            {% endif %}
+            <p class="field-hint mono-label">Shown in the list and in recommendations.</p>
+        </div>
+
+        <div class="field">
+            <label class="form-label mono-label" for="content">Content</label>
+            <textarea class="form-control content-input{{ ' is-invalid' if errors.content }}"
+                      id="content"
+                      name="content"
+                      rows="18"
+                      {% if errors.content %}aria-describedby="content-error"{% endif %}>{{ values.content }}</textarea>
+            {% if errors.content %}
+                <p class="field-error mono-label" id="content-error">{{ errors.content }}</p>
+            {% endif %}
+            <p class="field-hint mono-label">Markdown. Fenced code blocks and tables work.</p>
+        </div>
+
+        <div class="field">
+            <label class="form-label mono-label" for="tags">Tags</label>
+            <input class="form-control{{ ' is-invalid' if errors.tags }}"
+                   type="text"
+                   id="tags"
+                   name="tags"
+                   value="{{ values.tags }}"
+                   placeholder="python, async">
+            {% if errors.tags %}
+                <p class="field-error mono-label" id="tags-error">{{ errors.tags }}</p>
+            {% endif %}
+            <p class="field-hint mono-label">Comma separated. Lowercased, duplicates dropped.</p>
+        </div>
+
+        <div class="form-actions">
+            <button class="btn btn-light write-btn" type="submit">
+                {{ "Save changes" if editing else "Publish" }}
+            </button>
+            <a class="back-link mono-label"
+               href="{{ url_for('post_page', post_id=post.id) if editing else url_for('home') }}">
+                Cancel
+            </a>
+        </div>
+    </form>
+
+    {% if editing %}
+        {# Действия над самой записью, а не над её текстом, поэтому вне
+           формы: у них свои адреса и свои последствия. #}
+        <section class="record-actions" aria-label="Post actions">
+            <div class="record-action">
+                <div>
+                    <p class="record-action-name">
+                        {{ "Pinned to the top" if post.is_pinned else "Not pinned" }}
+                    </p>
+                    <p class="record-action-note">
+                        {% if post.is_pinned %}
+                            This post leads the front page.
+                        {% else %}
+                            Pinning this one unpins whichever post is pinned now.
+                        {% endif %}
+                    </p>
+                </div>
+                <form method="post" action="{{ url_for('toggle_pin', post_id=post.id) }}">
+                    <button class="btn record-btn{{ ' is-active' if post.is_pinned }}" type="submit">
+                        {{ "Unpin" if post.is_pinned else "Pin" }}
+                    </button>
+                </form>
+            </div>
+
+            <div class="record-action">
+                <div>
+                    <p class="record-action-name">Delete this post</p>
+                    <p class="record-action-note">Permanent. There is no undo.</p>
+                </div>
+                <button class="btn record-btn is-danger"
+                        type="button"
+                        data-bs-toggle="modal"
+                        data-bs-target="#deleteModal">Delete</button>
+            </div>
+        </section>
+
+        <div class="modal fade"
+             id="deleteModal"
+             tabindex="-1"
+             aria-labelledby="deleteModalLabel"
+             aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 class="modal-title" id="deleteModalLabel">Delete this post?</h2>
+                        <button type="button"
+                                class="btn-close"
+                                data-bs-dismiss="modal"
+                                aria-label="Close"></button>
+                    </div>
+                    <form action="{{ url_for('delete_post', post_id=post.id) }}" method="post">
+                        <div class="modal-body">
+                            <p class="mb-0">
+                                <strong>{{ post.title }}</strong> will be removed
+                                permanently. This cannot be undone.
+                            </p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button"
+                                    class="btn btn-outline-secondary"
+                                    data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-danger">Delete post</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+{% endblock content %}
