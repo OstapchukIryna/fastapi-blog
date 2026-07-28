@@ -14,11 +14,36 @@
     --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
     --bs-body-font-family: "Newsreader", Georgia, serif;
-    --bs-body-font-size: 1.0625rem;
     --bs-body-line-height: 1.7;
     --bs-border-radius: 0.5rem;
 
     --measure: 760px;
+
+    /* Типографическая шкала. Раньше в файле было 20 разных кеглей и
+       восемь определений clamp, четыре из которых почти совпадали —
+       это не шкала, а список случайных значений. Семь ступеней текста
+       и четыре дисплейных покрывают всё, что реально нужно. */
+    --text-label: 0.72rem;
+    /* служебные строки моношрифтом */
+    --text-xs: 0.8rem;
+    /* бренд и компактные кнопки */
+    --text-sm: 0.9rem;
+    /* код и моноширинные данные */
+    --text-base: 1.0625rem;
+    /* текст */
+    --text-md: 1.2rem;
+    /* ведущие абзацы, цитаты, подзаголовки */
+    --text-lg: 1.4rem;
+    /* заголовки в списке и в окне */
+    --text-xl: 1.7rem;
+    /* крупные заголовки внутри статьи */
+
+    --display-hero: clamp(2.75rem, 9vw, 4.25rem);
+    --display-voice: clamp(2rem, 5.6vw, 3.15rem);
+    --display-page: clamp(2rem, 6vw, 3rem);
+    --display-card: clamp(1.6rem, 4.5vw, 2.15rem);
+
+    --bs-body-font-size: var(--text-base);
 }
 
 [data-bs-theme="dark"] {
@@ -49,6 +74,11 @@
     --overlay: #14150f;
     --nav-bg: rgba(30, 31, 28, 0.85);
     --hairline-accent: rgba(255, 183, 3, 0.4);
+    /* Заливка главной кнопки отдельным токеном: на светлом янтарь
+       даёт 1.64 и его приходится менять, а сам акцент — нет */
+    --cta-bg: var(--accent);
+    --cta-bg-hover: var(--accent-hot);
+    --cta-fg: #1e1f1c;
 }
 
 [data-bs-theme="light"] {
@@ -59,8 +89,11 @@
     --bs-emphasis-color: #14150f;
     --bs-secondary-color: #75715e;
     /* comment Monokai работает как есть, 4.6 */
-    --bs-tertiary-bg: #fefef8;
-    --bs-border-color: #e2e2d6;
+    /* Поднятая поверхность и линейка были 1.05 и 1.22 к фону, то есть
+       «смена подложки» — одно из двух средств глубины в системе —
+       практически не читалась. Углублены до различимых значений. */
+    --bs-tertiary-bg: #efefe4;
+    --bs-border-color: #cfcfc0;
 
     /* Тёплые акценты Monokai на светлом нечитаемы: orange #fd971f даёт 2.05 */
     --link: #8f5000;
@@ -77,6 +110,12 @@
     --overlay: #272822;
     --nav-bg: rgba(39, 40, 34, 0.92);
     --hairline-accent: rgba(143, 80, 0, 0.4);
+    /* Кнопка следует за акцентом темы: янтарь на бумаге давал 1.64 при
+       минимуме 3 для нецветового элемента, и на экране оказывалось два
+       акцентных тона сразу — против правила единственного акцента */
+    --cta-bg: var(--link);
+    --cta-bg-hover: var(--link-hover);
+    --cta-fg: #f8f8f2;
 }
 
 :root {
@@ -90,7 +129,13 @@ body {
     padding-top: 3.75rem;
 }
 
-main.container {
+/* Одна мера на шапку, контент и подвал. Без этого навбар и подвал
+   остаются на бутстраповских 1140px, и бренд висит на 190–290px левее
+   всего остального — единственная видимая ошибка ремесла на странице,
+   которая целиком про ремесло. */
+main.container,
+.navbar > .container,
+.site-footer > .container {
     max-width: var(--measure);
     padding-inline: 1.25rem;
 }
@@ -108,7 +153,7 @@ h4 {
 /* Утилита: моношрифт капслоком для служебных подписей */
 .mono-label {
     font-family: var(--font-mono);
-    font-size: 0.72rem;
+    font-size: var(--text-label);
     font-weight: 400;
     text-transform: uppercase;
     letter-spacing: 0.09em;
@@ -128,14 +173,14 @@ h4 {
 
 .navbar-brand {
     font-family: var(--font-mono);
-    font-size: 0.8rem;
+    font-size: var(--text-xs);
     font-weight: 500;
     letter-spacing: 0.04em;
 }
 
 .navbar-nav .nav-link {
     font-family: var(--font-mono);
-    font-size: 0.72rem;
+    font-size: var(--text-label);
     text-transform: uppercase;
     letter-spacing: 0.09em;
 }
@@ -167,14 +212,14 @@ h4 {
 }
 
 .masthead-title {
-    font-size: clamp(2.75rem, 9vw, 4.25rem);
+    font-size: var(--display-hero);
     letter-spacing: -0.045em;
     line-height: 0.92;
     margin-bottom: 1.25rem;
 }
 
 .masthead-tagline {
-    font-size: 1.2rem;
+    font-size: var(--text-md);
     color: var(--bs-secondary-color);
     max-width: 38ch;
     margin-bottom: 2.25rem;
@@ -206,23 +251,31 @@ h4 {
 .hero-handle {
     margin: 0;
     font-family: var(--font-mono);
-    font-size: 1rem;
+    font-size: var(--text-base);
     font-weight: 500;
     letter-spacing: 0.02em;
     color: var(--bs-emphasis-color);
 }
 
-.hero-name {
-    margin: 0.2rem 0 0;
-    color: var(--bs-secondary-color);
+/* Роль и стек — то, что сканирует нанимающий. Раньше строка была
+   служебным моно в 0.72rem, то есть самым мелким текстом на странице;
+   теперь это факт, набранный шрифтом чтения. */
+.hero-role {
+    /* Без своего кегля: наследует документированный размер текста */
+    margin: 0.3rem 0 0;
+    line-height: 1.4;
+    color: var(--bs-body-color);
 }
 
 /* Тезис набран основным шрифтом текста в крупном кегле, а не
    гротеском заголовков: страница должна звучать как человек,
-   который говорит, а не как бренд, который объявляет. */
+   который говорит, а не как бренд, который объявляет. Семейство и
+   насыщенность заданы явно — иначе правило h1..h4 навяжет гротеск. */
 .hero-statement {
-    margin: 0 0 2.5rem;
-    font-size: clamp(2rem, 5.6vw, 3.15rem);
+    margin: 0 0 1rem;
+    font-family: var(--bs-body-font-family);
+    font-weight: 400;
+    font-size: var(--display-voice);
     line-height: 1.14;
     letter-spacing: -0.02em;
     color: var(--bs-emphasis-color);
@@ -235,14 +288,13 @@ h4 {
 
 /* --- Панель «сейчас» -----------------------------------------
    Реальное состояние работы, правится руками вместе с датой.
-   Левая линейка — тот же приём, что у закреплённой записи
-   и цитат, а не новый. */
+   Выделяется поднятой подложкой и янтарной подписью Now, без
+   линейки сбоку. */
 
 .now-panel {
     padding: 1.5rem 1.75rem;
     background-color: var(--bs-tertiary-bg);
     border: 1px solid var(--bs-border-color);
-    border-left: 2px solid var(--accent);
     border-radius: var(--bs-border-radius);
 }
 
@@ -285,7 +337,7 @@ h4 {
    а не фраза — пусть и выглядит как путь */
 .now-source {
     font-family: var(--font-mono);
-    font-size: 0.9rem;
+    font-size: var(--text-sm);
     text-decoration: none;
     border-bottom: 1px solid var(--hairline-accent);
 }
@@ -303,6 +355,31 @@ h4 {
     margin-top: 1.75rem;
     padding-top: 1.5rem;
     border-top: 1px solid var(--bs-border-color);
+}
+
+/* Панель Now как концовка главной: раньше страница обрывалась
+   копирайтом, хотя это последний экран того, кто дочитал */
+.closing-panel {
+    margin-top: 4rem;
+}
+
+/* Скелет разбора вместо аннотации в списке. Точка-разделитель рисуется
+   псевдоэлементом, чтобы не попадать в разметку и в выделение текста. */
+.post-outline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0;
+    margin: 0.55rem 0 0;
+    padding: 0;
+    list-style: none;
+    color: var(--bs-secondary-color);
+}
+
+.post-outline li + li::before {
+    content: "·";
+    padding: 0 0.55rem;
+    opacity: 0.45;
 }
 
 /* --- Страница всех тем ---------------------------------------- */
@@ -328,7 +405,7 @@ h4 {
 .topic-row .name {
     font-family: var(--font-display);
     font-weight: 700;
-    font-size: 1.2rem;
+    font-size: var(--text-md);
     color: var(--bs-emphasis-color);
 }
 
@@ -353,7 +430,7 @@ h4 {
 }
 
 .author-masthead h1 {
-    font-size: clamp(1.9rem, 6vw, 2.6rem);
+    font-size: var(--display-page);
     letter-spacing: -0.035em;
     margin-bottom: 0.35rem;
 }
@@ -469,15 +546,13 @@ h4 {
 }
 
 .lead-post h2 {
-    font-size: clamp(1.6rem, 4.5vw, 2.15rem);
+    font-size: var(--display-card);
     margin-bottom: 0.75rem;
 }
 
-/* Закреплённая запись: та же левая линейка, что у now-strip
-   и цитат — приём переиспользуется, а не изобретается новый */
-.lead-post.is-pinned {
-    border-left: 2px solid var(--accent);
-}
+/* Закрепление помечает янтарная подпись Pinned и поднятая подложка.
+   Толстой линейки сбоку больше нет: она дублировала подпись, которая
+   и так называет состояние словом. */
 
 .lead-post .pin-label {
     display: block;
@@ -534,7 +609,7 @@ h4 {
 }
 
 .archive-item h2 {
-    font-size: 1.25rem;
+    font-size: var(--text-lg);
     margin-bottom: 0.5rem;
 }
 
@@ -545,7 +620,7 @@ h4 {
     line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
-    font-size: 0.95rem;
+    font-size: var(--text-sm);
 }
 
 /* --- Страница записи ---------------------------------------- */
@@ -557,13 +632,13 @@ h4 {
 }
 
 .post-header h1 {
-    font-size: clamp(2rem, 6vw, 3rem);
+    font-size: var(--display-page);
     letter-spacing: -0.04em;
     margin-bottom: 1rem;
 }
 
 .post-body {
-    font-size: 1.12rem;
+    font-size: var(--text-md);
     max-width: 68ch;
 }
 
@@ -572,12 +647,12 @@ h4 {
 }
 
 .post-body h2 {
-    font-size: 1.5rem;
+    font-size: var(--text-xl);
     margin: 2.5rem 0 1rem;
 }
 
 .post-body h3 {
-    font-size: 1.2rem;
+    font-size: var(--text-md);
     margin: 2rem 0 0.75rem;
 }
 
@@ -608,12 +683,14 @@ h4 {
     text-underline-offset: 0.2em;
 }
 
-/* Та же левая линейка, что у now-strip: один приём вместо нового */
+/* Единственная левая линейка, оставшаяся в системе. У цитаты она
+   типографский приём, а не украшение карточки: так набирают выноски
+   с тех пор, как существуют печатные книги. */
 .post-body blockquote {
     margin: 2rem 0;
     padding-left: 1.25rem;
     border-left: 2px solid var(--accent);
-    font-size: 1.15rem;
+    font-size: var(--text-md);
     color: var(--bs-emphasis-color);
 }
 
@@ -628,7 +705,7 @@ h4 {
     width: 100%;
     margin-bottom: 1.5rem;
     border-collapse: collapse;
-    font-size: 0.95rem;
+    font-size: var(--text-sm);
 }
 
 .post-body th,
@@ -640,7 +717,7 @@ h4 {
 
 .post-body th {
     font-family: var(--font-mono);
-    font-size: 0.72rem;
+    font-size: var(--text-label);
     font-weight: 400;
     text-transform: uppercase;
     letter-spacing: 0.09em;
@@ -649,7 +726,7 @@ h4 {
 
 .post-body pre {
     font-family: var(--font-mono);
-    font-size: 0.85rem;
+    font-size: var(--text-sm);
     padding: 1.25rem;
     background-color: var(--bs-tertiary-bg);
     border: 1px solid var(--bs-border-color);
@@ -663,8 +740,12 @@ h4 {
     color: var(--link);
 }
 
+/* Внутри pre кегль уже задан самим блоком, и оптическая поправка для
+   строчного кода применялась к нему второй раз — код в блоке выходил
+   12.7px. Здесь поправка снимается. */
 .post-body pre code {
     color: inherit;
+    font-size: inherit;
 }
 
 /* --- Подпись автора ----------------------------------------- */
@@ -690,7 +771,7 @@ h4 {
 
 .author-byline .bio {
     margin: 0.45rem 0 0.9rem;
-    font-size: 0.97rem;
+    font-size: var(--text-base);
     color: var(--bs-secondary-color);
 }
 
@@ -718,10 +799,16 @@ h4 {
 
 /* Кнопка говорит служебным голосом сайта — тем же моноширинным
    капслоком, что метки и навигация */
+/* min-height, а не только отступы: кнопка была 39px при минимуме 44
+   для цели касания, и на телефоне это главная цель на странице */
 .write-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
     padding: 0.6rem 1.25rem;
     font-family: var(--font-mono);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.09em;
@@ -740,7 +827,7 @@ h4 {
 
 .byline-invite {
     margin: 0 0 1.2rem;
-    font-size: 1.02rem;
+    font-size: var(--text-base);
     color: var(--bs-emphasis-color);
 }
 
@@ -759,14 +846,13 @@ h4 {
     margin-top: 3rem;
     background-color: var(--bs-tertiary-bg);
     border: 1px solid var(--bs-border-color);
-    border-left: 2px solid var(--accent);
     border-radius: var(--bs-border-radius);
 }
 
 .contact-lead {
     max-width: 52ch;
     margin: 0.5rem 0 1.5rem;
-    font-size: 1.08rem;
+    font-size: var(--text-base);
 }
 
 /* --- Действия автора ------------------------------------------
@@ -825,7 +911,7 @@ h4 {
 .modal-title {
     font-family: var(--font-display);
     font-weight: 700;
-    font-size: 1.3rem;
+    font-size: var(--text-lg);
     letter-spacing: -0.02em;
     color: var(--bs-emphasis-color);
 }
@@ -833,7 +919,7 @@ h4 {
 /* Заголовок несёт вопрос, тело — последствия. Разный вес и цвет,
    иначе оба абзаца читаются как одна серая масса */
 .modal-body p {
-    font-size: 1.02rem;
+    font-size: var(--text-base);
     line-height: 1.6;
     color: var(--bs-secondary-color);
 }
@@ -978,7 +1064,7 @@ h4 {
 .related-card .headline {
     font-family: var(--font-display);
     font-weight: 700;
-    font-size: 1.05rem;
+    font-size: var(--text-base);
     line-height: 1.3;
 }
 
@@ -1025,7 +1111,7 @@ h4 {
 }
 
 .auth-title {
-    font-size: clamp(2rem, 8vw, 2.75rem);
+    font-size: var(--display-page);
 }
 
 .auth-form {
@@ -1081,7 +1167,7 @@ h4 {
 }
 
 .form-title {
-    font-size: clamp(2rem, 6vw, 2.9rem);
+    font-size: var(--display-page);
 }
 
 .post-form .field {
@@ -1108,7 +1194,7 @@ h4 {
    вертикальный ресайз, чтобы длинную статью было где писать */
 .content-input {
     font-family: var(--font-mono);
-    font-size: 0.9rem;
+    font-size: var(--text-sm);
     line-height: 1.6;
     resize: vertical;
     min-height: 20rem;
@@ -1119,7 +1205,6 @@ h4 {
     margin-bottom: 2rem;
     background-color: var(--bs-tertiary-bg);
     border: 1px solid var(--bs-border-color);
-    border-left: 2px solid var(--danger);
     border-radius: var(--bs-border-radius);
 }
 
@@ -1176,7 +1261,7 @@ h4 {
 .record-btn {
     padding: 0.5rem 1.15rem;
     font-family: var(--font-mono);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.09em;
@@ -1274,14 +1359,14 @@ h4 {
 }
 
 .error-title {
-    font-size: clamp(2rem, 6vw, 3rem);
+    font-size: var(--display-page);
     letter-spacing: -0.04em;
     margin-bottom: 1.1rem;
 }
 
 .error-detail {
     margin-bottom: 2.25rem;
-    font-size: 1.1rem;
+    font-size: var(--text-md);
     color: var(--bs-secondary-color);
 }
 
@@ -1310,17 +1395,17 @@ h4 {
 /* --- Кнопки ------------------------------------------------- */
 
 .btn-light {
-    --bs-btn-bg: var(--accent);
-    --bs-btn-border-color: var(--accent);
-    --bs-btn-color: #1e1f1c;
-    --bs-btn-hover-bg: var(--accent-hot);
-    --bs-btn-hover-border-color: var(--accent-hot);
-    --bs-btn-hover-color: #1e1f1c;
+    --bs-btn-bg: var(--cta-bg);
+    --bs-btn-border-color: var(--cta-bg);
+    --bs-btn-color: var(--cta-fg);
+    --bs-btn-hover-bg: var(--cta-bg-hover);
+    --bs-btn-hover-border-color: var(--cta-bg-hover);
+    --bs-btn-hover-color: var(--cta-fg);
     /* Без этого Bootstrap красит disabled в свой стандартный
        светло-серый — единственный не-акцентный цвет на странице */
-    --bs-btn-disabled-bg: var(--accent);
-    --bs-btn-disabled-border-color: var(--accent);
-    --bs-btn-disabled-color: #1e1f1c;
+    --bs-btn-disabled-bg: var(--cta-bg);
+    --bs-btn-disabled-border-color: var(--cta-bg);
+    --bs-btn-disabled-color: var(--cta-fg);
     --bs-btn-disabled-opacity: 0.45;
 }
 
@@ -1403,6 +1488,23 @@ h4 {
     .author-byline {
         flex-direction: column;
         gap: 1.1rem;
+    }
+
+    /* Цели касания были 20px при минимуме 44. Растёт только область
+       нажатия, вид не меняется — под тегами лежит перекрытие на всю
+       карточку, и промах уводил на запись, которую не выбирали. */
+    .card-tags a,
+    .channels a,
+    .now-source {
+        display: inline-flex;
+        align-items: center;
+        min-height: 44px;
+    }
+
+    /* Компенсируем прибавку высоты, чтобы ряды не разъезжались */
+    .card-tags,
+    .channels {
+        gap: 0 1.1rem;
     }
 
     /* Кнопка во всю ширину: на телефоне это основная цель касания */

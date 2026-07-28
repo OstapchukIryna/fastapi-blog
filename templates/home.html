@@ -11,60 +11,30 @@
             </p>
         </header>
     {% else %}
-        {# Герой ведёт не названием блога, а человеком в настоящем времени:
-           незнакомцу имя блога ничего не говорит, а «чем я занят прямо
-           сейчас» — говорит. Панель Now одновременно и есть точка контакта. #}
+        {# Герой сжат до личности и тезиса. Панель Now переехала в конец
+           страницы: сюда приходят оценить работу, и она должна быть
+           видна сразу, а «чем я занят сейчас» лучше читается как
+           закрывающая реплика, чем как преграда перед первой записью. #}
         <header class="hero">
             <div class="hero-identity">
                 <img class="avatar hero-avatar"
                      src="{{ url_for('static', path='profile_pics/avatar-256.jpg') }}"
-                     alt="{{ site.handle }}"
+                     alt=""
                      width="72"
                      height="72">
                 <div>
                     <p class="hero-handle">{{ site.handle }}</p>
-                    <p class="hero-name mono-label">{{ site.name }} · {{ site.role }}</p>
+                    <p class="hero-role">{{ site.name }} — {{ site.role }}. FastAPI, SQLAlchemy, SQLite.</p>
                 </div>
             </div>
 
-            <p class="hero-statement">
+            <h1 class="hero-statement">
                 I write about the things that <em>didn't work</em> the first time.
-            </p>
-
-            {# Правится руками вместе с датой в SITE: это состояние работы,
-               а не данные из базы #}
-            <section class="now-panel" aria-label="What I'm working on now">
-                <div class="now-head">
-                    <span class="mono-label now-title">Now</span>
-                    <span class="mono-label now-date">Updated {{ site.now_updated }}</span>
-                </div>
-                {# Строки «Writing» здесь нет намеренно: тезис выше уже
-                   говорит, о чём эти записи. Вместо неё — исходник:
-                   для бэкенда это единственное реальное доказательство. #}
-                <dl class="now-rows">
-                    <dt class="mono-label">Building</dt>
-                    <dd>This blog — FastAPI, SQLAlchemy, Jinja2</dd>
-                    <dt class="mono-label">Next</dt>
-                    <dd>JWT auth, file uploads, pagination</dd>
-                    <dt class="mono-label">Source</dt>
-                    <dd>
-                        <a class="now-source"
-                           href="{{ site.repo }}"
-                           target="_blank"
-                           rel="noopener noreferrer">{{ site.repo_label }}</a>
-                    </dd>
-                </dl>
-                <div class="now-foot">
-                    {{ contact.write_button() }}
-                    {{ contact.channels() }}
-                </div>
-            </section>
+            </h1>
         </header>
     {% endif %}
 
     {% if lead %}
-        {% set lead_mins = [1, (lead.content.split() | length / 200) | round(0, 'ceil') | int] | max %}
-
         {# article, а не a: внутри есть свои ссылки на теги, а вложенные
            ссылки в HTML недопустимы. Область клика по карточке
            сохраняется через перекрытие на заголовке. #}
@@ -79,7 +49,7 @@
                 <span class="sep">/</span>
                 <span>{{ lead.author.username }}</span>
                 <span class="sep">/</span>
-                <span>{{ lead_mins }} min</span>
+                <span>{{ lead.reading_minutes }} min</span>
             </p>
             <h2>
                 <a class="post-title stretched"
@@ -101,18 +71,26 @@
             <p class="section-rule mono-label">{{ 'Latest' if pinned else 'Archive' }}</p>
 
             {% for post in rest %}
-                {% set mins = [1, (post.content.split() | length / 200) | round(0, 'ceil') | int] | max %}
                 <article class="archive-item">
                     <p class="post-meta mono-label">
                         <span>{{ post.date_posted.strftime('%d %b %Y') }}</span>
                         <span class="sep">/</span>
-                        <span>{{ mins }} min</span>
+                        <span>{{ post.reading_minutes }} min</span>
                     </p>
                     <h2>
                         <a class="post-title stretched"
                            href="{{ url_for('post_page', post_id=post.id) }}">{{ post.title }}</a>
                     </h2>
-                    <p class="post-excerpt">{{ post.summary }}</p>
+                    {# Скелет разбора вместо аннотации: он показывает, как
+                       автор шёл к ответу. Порядок несёт смысл, поэтому ol.
+                       Записи без разделов откатываются на аннотацию. #}
+                    {% if post.outline %}
+                        <ol class="post-outline mono-label">
+                            {% for heading in post.outline %}<li>{{ heading }}</li>{% endfor %}
+                        </ol>
+                    {% else %}
+                        <p class="post-excerpt">{{ post.summary }}</p>
+                    {% endif %}
                     {% if post.tags %}
                         <div class="card-tags mono-label">
                             {% for tag in post.tags %}
@@ -128,5 +106,34 @@
             <p class="mono-label mb-2">No posts yet</p>
             <p class="mb-0">The first one is in progress.</p>
         </div>
+    {% endif %}
+
+    {% if not filter_tag %}
+        {# Закрывающая реплика: состояние работы правится руками вместе
+           с датой в SITE. Стоит после записей, потому что «напишите мне»
+           имеет смысл только когда есть за что. #}
+        <section class="now-panel closing-panel" aria-label="What I'm working on now">
+            <div class="now-head">
+                <span class="mono-label now-title">Now</span>
+                <span class="mono-label now-date">Updated {{ site.now_updated }}</span>
+            </div>
+            <dl class="now-rows">
+                <dt class="mono-label">Building</dt>
+                <dd>This blog — FastAPI, SQLAlchemy, Jinja2</dd>
+                <dt class="mono-label">Next</dt>
+                <dd>JWT auth, file uploads, pagination</dd>
+                <dt class="mono-label">Source</dt>
+                <dd>
+                    <a class="now-source"
+                       href="{{ site.repo }}"
+                       target="_blank"
+                       rel="noopener noreferrer">{{ site.repo_label }}</a>
+                </dd>
+            </dl>
+            <div class="now-foot">
+                {{ contact.write_button() }}
+                {{ contact.channels() }}
+            </div>
+        </section>
     {% endif %}
 {% endblock content %}

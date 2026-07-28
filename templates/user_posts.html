@@ -19,12 +19,11 @@
     {# Однородный список без ведущей карточки: сюда приходят просматривать
        написанное автором, а не выбирать, с чего начать #}
     {% for post in posts %}
-        {% set mins = [1, (post.content.split() | length / 200) | round(0, 'ceil') | int] | max %}
         <article class="archive-item">
             <p class="post-meta mono-label">
                 <span>{{ post.date_posted.strftime('%d %b %Y') }}</span>
                 <span class="sep">/</span>
-                <span>{{ mins }} min</span>
+                <span>{{ post.reading_minutes }} min</span>
             </p>
             <h2>
                 <a class="post-title stretched"
