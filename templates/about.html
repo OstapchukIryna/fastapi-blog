@@ -1,10 +1,11 @@
 {% extends "layout.html" %}
+{% import "_contact.html" as contact %}
 {% block content %}
     <header class="masthead">
         <span class="eyebrow mono-label">About</span>
-        <h1 class="masthead-title">Called Mad</h1>
+        <h1 class="masthead-title">{{ site.handle }}</h1>
         <p class="masthead-tagline">
-            Backend in Python, written down while I'm still learning it.
+            {{ site.name }} — backend in Python, written down while I'm still learning it.
         </p>
     </header>
 
@@ -46,14 +47,25 @@
         <dd>uv, ruff, pyrefly, pytest, Docker</dd>
 
         <dt>This site</dt>
-        <dd>FastAPI, Jinja2, SQLAlchemy — source on GitHub</dd>
+        <dd>
+            FastAPI, Jinja2, SQLAlchemy —
+            <a href="{{ site.repo }}" target="_blank" rel="noopener noreferrer">{{ site.repo_label }}</a>
+        </dd>
     </dl>
 
-    <div class="author-links mono-label">
-        <a href="#">GitHub</a>
-        <a href="#">Telegram</a>
-        <a href="#">Email</a>
-    </div>
+    {# Сюда доходят те, кто уже заинтересовался — самая «тёплая» аудитория
+       на сайте. Поэтому призыв здесь прямой и с конкретным поводом. #}
+    <section class="contact-block">
+        <span class="eyebrow mono-label">Get in touch</span>
+        <p class="contact-lead">
+            Working on the same stack, spotted a mistake in a post, or just want
+            to compare notes? Write to me — that's what this is for.
+        </p>
+        <div class="contact-actions">
+            {{ contact.write_button() }}
+            {{ contact.channels() }}
+        </div>
+    </section>
 
     <p class="mt-5">
         <a class="back-link mono-label" href="/">
