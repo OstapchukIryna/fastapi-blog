@@ -61,3 +61,8 @@ class PostDetail(PostResponse):
     """Ответ API для одной записи. Тело есть только здесь."""
 
     content: str
+
+
+class TagCount(BaseModel):
+    name: str
+    count: int
