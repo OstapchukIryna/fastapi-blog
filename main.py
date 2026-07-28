@@ -13,7 +13,14 @@ import models
 from database import Base, engine, get_db
 from error_handlers import register_error_handlers
 from models import get_or_create_tags
-from schemas import PostCreate, PostDetail, PostResponse, UserCreate, UserResponse
+from schemas import (
+    PostCreate,
+    PostDetail,
+    PostResponse,
+    TagCount,
+    UserCreate,
+    UserResponse,
+)
 from templating import templates
 
 # TODO: заменить на Alembic — create_all не умеет менять существующие таблицы
@@ -271,6 +278,26 @@ def create_post(post: PostCreate, db: DbSession):
     db.commit()
     db.refresh(new_post)
     return new_post
+
+
+@app.get("/api/tags", response_model=list[TagCount])
+def list_tags(db: DbSession):
+    return [{"name": name, "count": count} for name, count in all_topics(db)]
+
+
+@app.get("/api/tags/{tag}/posts", response_model=list[PostResponse])
+def get_tag_posts(tag: str, db: DbSession):
+    posts = (
+        db.execute(posts_query().join(models.Post.tags).where(models.Tag.name == tag))
+        .scalars()
+        .unique()
+        .all()
+    )
+    if not posts:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found"
+        )
+    return posts
 
 
 @app.post(
