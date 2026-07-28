@@ -6,11 +6,13 @@ from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 import models
 from database import Base, engine, get_db
 from error_handlers import register_error_handlers
+from models import get_or_create_tags
 from schemas import PostCreate, PostDetail, PostResponse, UserCreate, UserResponse
 from templating import templates
 
@@ -45,28 +47,6 @@ def posts_query():
         )
         .order_by(models.Post.date_posted.desc())
     )
-
-
-def get_or_create_tags(db: Session, names: list[str]) -> list[models.Tag]:
-    """Существующие теги переиспользуются, недостающие создаются.
-
-    Один запрос на всю пачку, а не по одному на имя.
-    """
-    if not names:
-        return []
-
-    existing = (
-        db.execute(select(models.Tag).where(models.Tag.name.in_(names))).scalars().all()
-    )
-    by_name = {tag.name: tag for tag in existing}
-
-    for name in names:
-        if name not in by_name:
-            tag = models.Tag(name=name)
-            db.add(tag)
-            by_name[name] = tag
-
-    return [by_name[name] for name in names]
 
 
 def find_related(
@@ -323,7 +303,16 @@ def create_user(user: UserCreate, db: DbSession):
         password_hash=bcrypt.hashpw(user.password.encode(), bcrypt.gensalt()).decode(),
     )
     db.add(new_user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Подстраховка от гонки: два запроса могли одновременно пройти
+        # проверку на clash выше и столкнуться уже на уровне БД
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username or email already registered",
+        ) from None
     db.refresh(new_user)
     return new_user
 
