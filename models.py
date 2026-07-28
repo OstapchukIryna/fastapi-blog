@@ -8,8 +8,9 @@ from sqlalchemy import (
     String,
     Table,
     Text,
+    select,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from database import Base
 
@@ -76,3 +77,23 @@ class Post(Base):
 
     author: Mapped[User] = relationship(back_populates="posts")
     tags: Mapped[list[Tag]] = relationship(secondary=post_tags, back_populates="posts")
+
+
+def get_or_create_tags(db: Session, names: list[str]) -> list[Tag]:
+    """Существующие теги переиспользуются, недостающие создаются.
+
+    Один запрос на всю пачку, а не по одному на имя.
+    """
+    if not names:
+        return []
+
+    existing = db.execute(select(Tag).where(Tag.name.in_(names))).scalars().all()
+    by_name = {tag.name: tag for tag in existing}
+
+    for name in names:
+        if name not in by_name:
+            tag = Tag(name=name)
+            db.add(tag)
+            by_name[name] = tag
+
+    return [by_name[name] for name in names]
