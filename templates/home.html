@@ -1,0 +1,78 @@
+{% extends "layout.html" %}
+{% block content %}
+    {% if filter_tag %}
+        {# Личная шапка на странице тега неуместна: это выборка, а не главная #}
+        <header class="masthead">
+            <span class="eyebrow mono-label">Tagged</span>
+            <h1 class="masthead-title">#{{ filter_tag }}</h1>
+            <p class="masthead-tagline">{{ posts | length }} post{{ '' if posts | length == 1 else 's' }}.</p>
+        </header>
+    {% else %}
+        <header class="masthead">
+            <h1 class="masthead-title">
+                Called
+                <br>
+                Mad
+            </h1>
+            <p class="masthead-tagline">Notes on Python backend work — what broke, why, and what I understood afterwards.</p>
+            {# Строка состояния: реальные данные о том, над чем идёт работа.
+               Правится руками или прокидывается из роутера. #}
+            <dl class="now-strip mono-label">
+                <dt>Now</dt>
+                <dd>
+                    FastAPI · async · SQLAlchemy
+                </dd>
+                <dt>Updated</dt>
+                <dd>
+                    July 2026
+                </dd>
+            </dl>
+        </header>
+    {% endif %}
+
+    {% if lead %}
+        {% set lead_mins = [1, (lead.content.split() | length / 200) | round(0, 'ceil') | int] | max %}
+
+        <a class="lead-post{% if pinned %} is-pinned{% endif %}"
+           href="{{ url_for('get_post', post_id=lead.id) }}">
+            {% if pinned %}
+                {# Метка обязательна: без неё старая запись в верхнем слоте
+                   читается как самая свежая #}
+                <span class="pin-label mono-label">Pinned</span>
+            {% endif %}
+            <p class="post-meta mono-label">
+                <span>{{ lead.date_posted }}</span>
+                <span class="sep">/</span>
+                <span>{{ lead.author }}</span>
+                <span class="sep">/</span>
+                <span>{{ lead_mins }} min</span>
+            </p>
+            <h2><span class="post-title">{{ lead.title }}</span></h2>
+            <p class="post-excerpt">{{ lead.summary }}</p>
+            <span class="read-more mono-label">Read <span class="arrow">&rarr;</span></span>
+        </a>
+
+        {% if rest %}
+            <p class="section-rule mono-label">{{ 'Latest' if pinned else 'Archive' }}</p>
+
+            {% for post in rest %}
+                {% set mins = [1, (post.content.split() | length / 200) | round(0, 'ceil') | int] | max %}
+                <a class="archive-item"
+                   href="{{ url_for('post_page', post_id=post.id) }}">
+                    <p class="post-meta mono-label">
+                        <span>{{ post.date_posted }}</span>
+                        <span class="sep">/</span>
+                        <span>{{ mins }} min</span>
+                    </p>
+                    <h2><span class="post-title">{{ post.title }}</span></h2>
+                    <p class="post-excerpt">{{ post.summary }}</p>
+                </a>
+            {% endfor %}
+        {% endif %}
+    {% else %}
+        <div class="empty-state">
+            <p class="mono-label mb-2">No posts yet</p>
+            <p class="mb-0">The first one is in progress.</p>
+        </div>
+    {% endif %}
+{% endblock content %}

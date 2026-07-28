@@ -1,0 +1,31 @@
+{% extends "layout.html" %}
+{% block content %}
+    <section class="error-page">
+        {# Код нужен разработчику, поэтому он надзаголовком.
+           Заголовок отвечает на вопрос человека: что произошло. #}
+        <span class="error-code eyebrow mono-label">Error {{ status_code }}</span>
+
+        <h1 class="error-title">{{ message or "Something went wrong" }}</h1>
+
+        <p class="error-detail">
+            {% if status_code == 404 %}
+                The address is either mistyped or points to something that no longer exists.
+            {% elif status_code == 403 %}
+                This one exists, but it isn't yours to open.
+            {% elif status_code == 422 %}
+                The request was understood, but part of it didn't have the expected shape.
+            {% elif status_code >= 500 %}
+                This is on my side, not yours. Trying again in a minute may be enough.
+            {% else %}
+                The request couldn't be completed.
+            {% endif %}
+        </p>
+
+        {# Пустой экран без выхода — тупик. Здесь всегда есть куда пойти. #}
+        <div class="error-actions mono-label">
+            <a class="back-link" href="/">
+                <span class="arrow">&larr;</span> All posts
+            </a>
+        </div>
+    </section>
+{% endblock content %}

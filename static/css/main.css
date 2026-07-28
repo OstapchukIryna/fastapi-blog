@@ -1,0 +1,838 @@
+/* ============================================================
+   Called Mad's Blog — тема v2
+   Amber on ink. Тёмная по умолчанию, светлая рабочая.
+   Всё через переменные Bootstrap 5.3.
+   ============================================================ */
+
+/* --- Токены ------------------------------------------------ */
+
+:root {
+    --accent: #ffb703;
+    --accent-hot: #fb8500;
+
+    --font-display: "Space Grotesk", system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+    --bs-body-font-family: "Newsreader", Georgia, serif;
+    --bs-body-font-size: 1.0625rem;
+    --bs-body-line-height: 1.7;
+    --bs-border-radius: 0.5rem;
+
+    --measure: 760px;
+}
+
+[data-bs-theme="dark"] {
+    --bs-body-bg: #1e1f1c;
+    --bs-body-color: #f8f8f2;
+    /* foreground Monokai */
+    --bs-emphasis-color: #ffffff;
+    --bs-secondary-color: #a39e8b;
+    /* родной comment #75715e даёт 3.38 — осветлён до 6.17 */
+    --bs-tertiary-bg: #272822;
+    /* background Monokai как поднятая поверхность */
+    --bs-border-color: #3e3d32;
+
+    --link: var(--accent);
+    /* 9.49 */
+    --link-hover: #ffd166;
+    /* Bootstrap 5.3 красит <a> через *-rgb, не через --bs-link-color */
+    --bs-link-color-rgb: 255, 183, 3;
+    --bs-link-hover-color-rgb: 255, 209, 102;
+    /* Розовый Monokai #f92672 даёт на этом фоне 4.38 — осветлён до 5.77 */
+    --danger: #ff6188;
+    --danger-hover: #c9134e;
+    /* темнее базы в 2.35 раза по яркости */
+    --danger-fg: #1e1f1c;
+    /* тёмный текст на светлой заливке, 5.77 */
+    --danger-hover-fg: #f8f8f2;
+    /* на затемнённой заливке подпись светлеет, 5.34 */
+    --overlay: #14150f;
+    --nav-bg: rgba(30, 31, 28, 0.85);
+    --hairline-accent: rgba(255, 183, 3, 0.4);
+}
+
+[data-bs-theme="light"] {
+    --bs-body-bg: #f8f8f2;
+    /* foreground Monokai становится бумагой */
+    --bs-body-color: #272822;
+    /* background Monokai становится чернилами, 13.94 */
+    --bs-emphasis-color: #14150f;
+    --bs-secondary-color: #75715e;
+    /* comment Monokai работает как есть, 4.6 */
+    --bs-tertiary-bg: #fefef8;
+    --bs-border-color: #e2e2d6;
+
+    /* Тёплые акценты Monokai на светлом нечитаемы: orange #fd971f даёт 2.05 */
+    --link: #8f5000;
+    /* 5.94 */
+    --link-hover: #b36400;
+    --bs-link-color-rgb: 143, 80, 0;
+    --bs-link-hover-color-rgb: 179, 100, 0;
+    --danger: #c4003f;
+    --danger-hover: #8a002c;
+    --danger-fg: #f8f8f2;
+    /* заливка тёмная — текст светлый, 5.76 */
+    --danger-hover-fg: #f8f8f2;
+    /* 9.31 */
+    --overlay: #272822;
+    --nav-bg: rgba(39, 40, 34, 0.92);
+    --hairline-accent: rgba(143, 80, 0, 0.4);
+}
+
+:root {
+    --bs-link-color: var(--link);
+    --bs-link-hover-color: var(--link-hover);
+}
+
+/* --- База --------------------------------------------------- */
+
+body {
+    padding-top: 3.75rem;
+}
+
+main.container {
+    max-width: var(--measure);
+    padding-inline: 1.25rem;
+}
+
+h1,
+h2,
+h3,
+h4 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
+}
+
+/* Утилита: моношрифт капслоком для служебных подписей */
+.mono-label {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+}
+
+/* --- Навбар ------------------------------------------------- */
+
+.bg-steel {
+    background-color: var(--nav-bg);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.navbar {
+    --bs-navbar-padding-y: 0.6rem;
+}
+
+.navbar-brand {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+}
+
+.navbar-nav .nav-link {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+}
+
+.navbar-nav .nav-link.active {
+    color: var(--accent) !important;
+}
+
+/* --- Шапка блога -------------------------------------------- */
+
+.masthead {
+    padding: 4.5rem 0 2.75rem;
+    border-bottom: 1px solid var(--bs-border-color);
+    margin-bottom: 3rem;
+}
+
+.masthead-title {
+    font-size: clamp(2.75rem, 9vw, 4.25rem);
+    letter-spacing: -0.045em;
+    line-height: 0.92;
+    margin-bottom: 1.25rem;
+}
+
+.masthead-tagline {
+    font-size: 1.2rem;
+    color: var(--bs-secondary-color);
+    max-width: 38ch;
+    margin-bottom: 2.25rem;
+}
+
+/* Строка «сейчас» — единственный акцентный элемент шапки.
+   Содержит реальное состояние работы, а не декорацию. */
+.now-strip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.4rem 1.25rem;
+    margin: 0;
+    padding-left: 1rem;
+    border-left: 2px solid var(--accent);
+}
+
+.now-strip dt {
+    color: var(--link);
+    font-weight: 500;
+}
+
+.now-strip dd {
+    margin: 0;
+    color: var(--bs-secondary-color);
+}
+
+/* --- Метаданные записи -------------------------------------- */
+
+.post-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    color: var(--bs-secondary-color);
+    margin-bottom: 0.7rem;
+}
+
+.post-meta .sep {
+    opacity: 0.35;
+}
+
+/* --- Заголовки записей -------------------------------------- */
+
+.post-title {
+    display: inline;
+    color: var(--bs-emphasis-color);
+    background-image: linear-gradient(var(--accent), var(--accent));
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    background-size: 0% 2px;
+    transition: background-size 0.28s ease;
+}
+
+.lead-post:hover .post-title,
+.lead-post:focus-visible .post-title,
+.archive-item:hover .post-title,
+.archive-item:focus-visible .post-title {
+    background-size: 100% 2px;
+}
+
+.post-excerpt {
+    color: var(--bs-secondary-color);
+    margin-bottom: 0;
+}
+
+/* --- Ведущая запись ----------------------------------------- */
+
+.lead-post {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    padding: 2rem;
+    margin-bottom: 3.5rem;
+    background-color: var(--bs-tertiary-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+    transition: border-color 0.2s ease;
+}
+
+.lead-post:hover,
+.lead-post:focus-visible {
+    color: inherit;
+    border-color: var(--hairline-accent);
+}
+
+.lead-post h2 {
+    font-size: clamp(1.6rem, 4.5vw, 2.15rem);
+    margin-bottom: 0.75rem;
+}
+
+/* Закреплённая запись: та же левая линейка, что у now-strip
+   и цитат — приём переиспользуется, а не изобретается новый */
+.lead-post.is-pinned {
+    border-left: 2px solid var(--accent);
+}
+
+.lead-post .pin-label {
+    display: block;
+    margin-bottom: 0.75rem;
+    color: var(--link);
+}
+
+.read-more {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-top: 1.4rem;
+    color: var(--link);
+}
+
+.read-more .arrow {
+    transition: transform 0.2s ease;
+}
+
+.lead-post:hover .read-more .arrow {
+    transform: translateX(4px);
+}
+
+/* --- Разделитель секции ------------------------------------- */
+
+.section-rule {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+    color: var(--bs-secondary-color);
+    letter-spacing: 0.14em;
+}
+
+.section-rule::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background-color: var(--bs-border-color);
+}
+
+/* --- Архив -------------------------------------------------- */
+
+.archive-item {
+    display: block;
+    padding: 1.6rem 0;
+    text-decoration: none;
+    color: inherit;
+    border-top: 1px solid var(--bs-border-color);
+    transition: transform 0.2s ease;
+}
+
+.archive-item:hover,
+.archive-item:focus-visible {
+    color: inherit;
+    transform: translateX(6px);
+}
+
+.archive-item h2 {
+    font-size: 1.25rem;
+    margin-bottom: 0.5rem;
+}
+
+/* Аннотация в архиве — ровно две строки, чтобы список оставался сканируемым */
+.archive-item .post-excerpt {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-size: 0.95rem;
+}
+
+/* --- Страница записи ---------------------------------------- */
+
+.post-header {
+    padding: 3rem 0 2rem;
+    border-bottom: 1px solid var(--bs-border-color);
+    margin-bottom: 2.5rem;
+}
+
+.post-header h1 {
+    font-size: clamp(2rem, 6vw, 3rem);
+    letter-spacing: -0.04em;
+    margin-bottom: 1rem;
+}
+
+.post-body {
+    font-size: 1.12rem;
+    max-width: 68ch;
+}
+
+.post-body p {
+    margin-bottom: 1.5rem;
+}
+
+.post-body h2 {
+    font-size: 1.5rem;
+    margin: 2.5rem 0 1rem;
+}
+
+.post-body h3 {
+    font-size: 1.2rem;
+    margin: 2rem 0 0.75rem;
+}
+
+.post-body ul,
+.post-body ol {
+    margin: 0 0 1.5rem;
+    padding-left: 1.4rem;
+}
+
+.post-body li {
+    margin-bottom: 0.5rem;
+}
+
+/* Маркер списка — единственное место, где акцент появляется в тексте */
+.post-body li::marker {
+    color: var(--link);
+}
+
+.post-body strong {
+    color: var(--bs-emphasis-color);
+    font-weight: 600;
+}
+
+.post-body a {
+    color: var(--link);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+}
+
+/* Та же левая линейка, что у now-strip: один приём вместо нового */
+.post-body blockquote {
+    margin: 2rem 0;
+    padding-left: 1.25rem;
+    border-left: 2px solid var(--accent);
+    font-size: 1.15rem;
+    color: var(--bs-emphasis-color);
+}
+
+.post-body hr {
+    margin: 2.75rem 0;
+    border: 0;
+    border-top: 1px solid var(--bs-border-color);
+    opacity: 1;
+}
+
+.post-body table {
+    width: 100%;
+    margin-bottom: 1.5rem;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+}
+
+.post-body th,
+.post-body td {
+    padding: 0.6rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.post-body th {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--bs-secondary-color);
+}
+
+.post-body pre {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    padding: 1.25rem;
+    background-color: var(--bs-tertiary-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+    overflow-x: auto;
+}
+
+.post-body code {
+    font-family: var(--font-mono);
+    font-size: 0.88em;
+    color: var(--link);
+}
+
+.post-body pre code {
+    color: inherit;
+}
+
+/* --- Подпись автора ----------------------------------------- */
+
+/* Конец статьи — момент, когда читатель спрашивает «кто это написал».
+   Поэтому здесь не подпись, а короткая справка и способ связаться. */
+.author-byline {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.25rem;
+    margin-top: 2.5rem;
+    padding: 1.5rem;
+    background-color: var(--bs-tertiary-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+}
+
+.eyebrow {
+    display: block;
+    margin-bottom: 0.4rem;
+    color: var(--bs-secondary-color);
+}
+
+.author-byline .bio {
+    margin: 0.45rem 0 0.9rem;
+    font-size: 0.97rem;
+    color: var(--bs-secondary-color);
+}
+
+.author-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.1rem;
+}
+
+.author-links a {
+    color: var(--bs-secondary-color);
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.author-links a:hover,
+.author-links a:focus-visible {
+    color: var(--link);
+}
+
+/* --- Действия автора ------------------------------------------
+   Служебный элемент: читателю не нужен, автору должен быть найден.
+   Поэтому приглушён до цвета вторичного текста и проявляется
+   только при наведении. */
+
+.post-actions {
+    display: flex;
+    gap: 1.25rem;
+    margin-top: 2.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--bs-border-color);
+}
+
+.post-actions a,
+.post-actions button {
+    padding: 0;
+    background: none;
+    border: 0;
+    color: var(--bs-secondary-color);
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.post-actions a:hover,
+.post-actions a:focus-visible {
+    color: var(--link);
+}
+
+.post-actions button:hover,
+.post-actions button:focus-visible {
+    color: var(--danger);
+}
+
+/* --- Модальное окно ------------------------------------------- */
+
+/* Поверхность светлее обычной карточки: окно должно читаться
+   как слой над страницей, а не как её продолжение */
+.modal-content {
+    background-color: var(--overlay);
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+}
+
+.modal-header,
+.modal-footer {
+    border-color: var(--bs-border-color);
+    padding: 1.25rem 1.5rem;
+}
+
+.modal-body {
+    padding: 0.5rem 1.5rem 1.25rem;
+}
+
+.modal-title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.3rem;
+    letter-spacing: -0.02em;
+    color: var(--bs-emphasis-color);
+}
+
+/* Заголовок несёт вопрос, тело — последствия. Разный вес и цвет,
+   иначе оба абзаца читаются как одна серая масса */
+.modal-body p {
+    font-size: 1.02rem;
+    line-height: 1.6;
+    color: var(--bs-secondary-color);
+}
+
+.modal-body strong {
+    color: var(--bs-emphasis-color);
+}
+
+.btn-danger {
+    --bs-btn-bg: var(--danger);
+    --bs-btn-border-color: var(--danger);
+    --bs-btn-color: var(--danger-fg);
+    --bs-btn-hover-bg: var(--danger-hover);
+    --bs-btn-hover-border-color: var(--danger-hover);
+    --bs-btn-hover-color: var(--danger-hover-fg);
+    --bs-btn-active-bg: var(--danger-hover);
+    --bs-btn-active-border-color: var(--danger-hover);
+    --bs-btn-active-color: var(--danger-hover-fg);
+}
+
+.btn-outline-secondary {
+    --bs-btn-color: var(--bs-secondary-color);
+    --bs-btn-border-color: var(--bs-border-color);
+    --bs-btn-hover-bg: transparent;
+    --bs-btn-hover-color: var(--bs-emphasis-color);
+    --bs-btn-hover-border-color: var(--bs-secondary-color);
+}
+
+/* --- Теги записи --------------------------------------------- */
+
+.post-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 2.5rem;
+}
+
+.post-tags a {
+    padding: 0.35rem 0.7rem;
+    color: var(--bs-secondary-color);
+    text-decoration: none;
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+    transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.post-tags a:hover,
+.post-tags a:focus-visible {
+    color: var(--link);
+    border-color: var(--hairline-accent);
+}
+
+/* Обесцвечивание принудительное: акцент должен остаться
+   единственным цветом на странице при любой загруженной фотографии */
+.avatar {
+    border-radius: 50%;
+    object-fit: cover;
+    filter: grayscale(1) brightness(0.9) contrast(1.08);
+    border: 1px solid var(--bs-border-color);
+    flex-shrink: 0;
+}
+
+.author-byline .name {
+    font-family: var(--font-display);
+    font-weight: 700;
+    color: var(--bs-emphasis-color);
+    line-height: 1.3;
+}
+
+
+/* --- Индикатор чтения ---------------------------------------
+   Показывает реальную позицию прокрутки. Никакого стартового
+   смещения: подрисованный прогресс — это ровно тот тёмный
+   паттерн, ради вида которого врут пользователю. */
+
+.reading-progress {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background-color: var(--accent);
+    transform: scaleX(0);
+    transform-origin: 0 50%;
+    z-index: 1040;
+    /* fixed-top у Bootstrap — 1030 */
+    will-change: transform;
+}
+
+/* --- Связанные записи ---------------------------------------- */
+
+.related {
+    margin-top: 4rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--bs-border-color);
+}
+
+.related-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-top: 1.25rem;
+}
+
+.related-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 1.5rem;
+    text-decoration: none;
+    color: inherit;
+    background-color: var(--bs-tertiary-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+    transition: border-color 0.2s ease;
+}
+
+.related-card:hover,
+.related-card:focus-visible {
+    color: inherit;
+    border-color: var(--hairline-accent);
+}
+
+/* Основание рекомендации показывается явно: читатель видит,
+   почему ему предлагают именно это, и может с этим не согласиться */
+.related-card .shared-tag {
+    color: var(--link);
+}
+
+.related-card .headline {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.05rem;
+    line-height: 1.3;
+}
+
+/* auto прижимает метаданные к низу — у карточек с разной длиной
+   заголовка нижние строки выравниваются между собой */
+.related-card .meta {
+    margin-top: auto;
+    padding-top: 0.4rem;
+    color: var(--bs-secondary-color);
+}
+
+.tag {
+    color: var(--link);
+}
+
+/* Возврат к списку — завершающее действие, не ссылка внутри текста.
+   Приглушена намеренно: соседние записи выше должны быть заметнее. */
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: var(--bs-secondary-color);
+    text-decoration: none;
+}
+
+.back-link:hover,
+.back-link:focus-visible {
+    color: var(--link);
+}
+
+.back-link .arrow {
+    transition: transform 0.2s ease;
+}
+
+.back-link:hover .arrow {
+    transform: translateX(-3px);
+}
+
+/* --- Страница ошибки ------------------------------------------
+   Код — техническая подробность, поэтому он надзаголовком.
+   Заголовок несёт то, что человеку действительно нужно понять. */
+
+.error-page {
+    max-width: 46ch;
+    padding: 5.5rem 0 4rem;
+}
+
+.error-code {
+    color: var(--link);
+}
+
+.error-title {
+    font-size: clamp(2rem, 6vw, 3rem);
+    letter-spacing: -0.04em;
+    margin-bottom: 1.1rem;
+}
+
+.error-detail {
+    margin-bottom: 2.25rem;
+    font-size: 1.1rem;
+    color: var(--bs-secondary-color);
+}
+
+.error-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.75rem;
+}
+
+/* --- Пустое состояние --------------------------------------- */
+
+.empty-state {
+    padding: 4rem 0;
+    border-top: 1px solid var(--bs-border-color);
+    color: var(--bs-secondary-color);
+}
+
+/* --- Карточка общего назначения ----------------------------- */
+
+.content-section {
+    background-color: var(--bs-tertiary-bg);
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+}
+
+/* --- Кнопки ------------------------------------------------- */
+
+.btn-light {
+    --bs-btn-bg: var(--accent);
+    --bs-btn-border-color: var(--accent);
+    --bs-btn-color: #1e1f1c;
+    --bs-btn-hover-bg: var(--accent-hot);
+    --bs-btn-hover-border-color: var(--accent-hot);
+    --bs-btn-hover-color: #1e1f1c;
+}
+
+.btn-outline-light {
+    --bs-btn-color: #f8f8f2;
+    --bs-btn-border-color: rgba(255, 255, 255, 0.3);
+    --bs-btn-hover-bg: transparent;
+    --bs-btn-hover-color: var(--accent);
+    --bs-btn-hover-border-color: var(--accent);
+}
+
+/* --- Подвал ------------------------------------------------- */
+
+.site-footer {
+    color: var(--bs-secondary-color);
+    border-top: 1px solid var(--bs-border-color);
+}
+
+.site-footer a {
+    color: var(--bs-secondary-color);
+    text-decoration: none;
+}
+
+.site-footer a:hover {
+    color: var(--link);
+}
+
+/* --- Базовое качество --------------------------------------- */
+
+:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .masthead {
+        padding-top: 3rem;
+    }
+
+    .lead-post {
+        padding: 1.5rem;
+    }
+}
