@@ -18,9 +18,9 @@ from models import get_or_create_tags
 from schemas import (
     PostCreate,
     PostDetail,
-    PostForm,
     PostFormInput,
     PostResponse,
+    PostUpdate,
     TagCount,
     UserCreate,
     UserResponse,
@@ -609,35 +609,41 @@ def create_post(post: PostCreate, db: DbSession):
     return new_post
 
 
-@app.put("/api/posts/{post_id}", response_model=PostDetail)
-def replace_post(post: PostDep, data: PostForm, db: DbSession) -> models.Post:
-    """Replace the editable fields of a post.
+@app.patch("/api/posts/{post_id}", response_model=PostDetail)
+def update_post_fields(post: PostDep, data: PostUpdate, db: DbSession) -> models.Post:
+    """Change some fields of a post, leaving the rest alone.
 
-    PUT rather than PATCH because the body is a complete replacement:
-    every editable field is required, and omitting tags clears them
-    rather than leaving them alone. Sending the same body twice leaves
-    the post in the same state, which is what PUT promises.
+    PATCH rather than PUT: a client fixing a typo in the title should
+    not have to resend the whole article to avoid blanking it.
 
-    The author is not part of the body. Ownership is not an editable
-    field, and PostForm — unlike PostCreate — has no user_id.
+    Which fields to touch comes from exclude_unset, so an omitted field
+    and a field sent as null both mean "leave it alone". The keys can
+    only be PostUpdate's own, which is what makes setattr safe here.
 
-    A missing id is a 404 rather than a create: ids come from the
-    database, so there is no meaningful post to create at an id the
-    client picked.
+    Tags are replaced as a set rather than merged: sending [] clears
+    them, omitting the key keeps them. There is no way to add one tag
+    without naming the others, which is the usual trade for keeping a
+    collection field simple.
+
+    The author is not in the body — ownership is not editable. An empty
+    body changes nothing and returns the post unchanged.
 
     Args:
-        post (PostDep): the post being replaced, resolved by the
+        post (PostDep): the post being changed, resolved by the
             dependency, which raises 404 when it does not exist.
-        data (PostForm): the replacement fields, already validated.
+        data (PostUpdate): the fields to change, already validated.
         db (DbSession): current database session.
 
     Returns:
-        models.Post: the post as stored after the replacement.
+        models.Post: the post as stored after the change.
     """
-    post.title = data.title
-    post.summary = data.summary
-    post.content = data.content
-    post.tags = get_or_create_tags(db, data.tags)
+    changes = data.model_dump(exclude_unset=True, exclude_none=True)
+
+    if "tags" in changes:
+        post.tags = get_or_create_tags(db, changes.pop("tags"))
+    for name, value in changes.items():
+        setattr(post, name, value)
+
     db.commit()
     db.refresh(post)
     return post
