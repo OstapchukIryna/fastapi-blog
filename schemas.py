@@ -1,18 +1,22 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class UserCreate(BaseModel):
     username: str = Field(min_length=3, max_length=50)
-    email: str = Field(min_length=3, max_length=120)
+    email: EmailStr = Field(min_length=3, max_length=120)
     password: str = Field(min_length=8, max_length=128)
 
 
-class UserResponse(BaseModel):
-    """Пароль сюда не входит намеренно: response_model отсекает всё,
-    чего нет в схеме, поэтому хеш физически не попадёт в ответ."""
+class UserUpdate(BaseModel):
+    username: str | None = Field(default=None, min_length=3, max_length=50)
+    email: EmailStr | None = Field(default=None, min_length=3, max_length=120)
+    password: str | None = Field(default=None, min_length=8, max_length=128)
+    image_file: str | None = Field(default=None, min_length=3, max_length=200)
 
+
+class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -22,7 +26,8 @@ class UserResponse(BaseModel):
 
 
 def normalise_tags(value: list[str]) -> list[str]:
-    """Strip, lowercase and de-duplicate a list of tag names.
+    """
+    Strip, lowercase and de-duplicate a list of tag names.
 
     Shared by every schema that accepts tags, so the rules cannot drift
     apart between creating and updating a post.
@@ -32,6 +37,7 @@ def normalise_tags(value: list[str]) -> list[str]:
 
     Returns:
         list[str]: cleaned names, blanks dropped, order preserved.
+
     """
     cleaned = [tag.strip().lower() for tag in value if tag.strip()]
     # dict.fromkeys rather than set: drops duplicates but keeps order
@@ -39,9 +45,6 @@ def normalise_tags(value: list[str]) -> list[str]:
 
 
 class PostForm(BaseModel):
-    """Поля, которые вводит человек. HTML-форма и API проверяются
-    одним и тем же кодом, поэтому правила не могут разойтись."""
-
     title: str = Field(min_length=1, max_length=100)
     summary: str = Field(min_length=1, max_length=250)
     content: str = Field(min_length=1)
@@ -55,14 +58,12 @@ class PostForm(BaseModel):
 
 
 class PostCreate(PostForm):
-    """То же плюс автор: в API его передаёт клиент, а в форме он
-    берётся из сессии, поэтому в PostForm ему не место."""
-
     user_id: int
 
 
 class PostUpdate(BaseModel):
-    """A partial change to a post, for PATCH.
+    """
+    A partial change to a post, for PATCH.
 
     Every field is optional, and None means "not sent" rather than "set
     to null" — none of these columns is nullable, so there is nothing a
@@ -80,6 +81,7 @@ class PostUpdate(BaseModel):
         tags (list[str] | None): the complete new tag set, if changing
             it. Tags are replaced wholesale rather than merged, so
             sending [] clears them; omitting the field leaves them.
+
     """
 
     title: str | None = Field(default=None, min_length=1, max_length=100)
@@ -95,7 +97,8 @@ class PostUpdate(BaseModel):
 
 
 class PostFormInput(BaseModel):
-    """Raw input from the HTML form: exactly what the browser sent.
+    """
+    Raw input from the HTML form: exactly what the browser sent.
 
     A separate type from PostForm because they are different things.
     Everything here is a string and everything is optional — the form can
@@ -111,6 +114,7 @@ class PostFormInput(BaseModel):
         summary (str): the summary as typed.
         content (str): the markdown body as typed.
         tags (str): tags as one comma-separated string.
+
     """
 
     title: str = ""
@@ -119,7 +123,8 @@ class PostFormInput(BaseModel):
     tags: str = ""
 
     def validated(self) -> PostForm:
-        """Turn the raw input into a validated post.
+        """
+        Turn the raw input into a validated post.
 
         The tag string becomes a list here; the remaining rules are not
         duplicated but taken from PostForm, the same model the API
@@ -132,6 +137,7 @@ class PostFormInput(BaseModel):
         Raises:
             ValidationError: if any field fails validation. The caller
                 catches it and redraws the form with the errors.
+
         """
         return PostForm(
             title=self.title,
@@ -146,9 +152,6 @@ class PostFormInput(BaseModel):
 
 
 class PostResponse(BaseModel):
-    """Ответ API для списка. Без content: выдача из десяти записей
-    иначе тащит десять полных статей ради заголовков."""
-
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -167,8 +170,6 @@ class PostResponse(BaseModel):
 
 
 class PostDetail(PostResponse):
-    """Ответ API для одной записи. Тело есть только здесь."""
-
     content: str
 
 
