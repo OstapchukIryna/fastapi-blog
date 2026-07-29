@@ -1,8 +1,12 @@
 {% extends "layout.html" %}
 {% block content %}
     {# Одна форма на создание и правку: поля совпадают полностью,
-       различаются только заголовок, адрес отправки и подпись кнопки. #}
-    {% set editing = mode == "edit" %}
+       различаются только заголовок, адрес отправки и подпись кнопки.
+       Всё состояние приходит одним объектом view. #}
+    {% set editing = view.editing %}
+    {% set values = view.values %}
+    {% set errors = view.errors %}
+    {% set post = view.post %}
 
     <header class="masthead form-masthead">
         <span class="eyebrow mono-label">{{ "Edit" if editing else "New" }}</span>
