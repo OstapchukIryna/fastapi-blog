@@ -42,7 +42,7 @@ class User(Base):
     def image_path(self) -> str:
         if self.image_file:
             return f"/media/profile_pics/{self.image_file}"
-        return "/static/profile_pics/avatar-128.jpg"
+        return "/static/profile_pics/default.jpg"
 
 
 class Tag(Base):
@@ -81,12 +81,7 @@ class Post(Base):
 
     @property
     def outline(self) -> list[str]:
-        """Заголовки разделов записи.
-
-        В списке записей это заменяет аннотацию: скелет рассуждения
-        показывает, как автор шёл к ответу, а аннотация — только о чём
-        текст. Оценивающему нужно первое.
-        """
+        """Headers from post"""
         return [
             line.removeprefix("## ").strip()
             for line in self.content.splitlines()
@@ -95,19 +90,12 @@ class Post(Base):
 
     @property
     def reading_minutes(self) -> int:
-        """Время чтения при 200 словах в минуту, не меньше одной.
-
-        Здесь, а не в шаблоне: та же формула была скопирована в четыре
-        шаблона и каждый раз разбирала полный текст записи.
-        """
+        """Time to read based on resading speen 200 words per minutes, but min is one."""
         return max(1, ceil(len(self.content.split()) / 200))
 
 
 def get_or_create_tags(db: Session, names: list[str]) -> list[Tag]:
-    """Существующие теги переиспользуются, недостающие создаются.
-
-    Один запрос на всю пачку, а не по одному на имя.
-    """
+    """Check of existing tags or create new ones."""
     if not names:
         return []
 

@@ -24,6 +24,7 @@ from schemas import (
     TagCount,
     UserCreate,
     UserResponse,
+    UserUpdate,
 )
 from templating import templates
 
@@ -609,6 +610,36 @@ def get_post(post: PostDep):
     return post
 
 
+@app.delete("/api/posts/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_post_api(post: PostDep, db: DbSession) -> Response:
+    """
+    Delete a post.
+
+    Returns 204 with no body: there is nothing meaningful to send back
+    about a resource that no longer exists.
+
+    Repeating the request gives 404, not 204. DELETE is idempotent in
+    its effect — the post is gone either way — but the second call is
+    honestly reporting that there was nothing at that id to delete.
+
+    The rows in post_tags go with the post. The tags themselves stay,
+    even when nothing references them any more; they are invisible in
+    /api/tags, which joins through posts, but they do accumulate.
+
+    Args:
+        post (PostDep): the post to delete; the dependency raises 404
+            when the id does not exist.
+        db (DbSession): current database session.
+
+    Returns:
+        Response: an empty 204.
+
+    """
+    db.delete(post)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @app.post("/api/posts", response_model=PostDetail, status_code=status.HTTP_201_CREATED)
 def create_post(post: PostCreate, db: DbSession):
     # The only 404 check left in the route: the author comes in the request body,
@@ -715,6 +746,43 @@ def update_post_fields(post: PostDep, data: PostUpdate, db: DbSession) -> models
     db.commit()
     db.refresh(post)
     return post
+
+
+@app.patch("/api/users/{user_id}", response_model=UserResponse)
+def update_user_fields(user: UserDep, data: UserUpdate, db: DbSession) -> models.User:
+    """
+    Change some fields of a user, leaving the rest alone.
+
+    Which fields to touch comes from exclude_unset, so an omitted field
+    and a field sent as null both mean "leave it alone". The keys can
+    only be UserUpdate's own, which is what makes setattr safe here.
+
+    Args:
+        user (UserDep): the user being changed, resolved by the
+            dependency, which raises 404 when it does not exist.
+        data (UsertUpdate): the fields to change, already validated.
+        db (DbSession): current database session.
+
+    Returns:
+        models.User: the user as stored after the change.
+
+    """
+    changes = data.model_dump(exclude_unset=True, exclude_none=True)
+
+    for name, value in changes.items():
+        setattr(user, name, value)
+
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@app.delete("/api/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(user: UserDep, db: DbSession) -> Response:
+    """Cascading deletion of a user. All posts will be delete as well. Returns an empty 204."""
+    db.delete(user)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @app.get("/api/tags", response_model=list[TagCount])
