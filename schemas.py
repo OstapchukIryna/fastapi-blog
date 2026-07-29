@@ -46,15 +46,22 @@ class PostCreate(PostForm):
 
 
 class PostFormInput(BaseModel):
-    """Сырой ввод HTML-формы: ровно то, что прислал браузер.
+    """Raw input from the HTML form: exactly what the browser sent.
 
-    Отдельный тип от PostForm, потому что это разные вещи. Здесь всё
-    строки и всё необязательное — форму можно отправить пустой, и это
-    не ошибка программы, а ошибка человека, которую надо показать.
-    Теги приходят одной строкой, потому что в HTML нет поля «список».
+    A separate type from PostForm because they are different things.
+    Everything here is a string and everything is optional — the form can
+    be submitted empty, and that is a person's mistake to be shown back,
+    not a programming error. Tags arrive as one string because HTML has
+    no "list" field.
 
-    Пустые значения по умолчанию нужны для GET: пустая форма — это
-    PostFormInput() без аргументов.
+    The empty defaults are what makes a blank form: PostFormInput() with
+    no arguments.
+
+    Attributes:
+        title (str): the post title as typed.
+        summary (str): the summary as typed.
+        content (str): the markdown body as typed.
+        tags (str): tags as one comma-separated string.
     """
 
     title: str = ""
@@ -63,14 +70,19 @@ class PostFormInput(BaseModel):
     tags: str = ""
 
     def validated(self) -> PostForm:
-        """Проверенная запись из сырого ввода.
+        """Turn the raw input into a validated post.
 
-        Здесь строка тегов превращается в список; остальные правила не
-        дублируются, а берутся из PostForm — того же, что проверяет API.
+        The tag string becomes a list here; the remaining rules are not
+        duplicated but taken from PostForm, the same model the API
+        validates against.
+
+        Returns:
+            PostForm: the validated fields, with tags split, lowercased
+            and de-duplicated.
 
         Raises:
-            ValidationError: если какое-то поле не прошло проверку.
-                Вызывающий ловит её и перерисовывает форму с ошибками.
+            ValidationError: if any field fails validation. The caller
+                catches it and redraws the form with the errors.
         """
         return PostForm(
             title=self.title,

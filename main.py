@@ -26,7 +26,7 @@ from schemas import (
 )
 from templating import templates
 
-# TODO: заменить на Alembic — create_all не умеет менять существующие таблицы
+# TODO: replace with Alembic — create_all cannot alter existing tables
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
@@ -39,15 +39,18 @@ register_error_handlers(app)
 DbSession = Annotated[Session, Depends(get_db)]
 
 
-# --- Вспомогательное -------------------------------------------------
+# --- Helpers ---------------------------------------------------------
 
 
 def posts_query():
-    """Базовая выборка записей с подтянутыми связями.
+    """Build the base post query with its relations already loaded.
 
-    selectinload и joinedload здесь не оптимизация «на будущее»: без них
-    обращение к post.tags в шаблоне порождает отдельный запрос на каждую
-    запись — та самая проблема N+1.
+    selectinload and joinedload are not speculative optimisation: without
+    them, touching post.tags in a template issues one query per post,
+    which is the N+1 problem.
+
+    Returns:
+        Select: posts ordered newest first, with tags and author loaded.
     """
     return (
         select(models.Post)
@@ -62,10 +65,18 @@ def posts_query():
 def find_related(
     db: Session, current: models.Post, limit: int = 2
 ) -> tuple[list[dict], str]:
-    """Подбирает записи по пересечению тегов.
+    """
+    Find related posts by tags. Returns a list of related posts with shared tags.
 
-    Заголовок секции возвращается вместе со списком: если общих тегов
-    нет, блок не называется Related.
+    Args:
+        db (Session): current database session
+        current (models.Post): current post
+        limit (int, optional): Limit of related posts to return. Defaults to 2.
+
+    Returns:
+        tuple[list[dict], str]: List of related posts with shared tags
+        and a label indicating the type of relation
+
     """
     current_tags = {tag.name for tag in current.tags}
 
@@ -89,8 +100,6 @@ def find_related(
             for p in candidates
         ]
         if matched:
-            # Сортировка по кортежу: сначала число общих тегов,
-            # при равенстве — свежесть
             matched.sort(
                 key=lambda m: (len(m["shared"]), m["post"].date_posted), reverse=True
             )
@@ -106,10 +115,15 @@ def find_related(
 
 
 def all_topics(db: Session) -> list[tuple[str, int]]:
-    """Теги с числом записей, от популярных к редким.
+    """
+    Sort tags by counting posts with them. Return list of tuples with tag name and count of posts.
 
-    Один запрос с группировкой вместо загрузки всех тегов и подсчёта
-    их записей в Python — считать умеет база.
+    Args:
+        db (Session): current database session
+
+    Returns:
+        list[tuple[str, int]]: List of tuples containing tag names and their respective post counts
+
     """
     rows = db.execute(
         select(models.Tag.name, func.count(models.Post.id))
@@ -121,11 +135,17 @@ def all_topics(db: Session) -> list[tuple[str, int]]:
 
 
 def current_author(db: Session) -> models.User:
-    """Автор, от имени которого создаётся запись.
+    """
+    Get author of current post.
 
-    В блоге один пользователь, поэтому берётся первый по id. С
-    появлением JWT здесь будет пользователь из токена — это второе и
-    последнее место, завязанное на «автор всегда один».
+    Args:
+        db (Session): current database session
+
+    Raises:
+        HTTPException: If no author is found in the database, raises a 500 Internal Server Error with a message to run the seed script.
+
+    Returns:
+        models.User: The first user found in the database, representing the author of the current post.
     """
     author = db.execute(select(models.User).order_by(models.User.id)).scalars().first()
     if author is None:
@@ -137,12 +157,15 @@ def current_author(db: Session) -> models.User:
 
 
 def form_errors(exception: ValidationError) -> dict[str, str]:
-    """Ошибки Pydantic в вид «поле → сообщение».
+    """
+    Generate human-readable exeptions
 
-    По одной на поле: показывать три сообщения про один и тот же ввод
-    бессмысленно, а первое обычно и есть причина. Формулировки свои:
-    «String should have at least 1 character» — голос валидатора, а
-    человеку нужно знать, что поле обязательно.
+    Args:
+        exception (ValidationError): exeption from pydantic validation
+
+    Returns:
+        dict[str, str]: dictionary with field name and error message
+
     """
     errors: dict[str, str] = {}
     for error in exception.errors():
@@ -163,12 +186,15 @@ def form_errors(exception: ValidationError) -> dict[str, str]:
     return errors
 
 
-def set_pinned(db: Session, post: models.Post, pinned: bool) -> None:
-    """Закрепление одно на весь блог.
+def set_pinned(db: Session, post: models.Post, *, pinned: bool) -> None:
+    """
+    Set pinned status for a post
 
-    Ведущая запись на главной ровно одна, поэтому закрепление новой
-    снимает предыдущее. Без этого вторая закреплённая запись молча
-    теряет метку и выглядит обычной — arrange() берёт только первую.
+    Args:
+        db (Session): current database session
+        post (models.Post): post to be pinned
+        pinned (bool): if True, pin the post; if False, unpin the post
+
     """
     if pinned:
         db.execute(
@@ -180,10 +206,15 @@ def set_pinned(db: Session, post: models.Post, pinned: bool) -> None:
 
 
 def arrange(items: Sequence[models.Post]) -> dict:
-    """Раскладывает список на ведущую запись и остальные.
+    """
+    Separate posts onto one pinned and others. Rearrange them
 
-    Без закреплённой ведущей становится первая по порядку, то есть
-    самая свежая — выборки уже отсортированы по дате.
+    Args:
+        items (Sequence[models.Post]): sequence of posts
+
+    Returns:
+        dict: Dictionary containing pinned post, lead post, and the rest of the posts
+
     """
     pinned = next((p for p in items if p.is_pinned), None)
     rest = [p for p in items if p is not pinned]
@@ -191,19 +222,14 @@ def arrange(items: Sequence[models.Post]) -> dict:
     return {"pinned": pinned, "lead": lead, "rest": rest}
 
 
-# --- Зависимости ------------------------------------------------------
-# «Достать по id, иначе 404» повторялось в одиннадцати роутах. Здесь это
-# написано один раз: FastAPI превращает параметр пути в объект до входа
-# в тело роута, поэтому роут получает готовую запись и про 404 не знает.
+# --- Dependencies ------------------------------------------------------
+# Create dependencies for loading posts, users, and tagged posts from the database.
+# These dependencies will be used in the route handlers to fetch the required data based on the provided parameters.
+# Prevent code duplication and ensure consistent error handling for missing resources.
 
 
 def load_post(post_id: int, db: DbSession) -> models.Post:
-    """Запись со связями, иначе 404.
-
-    Связи подтягиваются даже там, где роут их не читает — закрепление и
-    удаление. Один лишний запрос на двух авторских действиях дешевле,
-    чем вторая почти такая же зависимость рядом.
-    """
+    """Returns post by id, otherwise 404."""
     post = db.execute(posts_query().where(models.Post.id == post_id)).scalars().first()
     if post is None:
         raise HTTPException(
@@ -213,7 +239,7 @@ def load_post(post_id: int, db: DbSession) -> models.Post:
 
 
 def load_user(user_id: int, db: DbSession) -> models.User:
-    """Пользователь, иначе 404."""
+    """Returns user by id, otherwise 404."""
     user = db.get(models.User, user_id)
     if user is None:
         raise HTTPException(
@@ -223,11 +249,7 @@ def load_user(user_id: int, db: DbSession) -> models.User:
 
 
 def load_tagged_posts(tag: str, db: DbSession) -> Sequence[models.Post]:
-    """Записи с тегом, иначе 404.
-
-    Пустая выборка и означает «такого тега нет»: отдельно проверять
-    существование тега незачем.
-    """
+    """Returns posts by tag, otherwise 404. If tags are not found or no posts with this tag, return 404."""
     posts = (
         db.execute(posts_query().join(models.Post.tags).where(models.Tag.name == tag))
         .scalars()
@@ -246,7 +268,7 @@ UserDep = Annotated[models.User, Depends(load_user)]
 TaggedPostsDep = Annotated[Sequence[models.Post], Depends(load_tagged_posts)]
 
 
-# --- Страницы ---------------------------------------------------------
+# --- Routes ---------------------------------------------------------
 
 
 @app.get("/", include_in_schema=False, name="home")
@@ -262,19 +284,21 @@ def home(request: Request, db: DbSession):
 
 @dataclass(slots=True)
 class PostFormView:
-    """Состояние формы записи, из которого рисуется страница.
+    """State of the post form, from which the page is drawn.
 
-    Три поля вместо шести аргументов, и два из прежних выведены, а не
-    переданы: правка — это состояние, у которого есть запись, а 422 —
-    состояние, у которого есть ошибки. Раньше можно было собрать
-    «mode='edit' и post=None» или «есть ошибки, но код 200» — каждая
-    такая пара означала бы сломанную страницу, и ничто её не запрещало.
+    Three fields instead of the previous six arguments. Two of the old
+    ones are derived rather than passed: editing means "there is a post",
+    and 422 means "there are errors". Before, `mode="edit"` with
+    `post=None`, or errors alongside a 200, were both constructible and
+    nothing prevented it.
 
     Attributes:
-        values: то, что человек ввёл. Возвращается в поля даже когда
-            запись не сохранилась — терять набранный текст недопустимо.
-        post: правится существующая запись, либо None для новой.
-        errors: поле → сообщение, по одному на поле.
+        values (PostFormInput): what the person typed. Returned to the
+            fields even when the post was not saved, so typed text is
+            never lost.
+        post (models.Post | None): the post being edited, or None when
+            creating a new one.
+        errors (dict[str, str]): field name to message, one per field.
     """
 
     values: PostFormInput
@@ -283,27 +307,48 @@ class PostFormView:
 
     @property
     def editing(self) -> bool:
-        """Правка отличается от создания наличием записи, а не флагом."""
+        """Whether an existing post is being edited.
+
+        Returns:
+            bool: True when a post is present, which is what
+            distinguishes editing from creating.
+        """
         return self.post is not None
 
     @property
     def title(self) -> str:
-        """Заголовок страницы и вкладки."""
+        """Title for the page and the browser tab.
+
+        Returns:
+            str: "Edit post" when editing, otherwise "New post".
+        """
         return "Edit post" if self.editing else "New post"
 
     @property
     def status_code(self) -> int:
-        """422, когда есть что исправлять, иначе обычные 200."""
+        """HTTP status the form should be returned with.
+
+        Returns:
+            int: 422 when there is something to fix, otherwise 200.
+        """
         return (
             status.HTTP_422_UNPROCESSABLE_CONTENT if self.errors else status.HTTP_200_OK
         )
 
 
 def post_to_input(post: models.Post) -> PostFormInput:
-    """Существующая запись в том виде, в каком её показывают поля формы.
+    """Convert an existing post into the values its form fields show.
 
-    Живёт здесь, а не в schemas: превращение тегов обратно в строку
-    требует знания модели, а схемам про модели знать незачем.
+    Lives here rather than in schemas because turning tags back into a
+    string requires knowing the model, and schemas should not know about
+    models.
+
+    Args:
+        post (models.Post): the post being edited.
+
+    Returns:
+        PostFormInput: the post's fields as the form displays them, with
+        tags joined into a comma-separated string.
     """
     return PostFormInput(
         title=post.title,
@@ -314,18 +359,20 @@ def post_to_input(post: models.Post) -> PostFormInput:
 
 
 def render_post_form(request: Request, view: PostFormView) -> Response:
-    """Рисует форму записи в переданном состоянии.
+    """Draw the post form in the given state.
 
-    Одна форма на создание и правку: поля совпадают полностью, а
-    различия — заголовок, адрес отправки и подпись кнопки — выводятся
-    из view.
+    One form serves both creating and editing: the fields are identical,
+    and the differences — heading, submit target, button label — are
+    derived from the view.
 
     Args:
-        request: нужен Jinja2Templates и url_for в шаблоне.
-        view: что показать — введённое, правимая запись, ошибки.
+        request (Request): needed by Jinja2Templates and url_for.
+        view (PostFormView): what to show — typed values, the post being
+            edited, and any errors.
 
     Returns:
-        Страницу формы; 422, если во view есть ошибки.
+        Response: the form page, with status 422 if the view holds
+        errors.
     """
     return templates.TemplateResponse(
         request,
@@ -335,11 +382,18 @@ def render_post_form(request: Request, view: PostFormView) -> Response:
     )
 
 
-# Объявлено до /posts/{post_id}: FastAPI разбирает маршруты в порядке
-# регистрации, и «new» иначе попадёт в post_id: int и даст 422
+# Must be declared before /posts/{post_id} because FastAPI parses routes in the order of registration,
+# and "new" would otherwise match post_id: int and give 422
 @app.get("/posts/new", include_in_schema=False, name="new_post")
 def new_post_form(request: Request) -> Response:
-    """Пустая форма новой записи."""
+    """Show an empty form for a new post.
+
+    Args:
+        request (Request): needed by the template.
+
+    Returns:
+        Response: the blank form page.
+    """
     return render_post_form(request, PostFormView(values=PostFormInput()))
 
 
@@ -347,14 +401,19 @@ def new_post_form(request: Request) -> Response:
 def create_post_page(
     request: Request, db: DbSession, form: Annotated[PostFormInput, Form()]
 ) -> Response:
-    """Создаёт запись из формы.
+    """Create a post from the submitted form.
 
-    Поля собираются в PostFormInput самим FastAPI: модель в Form()
-    описывает форму так же, как модель в теле описывает JSON.
+    FastAPI fills PostFormInput itself: a model behind Form() describes a
+    form the way a model in the body describes JSON.
+
+    Args:
+        request (Request): needed by the template and by url_for.
+        db (DbSession): current database session.
+        form (PostFormInput): the submitted fields, unvalidated.
 
     Returns:
-        Перенаправление 303 на созданную запись, либо форму с ошибками
-        и введённым текстом, если проверка не прошла.
+        Response: a 303 redirect to the new post, or the form again with
+        errors and the typed text if validation failed.
     """
     try:
         data = form.validated()
@@ -381,7 +440,16 @@ def create_post_page(
 
 @app.get("/posts/{post_id}/edit", include_in_schema=False, name="edit_post")
 def edit_post_form(request: Request, post: PostDep) -> Response:
-    """Форма правки, заполненная существующей записью."""
+    """Show the edit form filled with an existing post.
+
+    Args:
+        request (Request): needed by the template.
+        post (PostDep): the post being edited, resolved by the
+            dependency, which raises 404 when it does not exist.
+
+    Returns:
+        Response: the form page populated from the post.
+    """
     return render_post_form(
         request, PostFormView(values=post_to_input(post), post=post)
     )
@@ -394,12 +462,19 @@ def update_post(
     db: DbSession,
     form: Annotated[PostFormInput, Form()],
 ) -> Response:
-    """Сохраняет правку записи.
+    """Save an edit to a post.
+
+    Args:
+        request (Request): needed by the template and by url_for.
+        post (PostDep): the post being edited.
+        db (DbSession): current database session.
+        form (PostFormInput): the submitted fields, unvalidated.
 
     Returns:
-        Перенаправление 303 на запись, либо форму с ошибками и
-        введённым текстом, если проверка не прошла. Запись при неудаче
-        не меняется: присваивание идёт после проверки.
+        Response: a 303 redirect to the post, or the form again with
+        errors and the typed text if validation failed. The post is
+        left untouched on failure, because assignment happens after
+        validation.
     """
     try:
         data = form.validated()
@@ -420,11 +495,10 @@ def update_post(
     )
 
 
-# Отдельное действие, а не поле формы: закрепление — один щелчок, из-за
-# него не должно требоваться сохранять всю запись
+# One separate action, not a form field
 @app.post("/posts/{post_id}/pin", include_in_schema=False, name="toggle_pin")
 def toggle_pin(request: Request, post: PostDep, db: DbSession):
-    set_pinned(db, post, not post.is_pinned)
+    set_pinned(db, post, pinned=not post.is_pinned)
     db.commit()
     return RedirectResponse(
         request.url_for("edit_post", post_id=post.id),
@@ -496,8 +570,6 @@ def login(request: Request):
 def delete_post(post: PostDep, db: DbSession):
     db.delete(post)
     db.commit()
-    # 303, а не 302: только он гарантирует переход методом GET —
-    # иначе обновление страницы повторит удаление
     return RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -516,9 +588,8 @@ def get_post(post: PostDep):
 
 @app.post("/api/posts", response_model=PostDetail, status_code=status.HTTP_201_CREATED)
 def create_post(post: PostCreate, db: DbSession):
-    # Единственная проверка «есть или 404», оставшаяся в роуте: автор
-    # приходит в теле запроса, а не в пути, и зависимость по параметру
-    # пути его не увидит.
+    # The only 404 check left in the route: the author comes in the request body,
+    # not in the path, and the dependency on the path parameter will not see it.
     if db.get(models.User, post.user_id) is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
@@ -563,8 +634,6 @@ def create_user(user: UserCreate, db: DbSession):
     )
 
     if clash is not None:
-        # Одно сообщение на оба случая: раздельные ответы позволяют
-        # перебором выяснить, какие адреса зарегистрированы
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username or email already registered",
@@ -579,8 +648,7 @@ def create_user(user: UserCreate, db: DbSession):
     try:
         db.commit()
     except IntegrityError:
-        # Подстраховка от гонки: два запроса могли одновременно пройти
-        # проверку на clash выше и столкнуться уже на уровне БД
+        # Race prevention
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
