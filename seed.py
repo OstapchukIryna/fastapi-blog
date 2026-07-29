@@ -7,6 +7,7 @@
 Скрипт идемпотентен: повторный запуск ничего не дублирует.
 """
 
+import asyncio
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -14,10 +15,10 @@ from typing import NotRequired, TypedDict
 
 import bcrypt
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 import models
-from database import Base, engine
+from database import AsyncSessionLocal, Base, engine
 from models import get_or_create_tags
 
 CONTENT_DIR = Path(__file__).parent / "content"
@@ -102,14 +103,11 @@ def load_content(slug: str) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def get_or_create_author(db: Session) -> models.User:
-    user = (
-        db.execute(
-            select(models.User).where(models.User.username == AUTHOR["username"])
-        )
-        .scalars()
-        .first()
+async def get_or_create_author(db: AsyncSession) -> models.User:
+    result = await db.execute(
+        select(models.User).where(models.User.username == AUTHOR["username"])
     )
+    user = result.scalars().first()
 
     if user is not None:
         return user
@@ -122,25 +120,22 @@ def get_or_create_author(db: Session) -> models.User:
         ).decode(),
     )
     db.add(user)
-    db.flush()  # чтобы получить user.id до коммита
+    await db.flush()  # чтобы получить user.id до коммита
     return user
 
 
-def seed() -> None:
-    with Session(engine) as db:
-        author = get_or_create_author(db)
+async def seed() -> None:
+    async with AsyncSessionLocal() as db:
+        author = await get_or_create_author(db)
 
         created = 0
         for item in POSTS:
             # Идемпотентность по заголовку: колонки slug в модели нет,
             # а заголовки здесь уникальны
-            exists = (
-                db.execute(
-                    select(models.Post).where(models.Post.title == item["title"])
-                )
-                .scalars()
-                .first()
+            result = await db.execute(
+                select(models.Post).where(models.Post.title == item["title"])
             )
+            exists = result.scalars().first()
             if exists is not None:
                 continue
 
@@ -152,19 +147,26 @@ def seed() -> None:
                     date_posted=item["date"],
                     is_pinned=item.get("pinned", False),
                     author=author,
-                    tags=get_or_create_tags(db, item["tags"]),
+                    tags=await get_or_create_tags(db, item["tags"]),
                 )
             )
             created += 1
 
-        db.commit()
+        await db.commit()
         print(f"author: {author.username}, added posts: {created}")
 
 
-if __name__ == "__main__":
-    if "--reset" in sys.argv:
-        Base.metadata.drop_all(bind=engine)
-        print("tables dropped")
+async def main() -> None:
+    """Create the tables, optionally dropping them first, then seed."""
+    async with engine.begin() as conn:
+        if "--reset" in sys.argv:
+            await conn.run_sync(Base.metadata.drop_all)
+            print("tables dropped")
+        await conn.run_sync(Base.metadata.create_all)
 
-    Base.metadata.create_all(bind=engine)
-    seed()
+    await seed()
+    await engine.dispose()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

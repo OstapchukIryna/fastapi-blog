@@ -43,7 +43,7 @@ class User(Base):
     def image_path(self) -> str:
         if self.image_file:
             return f"/media/profile_pics/{self.image_file}"
-        return "/static/profile_pics/default.jpg"
+        return "/static/profile_pics/avatar-256.jpg"
 
 
 class Tag(Base):
