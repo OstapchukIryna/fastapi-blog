@@ -155,6 +155,7 @@ class PostResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    author: UserResponse
     title: str
     summary: str
     date_posted: datetime
