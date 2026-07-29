@@ -2,7 +2,10 @@ name: checks
 
 on:
   push:
-    branches: [main]
+    # master, not main: this repository's default branch is master, so
+    # the old value meant pushes to it never ran anything and only pull
+    # requests were checked.
+    branches: [master]
   pull_request:
 
 jobs:
@@ -27,3 +30,28 @@ jobs:
 
       - name: Type check
         run: uv run pyrefly check .
+
+  api:
+    name: api (postman)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      # The script seeds a throwaway database in a temp directory, starts
+      # the app against it, runs the collection and tears it all down.
+      # blog.db is committed, so nothing here may write to it.
+      - name: Run the Postman collection
+        run: ./scripts/api-tests.sh
+
+      # A run that quietly wrote to the tracked database would otherwise
+      # pass unnoticed.
+      - name: The run left no changes behind
+        run: git diff --exit-code
