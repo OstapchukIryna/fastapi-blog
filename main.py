@@ -5,14 +5,10 @@ from typing import Annotated
 
 import bcrypt
 from fastapi import Depends, FastAPI, Form, HTTPException, Request, Response, status
-from fastapi.exception_handlers import (
-    http_exception_handler,
-    request_validation_exception_handler,
-)
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
-from sqlalchemy import func, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
@@ -82,13 +78,13 @@ def posts_query():
 
 
 async def find_related(
-    db: DbSession, current: models.Post, limit: int = 2
+    db: AsyncSession, current: models.Post, limit: int = 2
 ) -> tuple[list[dict], str]:
     """
     Find related posts by tags. Returns a list of related posts with shared tags.
 
     Args:
-        db (DbSession): current database session
+        db (AsyncSession): current database session
         current (models.Post): current post
         limit (int, optional): Limit of related posts to return. Defaults to 2.
 
@@ -128,12 +124,12 @@ async def find_related(
     return [{"post": p, "shared": []} for p in fallback], "More posts"
 
 
-async def all_topics(db: DbSession) -> list[tuple[str, int]]:
+async def all_topics(db: AsyncSession) -> list[tuple[str, int]]:
     """
     Sort tags by counting posts with them. Return list of tuples with tag name and count of posts.
 
     Args:
-        db (DbSession): current database session
+        db (AsyncSession): current database session
 
     Returns:
         list[tuple[str, int]]: List of tuples containing tag names and their respective post counts
@@ -149,12 +145,12 @@ async def all_topics(db: DbSession) -> list[tuple[str, int]]:
     return [(name, count) for name, count in rows]
 
 
-async def current_author(db: DbSession) -> models.User:
+async def current_author(db: AsyncSession) -> models.User:
     """
     Get author of current post.
 
     Args:
-        db (DbSession): current database session
+        db (AsyncSession): current database session
 
     Raises:
         HTTPException: If no author is found in the database, raises a 500 Internal Server Error with a message to run the seed script.
@@ -203,12 +199,12 @@ def form_errors(exception: ValidationError) -> dict[str, str]:
     return errors
 
 
-async def set_pinned(db: DbSession, post: models.Post, *, pinned: bool) -> None:
+async def set_pinned(db: AsyncSession, post: models.Post, *, pinned: bool) -> None:
     """
     Set pinned status for a post
 
     Args:
-        db (Session): current database session
+        db (AsyncSession): current database session
         post (models.Post): post to be pinned
         pinned (bool): if True, pin the post; if False, unpin the post
 
@@ -459,12 +455,15 @@ async def create_post_page(
         title=data.title,
         summary=data.summary,
         content=data.content,
-        author=current_author(db),
-        tags=get_or_create_tags(db, data.tags),
+        author=await current_author(db),
+        tags=await get_or_create_tags(db, data.tags),
     )
     db.add(post)
     await db.commit()
-    await db.refresh(post)
+    # No refresh: the session is created with expire_on_commit=False, so
+    # the object keeps everything it holds after the commit. refresh()
+    # would expire the loaded relationships and leave them to load lazily
+    # during response serialisation, which in async raises MissingGreenlet.
     return RedirectResponse(
         request.url_for("post_page", post_id=post.id),
         status_code=status.HTTP_303_SEE_OTHER,
@@ -664,11 +663,10 @@ async def create_post(post: PostCreate, db: DbSession):
         summary=post.summary,
         content=post.content,
         user_id=post.user_id,
-        tags=get_or_create_tags(db, post.tags),
+        tags=await get_or_create_tags(db, post.tags),
     )
     db.add(new_post)
     await db.commit()
-    await db.refresh(new_post)
     return new_post
 
 
@@ -715,7 +713,6 @@ async def update_all_post_fields(
         setattr(post, name, value)
 
     await db.commit()
-    await db.refresh(post)
     return post
 
 
@@ -756,7 +753,6 @@ async def update_post_fields(
         setattr(post, name, value)
 
     await db.commit()
-    await db.refresh(post)
     return post
 
 
@@ -771,11 +767,26 @@ async def update_user_fields(
     and a field sent as null both mean "leave it alone". The keys can
     only be UserUpdate's own, which is what makes setattr safe here.
 
+    username and email are unique, so a change to either is checked
+    against the other rows before it is applied: a duplicate is a 400,
+    not the 500 an IntegrityError would produce. Re-sending the value a
+    field already holds is not a clash with yourself and passes through
+    as a no-op.
+
+    The password never reaches the model as-is. The column is
+    password_hash, so assigning `password` would set an attribute
+    SQLAlchemy does not map — the request would report success and
+    change nothing.
+
     Args:
         user (UserDep): the user being changed, resolved by the
             dependency, which raises 404 when it does not exist.
-        data (UsertUpdate): the fields to change, already validated.
+        data (UserUpdate): the fields to change, already validated.
         db (DbSession): current database session.
+
+    Raises:
+        HTTPException: 400 when the requested username or email already
+            belongs to somebody else.
 
     Returns:
         models.User: the user as stored after the change.
@@ -783,11 +794,43 @@ async def update_user_fields(
     """
     changes = data.model_dump(exclude_unset=True, exclude_none=True)
 
+    wanted = {
+        name: value
+        for name, value in changes.items()
+        if name in {"username", "email"} and value != getattr(user, name)
+    }
+    if wanted:
+        result = await db.execute(
+            select(models.User).where(
+                models.User.id != user.id,
+                or_(*[getattr(models.User, n) == v for n, v in wanted.items()]),
+            )
+        )
+        if result.scalars().first() is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username or email already registered",
+            )
+
+    if "password" in changes:
+        user.password_hash = bcrypt.hashpw(
+            changes.pop("password").encode(), bcrypt.gensalt()
+        ).decode()
+
     for name, value in changes.items():
         setattr(user, name, value)
 
-    await db.commit()
-    await db.refresh(user)
+    try:
+        await db.commit()
+    except IntegrityError:
+        # The same race create_user guards: two requests can both pass
+        # the check above and collide at the unique index.
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username or email already registered",
+        ) from None
+
     return user
 
 
@@ -841,7 +884,6 @@ async def create_user(user: UserCreate, db: DbSession):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username or email already registered",
         ) from None
-    await db.refresh(new_user)
     return new_user
 
 
