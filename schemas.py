@@ -21,6 +21,23 @@ class UserResponse(BaseModel):
     image_path: str
 
 
+def normalise_tags(value: list[str]) -> list[str]:
+    """Strip, lowercase and de-duplicate a list of tag names.
+
+    Shared by every schema that accepts tags, so the rules cannot drift
+    apart between creating and updating a post.
+
+    Args:
+        value (list[str]): tag names as received.
+
+    Returns:
+        list[str]: cleaned names, blanks dropped, order preserved.
+    """
+    cleaned = [tag.strip().lower() for tag in value if tag.strip()]
+    # dict.fromkeys rather than set: drops duplicates but keeps order
+    return list(dict.fromkeys(cleaned))
+
+
 class PostForm(BaseModel):
     """Поля, которые вводит человек. HTML-форма и API проверяются
     одним и тем же кодом, поэтому правила не могут разойтись."""
@@ -32,10 +49,9 @@ class PostForm(BaseModel):
 
     @field_validator("tags")
     @classmethod
-    def normalise_tags(cls, value: list[str]) -> list[str]:
-        cleaned = [t.strip().lower() for t in value if t.strip()]
-        # dict.fromkeys вместо set: убирает дубли, сохраняя порядок
-        return list(dict.fromkeys(cleaned))
+    def clean_tags(cls, value: list[str]) -> list[str]:
+        """Normalise submitted tags. See normalise_tags."""
+        return normalise_tags(value)
 
 
 class PostCreate(PostForm):
@@ -43,6 +59,39 @@ class PostCreate(PostForm):
     берётся из сессии, поэтому в PostForm ему не место."""
 
     user_id: int
+
+
+class PostUpdate(BaseModel):
+    """A partial change to a post, for PATCH.
+
+    Every field is optional, and None means "not sent" rather than "set
+    to null" — none of these columns is nullable, so there is nothing a
+    null could sensibly mean. The caller applies only the fields that
+    actually arrived, via model_dump(exclude_unset=True).
+
+    The constraints still hold for whatever is sent: a title of "" is
+    rejected the same way it is on create. Only the requirement to send
+    the field at all is lifted.
+
+    Attributes:
+        title (str | None): new title, if changing it.
+        summary (str | None): new summary, if changing it.
+        content (str | None): new markdown body, if changing it.
+        tags (list[str] | None): the complete new tag set, if changing
+            it. Tags are replaced wholesale rather than merged, so
+            sending [] clears them; omitting the field leaves them.
+    """
+
+    title: str | None = Field(default=None, min_length=1, max_length=100)
+    summary: str | None = Field(default=None, min_length=1, max_length=250)
+    content: str | None = Field(default=None, min_length=1)
+    tags: list[str] | None = None
+
+    @field_validator("tags")
+    @classmethod
+    def clean_tags(cls, value: list[str] | None) -> list[str] | None:
+        """Normalise submitted tags, leaving an absent field absent."""
+        return None if value is None else normalise_tags(value)
 
 
 class PostFormInput(BaseModel):
