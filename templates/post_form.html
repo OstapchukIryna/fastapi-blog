@@ -20,8 +20,14 @@
         </div>
     {% endif %}
 
+    {# action и method остаются настоящими: без JS форма уходит на
+       серверный маршрут, как раньше. Скрипт внизу перехватывает submit
+       и шлёт то же самое в /api, чтобы показать окно с исходом. #}
     <form class="post-form"
+          id="postForm"
           method="post"
+          data-post-id="{{ post.id if editing else '' }}"
+          data-author-id="{{ view.author_id or '' }}"
           action="{{ url_for('update_post', post_id=post.id) if editing else url_for('create_post_page') }}">
         <div class="field">
             <label class="form-label mono-label" for="title">Title</label>
@@ -31,9 +37,11 @@
                    name="title"
                    maxlength="100"
                    value="{{ values.title }}"
-                   {% if errors.title %}aria-describedby="title-error"{% endif %}
+                   aria-describedby="title-error"
                    autofocus>
-            {% if errors.title %}<p class="field-error mono-label" id="title-error">{{ errors.title }}</p>{% endif %}
+            <p class="field-error mono-label"
+               id="title-error"
+               {{ '' if errors.title else 'hidden' }}>{{ errors.title }}</p>
         </div>
 
         <div class="field">
@@ -43,8 +51,10 @@
                       name="summary"
                       rows="2"
                       maxlength="250"
-                      {% if errors.summary %}aria-describedby="summary-error"{% endif %}>{{ values.summary }}</textarea>
-            {% if errors.summary %}<p class="field-error mono-label" id="summary-error">{{ errors.summary }}</p>{% endif %}
+                      aria-describedby="summary-error">{{ values.summary }}</textarea>
+            <p class="field-error mono-label"
+               id="summary-error"
+               {{ '' if errors.summary else 'hidden' }}>{{ errors.summary }}</p>
             <p class="field-hint mono-label">Shown in recommendations</p>
         </div>
 
@@ -54,8 +64,10 @@
                       id="content"
                       name="content"
                       rows="18"
-                      {% if errors.content %}aria-describedby="content-error"{% endif %}>{{ values.content }}</textarea>
-            {% if errors.content %}<p class="field-error mono-label" id="content-error">{{ errors.content }}</p>{% endif %}
+                      aria-describedby="content-error">{{ values.content }}</textarea>
+            <p class="field-error mono-label"
+               id="content-error"
+               {{ '' if errors.content else 'hidden' }}>{{ errors.content }}</p>
             <p class="field-hint mono-label">Markdown allowed</p>
         </div>
 
@@ -66,8 +78,11 @@
                    id="tags"
                    name="tags"
                    value="{{ values.tags }}"
+                   aria-describedby="tags-error"
                    placeholder="python, async">
-            {% if errors.tags %}<p class="field-error mono-label" id="tags-error">{{ errors.tags }}</p>{% endif %}
+            <p class="field-error mono-label"
+               id="tags-error"
+               {{ '' if errors.tags else 'hidden' }}>{{ errors.tags }}</p>
             <p class="field-hint mono-label">Comma separated</p>
         </div>
 
@@ -112,6 +127,7 @@
         <div class="modal fade"
              id="deleteModal"
              tabindex="-1"
+             data-bs-theme="dark"
              aria-labelledby="deleteModalLabel"
              aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
@@ -123,7 +139,11 @@
                                 data-bs-dismiss="modal"
                                 aria-label="Close"></button>
                     </div>
-                    <form action="{{ url_for('delete_post', post_id=post.id) }}" method="post">
+                    <form id="deletePostForm"
+                          data-post-id="{{ post.id }}"
+                          data-post-title="{{ post.title }}"
+                          action="{{ url_for('delete_post', post_id=post.id) }}"
+                          method="post">
                         <div class="modal-body">
                             <p class="mb-0">
                                 <strong>{{ post.title }}</strong> will be removed
@@ -131,10 +151,8 @@
                             </p>
                         </div>
                         <div class="modal-footer">
-                            <button type="button"
-                                    class="btn btn-outline-secondary"
-                                    data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" class="btn btn-danger">Delete post</button>
+                            <button type="button" class="btn record-btn" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-danger write-btn">Delete post</button>
                         </div>
                     </form>
                 </div>
@@ -142,3 +160,73 @@
         </div>
     {% endif %}
 {% endblock content %}
+
+{% block scripts %}
+    <!-- Post Form Handler -->
+    <script type="module">
+        import { wireForm } from "/static/js/utils.js";
+
+        const form = document.getElementById("postForm");
+        const postId = form.dataset.postId;
+        const editing = postId !== "";
+
+        // HTML has no list field, so tags arrive as one string
+        const splitTags = (value) =>
+            value.split(",").map((tag) => tag.trim()).filter(Boolean);
+
+        wireForm(form, {
+            request: (fields) => {
+                const post = {
+                    title: fields.get("title"),
+                    summary: fields.get("summary"),
+                    content: fields.get("content"),
+                    tags: splitTags(fields.get("tags")),
+                };
+
+                // PATCH: the post already knows its author. POST: the API
+                // takes the author in the body, so the page carries it.
+                return editing
+                    ? { url: `/api/posts/${postId}`, method: "PATCH", payload: post }
+                    : {
+                        url: "/api/posts",
+                        method: "POST",
+                        payload: { ...post, user_id: Number(form.dataset.authorId) },
+                    };
+            },
+            // The button label names where closing the window goes,
+            // because that is what pressing it actually does
+            result: (post) => ({
+                title: editing ? "Saved" : "Published",
+                message: editing
+                    ? `Changes to "${post.title}" saved.`
+                    : `Post "${post.title}" published.`,
+                action: "Open the post",
+            }),
+            after: (post) => window.location.assign(`/posts/${post.id}`),
+            failure: { action: "Back to the form" },
+            busy: editing ? "Saving" : "Publishing",
+        });
+
+        // Delete lives in its own window, so that one is closed before
+        // the result window opens. Its own nouns too: a deletion that
+        // failed is not "not saved", and there is no form to go back to.
+        const deleteForm = document.getElementById("deletePostForm");
+        if (deleteForm) {
+            wireForm(deleteForm, {
+                request: () => ({
+                    url: `/api/posts/${deleteForm.dataset.postId}`,
+                    method: "DELETE",
+                }),
+                result: () => ({
+                    title: "Deleted",
+                    message: `Post "${deleteForm.dataset.postTitle}" deleted.`,
+                    action: "Back to the blog",
+                }),
+                after: () => window.location.assign("/"),
+                failure: { title: "Not deleted", action: "Close" },
+                busy: "Deleting",
+                closes: "deleteModal",
+            });
+        }
+    </script>
+{% endblock scripts %}

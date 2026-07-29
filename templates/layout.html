@@ -24,10 +24,10 @@
               content="Notes on Python backend work — what broke, why, and what I understood afterwards.">
         <meta name="twitter:card" content="summary">
 
-        <!-- Fonts: Space Grotesk (display) / Newsreader (body) / JetBrains Mono (utility) -->
+        <!-- Fonts: Archivo (display) / Newsreader (body) / JetBrains Mono (utility) -->
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=JetBrains+Mono:wght@400;500&display=swap"
+        <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=JetBrains+Mono:wght@400;500&display=swap"
               rel="stylesheet">
 
         <!-- Bootstrap CSS -->
@@ -86,6 +86,9 @@
                             {% if is_author %}
                                 <a class="nav-link nav-write{{ ' active' if path.startswith('/posts/new') }}"
                                    href="{{ url_for('new_post') }}">Write</a>
+                                <a class="nav-link{{ ' active' if path.startswith('/profile') }}"
+                                   {% if path.startswith('/profile') %}aria-current="page"{% endif %}
+                                   href="{{ url_for('profile') }}">Profile</a>
                             {% endif %}
                             <div class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle"
@@ -125,6 +128,8 @@
                 {{ contact.channels() }}
             </div>
         </footer>
+
+        {% include "_modals.html" %}
 
         <script>
             document.getElementById('year').textContent = new Date().getFullYear();
@@ -174,5 +179,12 @@
                 window.addEventListener('resize', updateProgress);
             }
         </script>
+
+        {# Скрипты страниц — модулями, после бандла Bootstrap: они
+           отложены до конца разбора документа, поэтому глобальный
+           `bootstrap` к их запуску уже существует. Общие функции берут
+           из /static/js/utils.js — файл один на весь сайт. #}
+        {% block scripts %}
+        {% endblock scripts %}
     </body>
 </html>
