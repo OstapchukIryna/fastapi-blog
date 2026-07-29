@@ -45,6 +45,45 @@ class PostCreate(PostForm):
     user_id: int
 
 
+class PostFormInput(BaseModel):
+    """Сырой ввод HTML-формы: ровно то, что прислал браузер.
+
+    Отдельный тип от PostForm, потому что это разные вещи. Здесь всё
+    строки и всё необязательное — форму можно отправить пустой, и это
+    не ошибка программы, а ошибка человека, которую надо показать.
+    Теги приходят одной строкой, потому что в HTML нет поля «список».
+
+    Пустые значения по умолчанию нужны для GET: пустая форма — это
+    PostFormInput() без аргументов.
+    """
+
+    title: str = ""
+    summary: str = ""
+    content: str = ""
+    tags: str = ""
+
+    def validated(self) -> PostForm:
+        """Проверенная запись из сырого ввода.
+
+        Здесь строка тегов превращается в список; остальные правила не
+        дублируются, а берутся из PostForm — того же, что проверяет API.
+
+        Raises:
+            ValidationError: если какое-то поле не прошло проверку.
+                Вызывающий ловит её и перерисовывает форму с ошибками.
+        """
+        return PostForm(
+            title=self.title,
+            summary=self.summary,
+            content=self.content,
+            tags=[
+                part
+                for part in (chunk.strip() for chunk in self.tags.split(","))
+                if part
+            ],
+        )
+
+
 class PostResponse(BaseModel):
     """Ответ API для списка. Без content: выдача из десяти записей
     иначе тащит десять полных статей ради заголовков."""

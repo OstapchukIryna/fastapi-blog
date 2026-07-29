@@ -1,8 +1,9 @@
 from collections.abc import Sequence
+from dataclasses import dataclass, field
 from typing import Annotated
 
 import bcrypt
-from fastapi import Depends, FastAPI, Form, HTTPException, Request, status
+from fastapi import Depends, FastAPI, Form, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
@@ -17,7 +18,7 @@ from models import get_or_create_tags
 from schemas import (
     PostCreate,
     PostDetail,
-    PostForm,
+    PostFormInput,
     PostResponse,
     TagCount,
     UserCreate,
@@ -133,15 +134,6 @@ def current_author(db: Session) -> models.User:
             detail="No author in the database. Run: uv run python seed.py",
         )
     return author
-
-
-def split_tags(raw: str) -> list[str]:
-    """«python, async» → ['python', 'async'].
-
-    Приведение к нижнему регистру и снятие дублей делает PostForm —
-    здесь только разбор строки на части.
-    """
-    return [part for part in (chunk.strip() for chunk in raw.split(",")) if part]
 
 
 def form_errors(exception: ValidationError) -> dict[str, str]:
@@ -268,66 +260,107 @@ def home(request: Request, db: DbSession):
     )
 
 
-def render_post_form(
-    request: Request,
-    *,
-    mode: str,
-    values: dict[str, str],
-    errors: dict[str, str] | None = None,
-    post: models.Post | None = None,
-    status_code: int = status.HTTP_200_OK,
-):
-    """Одна форма на создание и правку.
+@dataclass(slots=True)
+class PostFormView:
+    """Состояние формы записи, из которого рисуется страница.
 
-    Введённое всегда возвращается в поля: терять набранный текст из-за
-    того, что заголовок оказался на символ длиннее, недопустимо.
+    Три поля вместо шести аргументов, и два из прежних выведены, а не
+    переданы: правка — это состояние, у которого есть запись, а 422 —
+    состояние, у которого есть ошибки. Раньше можно было собрать
+    «mode='edit' и post=None» или «есть ошибки, но код 200» — каждая
+    такая пара означала бы сломанную страницу, и ничто её не запрещало.
+
+    Attributes:
+        values: то, что человек ввёл. Возвращается в поля даже когда
+            запись не сохранилась — терять набранный текст недопустимо.
+        post: правится существующая запись, либо None для новой.
+        errors: поле → сообщение, по одному на поле.
+    """
+
+    values: PostFormInput
+    post: models.Post | None = None
+    errors: dict[str, str] = field(default_factory=dict)
+
+    @property
+    def editing(self) -> bool:
+        """Правка отличается от создания наличием записи, а не флагом."""
+        return self.post is not None
+
+    @property
+    def title(self) -> str:
+        """Заголовок страницы и вкладки."""
+        return "Edit post" if self.editing else "New post"
+
+    @property
+    def status_code(self) -> int:
+        """422, когда есть что исправлять, иначе обычные 200."""
+        return (
+            status.HTTP_422_UNPROCESSABLE_CONTENT if self.errors else status.HTTP_200_OK
+        )
+
+
+def post_to_input(post: models.Post) -> PostFormInput:
+    """Существующая запись в том виде, в каком её показывают поля формы.
+
+    Живёт здесь, а не в schemas: превращение тегов обратно в строку
+    требует знания модели, а схемам про модели знать незачем.
+    """
+    return PostFormInput(
+        title=post.title,
+        summary=post.summary,
+        content=post.content,
+        tags=", ".join(tag.name for tag in post.tags),
+    )
+
+
+def render_post_form(request: Request, view: PostFormView) -> Response:
+    """Рисует форму записи в переданном состоянии.
+
+    Одна форма на создание и правку: поля совпадают полностью, а
+    различия — заголовок, адрес отправки и подпись кнопки — выводятся
+    из view.
+
+    Args:
+        request: нужен Jinja2Templates и url_for в шаблоне.
+        view: что показать — введённое, правимая запись, ошибки.
+
+    Returns:
+        Страницу формы; 422, если во view есть ошибки.
     """
     return templates.TemplateResponse(
         request,
         "post_form.html",
-        {
-            "mode": mode,
-            "values": values,
-            "errors": errors or {},
-            "post": post,
-            "title": "New post" if mode == "new" else "Edit post",
-        },
-        status_code=status_code,
+        {"view": view, "title": view.title},
+        status_code=view.status_code,
     )
 
 
 # Объявлено до /posts/{post_id}: FastAPI разбирает маршруты в порядке
 # регистрации, и «new» иначе попадёт в post_id: int и даст 422
 @app.get("/posts/new", include_in_schema=False, name="new_post")
-def new_post_form(request: Request):
-    return render_post_form(
-        request,
-        mode="new",
-        values={"title": "", "summary": "", "content": "", "tags": ""},
-    )
+def new_post_form(request: Request) -> Response:
+    """Пустая форма новой записи."""
+    return render_post_form(request, PostFormView(values=PostFormInput()))
 
 
 @app.post("/posts/new", include_in_schema=False, name="create_post_page")
 def create_post_page(
-    request: Request,
-    db: DbSession,
-    title: Annotated[str, Form()] = "",
-    summary: Annotated[str, Form()] = "",
-    content: Annotated[str, Form()] = "",
-    tags: Annotated[str, Form()] = "",
-):
-    values = {"title": title, "summary": summary, "content": content, "tags": tags}
+    request: Request, db: DbSession, form: Annotated[PostFormInput, Form()]
+) -> Response:
+    """Создаёт запись из формы.
+
+    Поля собираются в PostFormInput самим FastAPI: модель в Form()
+    описывает форму так же, как модель в теле описывает JSON.
+
+    Returns:
+        Перенаправление 303 на созданную запись, либо форму с ошибками
+        и введённым текстом, если проверка не прошла.
+    """
     try:
-        data = PostForm(
-            title=title, summary=summary, content=content, tags=split_tags(tags)
-        )
+        data = form.validated()
     except ValidationError as exception:
         return render_post_form(
-            request,
-            mode="new",
-            values=values,
-            errors=form_errors(exception),
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            request, PostFormView(values=form, errors=form_errors(exception))
         )
 
     post = models.Post(
@@ -347,17 +380,10 @@ def create_post_page(
 
 
 @app.get("/posts/{post_id}/edit", include_in_schema=False, name="edit_post")
-def edit_post_form(request: Request, post: PostDep):
+def edit_post_form(request: Request, post: PostDep) -> Response:
+    """Форма правки, заполненная существующей записью."""
     return render_post_form(
-        request,
-        mode="edit",
-        post=post,
-        values={
-            "title": post.title,
-            "summary": post.summary,
-            "content": post.content,
-            "tags": ", ".join(tag.name for tag in post.tags),
-        },
+        request, PostFormView(values=post_to_input(post), post=post)
     )
 
 
@@ -366,24 +392,21 @@ def update_post(
     request: Request,
     post: PostDep,
     db: DbSession,
-    title: Annotated[str, Form()] = "",
-    summary: Annotated[str, Form()] = "",
-    content: Annotated[str, Form()] = "",
-    tags: Annotated[str, Form()] = "",
-):
-    values = {"title": title, "summary": summary, "content": content, "tags": tags}
+    form: Annotated[PostFormInput, Form()],
+) -> Response:
+    """Сохраняет правку записи.
+
+    Returns:
+        Перенаправление 303 на запись, либо форму с ошибками и
+        введённым текстом, если проверка не прошла. Запись при неудаче
+        не меняется: присваивание идёт после проверки.
+    """
     try:
-        data = PostForm(
-            title=title, summary=summary, content=content, tags=split_tags(tags)
-        )
+        data = form.validated()
     except ValidationError as exception:
         return render_post_form(
             request,
-            mode="edit",
-            post=post,
-            values=values,
-            errors=form_errors(exception),
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            PostFormView(values=form, post=post, errors=form_errors(exception)),
         )
 
     post.title = data.title
