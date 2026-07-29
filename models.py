@@ -11,7 +11,8 @@ from sqlalchemy import (
     Text,
     select,
 )
-from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
 
@@ -94,12 +95,12 @@ class Post(Base):
         return max(1, ceil(len(self.content.split()) / 200))
 
 
-def get_or_create_tags(db: Session, names: list[str]) -> list[Tag]:
+async def get_or_create_tags(db: AsyncSession, names: list[str]) -> list[Tag]:
     """Check of existing tags or create new ones."""
     if not names:
         return []
-
-    existing = db.execute(select(Tag).where(Tag.name.in_(names))).scalars().all()
+    result = await db.execute(select(Tag).where(Tag.name.in_(names)))
+    existing = result.scalars().all()
     by_name = {tag.name: tag for tag in existing}
 
     for name in names:
