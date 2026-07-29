@@ -1,15 +1,21 @@
 from collections.abc import Sequence
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from typing import Annotated
 
 import bcrypt
 from fastapi import Depends, FastAPI, Form, HTTPException, Request, Response, status
+from fastapi.exception_handlers import (
+    http_exception_handler,
+    request_validation_exception_handler,
+)
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, joinedload, selectinload
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload, selectinload
 
 import models
 from database import Base, engine, get_db
@@ -28,17 +34,26 @@ from schemas import (
 )
 from templating import templates
 
-# TODO: replace with Alembic — create_all cannot alter existing tables
-Base.metadata.create_all(bind=engine)
 
-app = FastAPI()
+# async await of creating db tables if they're not exist
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Startup
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield
+    # Shutdown
+    await engine.dispose()
+
+
+app = FastAPI(lifespan=lifespan)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/media", StaticFiles(directory="media"), name="media")
 
 register_error_handlers(app)
 
-DbSession = Annotated[Session, Depends(get_db)]
+DbSession = Annotated[AsyncSession, Depends(get_db)]
 
 
 # --- Helpers ---------------------------------------------------------
@@ -66,14 +81,14 @@ def posts_query():
     )
 
 
-def find_related(
-    db: Session, current: models.Post, limit: int = 2
+async def find_related(
+    db: DbSession, current: models.Post, limit: int = 2
 ) -> tuple[list[dict], str]:
     """
     Find related posts by tags. Returns a list of related posts with shared tags.
 
     Args:
-        db (Session): current database session
+        db (DbSession): current database session
         current (models.Post): current post
         limit (int, optional): Limit of related posts to return. Defaults to 2.
 
@@ -85,19 +100,16 @@ def find_related(
     current_tags = {tag.name for tag in current.tags}
 
     if current_tags:
-        candidates = (
-            db.execute(
-                posts_query()
-                .join(models.Post.tags)
-                .where(
-                    models.Tag.name.in_(current_tags),
-                    models.Post.id != current.id,
-                )
+        result = await db.execute(
+            posts_query()
+            .join(models.Post.tags)
+            .where(
+                models.Tag.name.in_(current_tags),
+                models.Post.id != current.id,
             )
-            .scalars()
-            .unique()
-            .all()
         )
+
+        candidates = result.scalars().unique().all()
 
         matched = [
             {"post": p, "shared": sorted(current_tags & {t.name for t in p.tags})}
@@ -109,49 +121,50 @@ def find_related(
             )
             return matched[:limit], "Related"
 
-    fallback = (
-        db.execute(posts_query().where(models.Post.id != current.id).limit(limit))
-        .scalars()
-        .unique()
-        .all()
+    result = await db.execute(
+        posts_query().where(models.Post.id != current.id).limit(limit)
     )
+    fallback = result.scalars().unique().all()
     return [{"post": p, "shared": []} for p in fallback], "More posts"
 
 
-def all_topics(db: Session) -> list[tuple[str, int]]:
+async def all_topics(db: DbSession) -> list[tuple[str, int]]:
     """
     Sort tags by counting posts with them. Return list of tuples with tag name and count of posts.
 
     Args:
-        db (Session): current database session
+        db (DbSession): current database session
 
     Returns:
         list[tuple[str, int]]: List of tuples containing tag names and their respective post counts
 
     """
-    rows = db.execute(
+    result = await db.execute(
         select(models.Tag.name, func.count(models.Post.id))
         .join(models.Tag.posts)
         .group_by(models.Tag.id)
         .order_by(func.count(models.Post.id).desc(), models.Tag.name)
-    ).all()
+    )
+    rows = result.all()
     return [(name, count) for name, count in rows]
 
 
-def current_author(db: Session) -> models.User:
+async def current_author(db: DbSession) -> models.User:
     """
     Get author of current post.
 
     Args:
-        db (Session): current database session
+        db (DbSession): current database session
 
     Raises:
         HTTPException: If no author is found in the database, raises a 500 Internal Server Error with a message to run the seed script.
 
     Returns:
         models.User: The first user found in the database, representing the author of the current post.
+
     """
-    author = db.execute(select(models.User).order_by(models.User.id)).scalars().first()
+    result = await db.execute(select(models.User).order_by(models.User.id))
+    author = result.scalars().first()
     if author is None:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -190,7 +203,7 @@ def form_errors(exception: ValidationError) -> dict[str, str]:
     return errors
 
 
-def set_pinned(db: Session, post: models.Post, *, pinned: bool) -> None:
+async def set_pinned(db: DbSession, post: models.Post, *, pinned: bool) -> None:
     """
     Set pinned status for a post
 
@@ -201,7 +214,7 @@ def set_pinned(db: Session, post: models.Post, *, pinned: bool) -> None:
 
     """
     if pinned:
-        db.execute(
+        await db.execute(
             update(models.Post)
             .where(models.Post.id != post.id, models.Post.is_pinned.is_(True))
             .values(is_pinned=False)
@@ -232,9 +245,10 @@ def arrange(items: Sequence[models.Post]) -> dict:
 # Prevent code duplication and ensure consistent error handling for missing resources.
 
 
-def load_post(post_id: int, db: DbSession) -> models.Post:
+async def load_post(post_id: int, db: DbSession) -> models.Post:
     """Returns post by id, otherwise 404."""
-    post = db.execute(posts_query().where(models.Post.id == post_id)).scalars().first()
+    result = await db.execute(posts_query().where(models.Post.id == post_id))
+    post = result.scalars().first()
     if post is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Post not found"
@@ -242,9 +256,9 @@ def load_post(post_id: int, db: DbSession) -> models.Post:
     return post
 
 
-def load_user(user_id: int, db: DbSession) -> models.User:
+async def load_user(user_id: int, db: DbSession) -> models.User:
     """Returns user by id, otherwise 404."""
-    user = db.get(models.User, user_id)
+    user = await db.get(models.User, user_id)
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
@@ -252,14 +266,12 @@ def load_user(user_id: int, db: DbSession) -> models.User:
     return user
 
 
-def load_tagged_posts(tag: str, db: DbSession) -> Sequence[models.Post]:
+async def load_tagged_posts(tag: str, db: DbSession) -> Sequence[models.Post]:
     """Returns posts by tag, otherwise 404. If tags are not found or no posts with this tag, return 404."""
-    posts = (
-        db.execute(posts_query().join(models.Post.tags).where(models.Tag.name == tag))
-        .scalars()
-        .unique()
-        .all()
+    result = await db.execute(
+        posts_query().join(models.Post.tags).where(models.Tag.name == tag)
     )
+    posts = result.scalars().unique().all()
     if not posts:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found"
@@ -277,8 +289,9 @@ TaggedPostsDep = Annotated[Sequence[models.Post], Depends(load_tagged_posts)]
 
 @app.get("/", include_in_schema=False, name="home")
 @app.get("/posts", include_in_schema=False, name="posts")
-def home(request: Request, db: DbSession):
-    posts = db.execute(posts_query()).scalars().unique().all()
+async def home(request: Request, db: DbSession):
+    result = await db.execute(posts_query())
+    posts = result.scalars().unique().all()
     return templates.TemplateResponse(
         request,
         "home.html",
@@ -416,7 +429,7 @@ def new_post_form(request: Request) -> Response:
 
 
 @app.post("/posts/new", include_in_schema=False, name="create_post_page")
-def create_post_page(
+async def create_post_page(
     request: Request, db: DbSession, form: Annotated[PostFormInput, Form()]
 ) -> Response:
     """
@@ -450,8 +463,8 @@ def create_post_page(
         tags=get_or_create_tags(db, data.tags),
     )
     db.add(post)
-    db.commit()
-    db.refresh(post)
+    await db.commit()
+    await db.refresh(post)
     return RedirectResponse(
         request.url_for("post_page", post_id=post.id),
         status_code=status.HTTP_303_SEE_OTHER,
@@ -478,7 +491,7 @@ def edit_post_form(request: Request, post: PostDep) -> Response:
 
 
 @app.post("/posts/{post_id}/edit", include_in_schema=False, name="update_post")
-def update_post(
+async def update_post(
     request: Request,
     post: PostDep,
     db: DbSession,
@@ -511,8 +524,8 @@ def update_post(
     post.title = data.title
     post.summary = data.summary
     post.content = data.content
-    post.tags = get_or_create_tags(db, data.tags)
-    db.commit()
+    post.tags = await get_or_create_tags(db, data.tags)
+    await db.commit()
     return RedirectResponse(
         request.url_for("post_page", post_id=post.id),
         status_code=status.HTTP_303_SEE_OTHER,
@@ -521,9 +534,9 @@ def update_post(
 
 # One separate action, not a form field
 @app.post("/posts/{post_id}/pin", include_in_schema=False, name="toggle_pin")
-def toggle_pin(request: Request, post: PostDep, db: DbSession):
-    set_pinned(db, post, pinned=not post.is_pinned)
-    db.commit()
+async def toggle_pin(request: Request, post: PostDep, db: DbSession):
+    await set_pinned(db, post, pinned=not post.is_pinned)
+    await db.commit()
     return RedirectResponse(
         request.url_for("edit_post", post_id=post.id),
         status_code=status.HTTP_303_SEE_OTHER,
@@ -531,8 +544,8 @@ def toggle_pin(request: Request, post: PostDep, db: DbSession):
 
 
 @app.get("/posts/{post_id}", include_in_schema=False, name="post_page")
-def post_page(request: Request, post: PostDep, db: DbSession):
-    related, related_label = find_related(db, post)
+async def post_page(request: Request, post: PostDep, db: DbSession):
+    related, related_label = await find_related(db, post)
     return templates.TemplateResponse(
         request,
         "post.html",
@@ -546,9 +559,9 @@ def post_page(request: Request, post: PostDep, db: DbSession):
 
 
 @app.get("/tags", include_in_schema=False, name="tags_index")
-def tags_index(request: Request, db: DbSession):
+async def tags_index(request: Request, db: DbSession):
     return templates.TemplateResponse(
-        request, "tags.html", {"topics": all_topics(db), "title": "Topics"}
+        request, "tags.html", {"topics": await all_topics(db), "title": "Topics"}
     )
 
 
@@ -566,13 +579,9 @@ def get_tag(request: Request, tag: str, tagged: TaggedPostsDep):
 
 
 @app.get("/users/{user_id}/posts", include_in_schema=False, name="user_posts")
-def user_posts_page(request: Request, user: UserDep, db: DbSession):
-    posts = (
-        db.execute(posts_query().where(models.Post.user_id == user.id))
-        .scalars()
-        .unique()
-        .all()
-    )
+async def user_posts_page(request: Request, user: UserDep, db: DbSession):
+    result = await db.execute(posts_query().where(models.Post.user_id == user.id))
+    posts = result.scalars().unique().all()
     return templates.TemplateResponse(
         request,
         "user_posts.html",
@@ -591,9 +600,9 @@ def login(request: Request):
 
 
 @app.post("/posts/{post_id}/delete", include_in_schema=False, name="delete_post")
-def delete_post(post: PostDep, db: DbSession):
-    db.delete(post)
-    db.commit()
+async def delete_post(post: PostDep, db: DbSession):
+    await db.delete(post)
+    await db.commit()
     return RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)
 
 
@@ -601,8 +610,9 @@ def delete_post(post: PostDep, db: DbSession):
 
 
 @app.get("/api/posts", response_model=list[PostResponse])
-def list_posts(db: DbSession):
-    return db.execute(posts_query()).scalars().unique().all()
+async def list_posts(db: DbSession):
+    result = await db.execute(posts_query())
+    return result.scalars().unique().all()
 
 
 @app.get("/api/posts/{post_id}", response_model=PostDetail)
@@ -611,7 +621,7 @@ def get_post(post: PostDep):
 
 
 @app.delete("/api/posts/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_post_api(post: PostDep, db: DbSession) -> Response:
+async def delete_post_api(post: PostDep, db: DbSession) -> Response:
     """
     Delete a post.
 
@@ -635,16 +645,16 @@ def delete_post_api(post: PostDep, db: DbSession) -> Response:
         Response: an empty 204.
 
     """
-    db.delete(post)
-    db.commit()
+    await db.delete(post)
+    await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @app.post("/api/posts", response_model=PostDetail, status_code=status.HTTP_201_CREATED)
-def create_post(post: PostCreate, db: DbSession):
+async def create_post(post: PostCreate, db: DbSession):
     # The only 404 check left in the route: the author comes in the request body,
     # not in the path, and the dependency on the path parameter will not see it.
-    if db.get(models.User, post.user_id) is None:
+    if await db.get(models.User, post.user_id) is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
@@ -657,13 +667,13 @@ def create_post(post: PostCreate, db: DbSession):
         tags=get_or_create_tags(db, post.tags),
     )
     db.add(new_post)
-    db.commit()
-    db.refresh(new_post)
+    await db.commit()
+    await db.refresh(new_post)
     return new_post
 
 
 @app.put("/api/posts/{post_id}", response_model=PostDetail)
-def update_all_post_fields(
+async def update_all_post_fields(
     post: PostDep, data: PostCreate, db: DbSession
 ) -> models.Post:
     """
@@ -694,23 +704,25 @@ def update_all_post_fields(
         models.Post: the post as stored after the replacement.
 
     """
-    if db.get(models.User, data.user_id) is None:
+    if await db.get(models.User, data.user_id) is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
 
     replacement = data.model_dump()
-    post.tags = get_or_create_tags(db, replacement.pop("tags"))
+    post.tags = await get_or_create_tags(db, replacement.pop("tags"))
     for name, value in replacement.items():
         setattr(post, name, value)
 
-    db.commit()
-    db.refresh(post)
+    await db.commit()
+    await db.refresh(post)
     return post
 
 
 @app.patch("/api/posts/{post_id}", response_model=PostDetail)
-def update_post_fields(post: PostDep, data: PostUpdate, db: DbSession) -> models.Post:
+async def update_post_fields(
+    post: PostDep, data: PostUpdate, db: DbSession
+) -> models.Post:
     """
     Change some fields of a post, leaving the rest alone.
 
@@ -739,17 +751,19 @@ def update_post_fields(post: PostDep, data: PostUpdate, db: DbSession) -> models
     changes = data.model_dump(exclude_unset=True, exclude_none=True)
 
     if "tags" in changes:
-        post.tags = get_or_create_tags(db, changes.pop("tags"))
+        post.tags = await get_or_create_tags(db, changes.pop("tags"))
     for name, value in changes.items():
         setattr(post, name, value)
 
-    db.commit()
-    db.refresh(post)
+    await db.commit()
+    await db.refresh(post)
     return post
 
 
 @app.patch("/api/users/{user_id}", response_model=UserResponse)
-def update_user_fields(user: UserDep, data: UserUpdate, db: DbSession) -> models.User:
+async def update_user_fields(
+    user: UserDep, data: UserUpdate, db: DbSession
+) -> models.User:
     """
     Change some fields of a user, leaving the rest alone.
 
@@ -772,22 +786,22 @@ def update_user_fields(user: UserDep, data: UserUpdate, db: DbSession) -> models
     for name, value in changes.items():
         setattr(user, name, value)
 
-    db.commit()
-    db.refresh(user)
+    await db.commit()
+    await db.refresh(user)
     return user
 
 
 @app.delete("/api/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_user(user: UserDep, db: DbSession) -> Response:
+async def delete_user(user: UserDep, db: DbSession) -> Response:
     """Cascading deletion of a user. All posts will be delete as well. Returns an empty 204."""
-    db.delete(user)
-    db.commit()
+    await db.delete(user)
+    await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @app.get("/api/tags", response_model=list[TagCount])
-def list_tags(db: DbSession):
-    return [{"name": name, "count": count} for name, count in all_topics(db)]
+async def list_tags(db: DbSession):
+    return [{"name": name, "count": count} for name, count in await all_topics(db)]
 
 
 @app.get("/api/tags/{tag}/posts", response_model=list[PostResponse])
@@ -798,17 +812,13 @@ def get_tag_posts(posts: TaggedPostsDep):
 @app.post(
     "/api/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED
 )
-def create_user(user: UserCreate, db: DbSession):
-    clash = (
-        db.execute(
-            select(models.User).where(
-                (models.User.username == user.username)
-                | (models.User.email == user.email)
-            )
+async def create_user(user: UserCreate, db: DbSession):
+    result = await db.execute(
+        select(models.User).where(
+            (models.User.username == user.username) | (models.User.email == user.email)
         )
-        .scalars()
-        .first()
     )
+    clash = result.scalars().first()
 
     if clash is not None:
         raise HTTPException(
@@ -823,15 +833,15 @@ def create_user(user: UserCreate, db: DbSession):
     )
     db.add(new_user)
     try:
-        db.commit()
+        await db.commit()
     except IntegrityError:
         # Race prevention
-        db.rollback()
+        await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username or email already registered",
         ) from None
-    db.refresh(new_user)
+    await db.refresh(new_user)
     return new_user
 
 
@@ -841,10 +851,6 @@ def get_user(user: UserDep):
 
 
 @app.get("/api/users/{user_id}/posts", response_model=list[PostResponse])
-def get_user_posts(user: UserDep, db: DbSession):
-    return (
-        db.execute(posts_query().where(models.Post.user_id == user.id))
-        .scalars()
-        .unique()
-        .all()
-    )
+async def get_user_posts(user: UserDep, db: DbSession):
+    result = await db.execute(posts_query().where(models.Post.user_id == user.id))
+    return result.scalars().unique().all()
