@@ -199,6 +199,61 @@ def arrange(items: Sequence[models.Post]) -> dict:
     return {"pinned": pinned, "lead": lead, "rest": rest}
 
 
+# --- Зависимости ------------------------------------------------------
+# «Достать по id, иначе 404» повторялось в одиннадцати роутах. Здесь это
+# написано один раз: FastAPI превращает параметр пути в объект до входа
+# в тело роута, поэтому роут получает готовую запись и про 404 не знает.
+
+
+def load_post(post_id: int, db: DbSession) -> models.Post:
+    """Запись со связями, иначе 404.
+
+    Связи подтягиваются даже там, где роут их не читает — закрепление и
+    удаление. Один лишний запрос на двух авторских действиях дешевле,
+    чем вторая почти такая же зависимость рядом.
+    """
+    post = db.execute(posts_query().where(models.Post.id == post_id)).scalars().first()
+    if post is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Post not found"
+        )
+    return post
+
+
+def load_user(user_id: int, db: DbSession) -> models.User:
+    """Пользователь, иначе 404."""
+    user = db.get(models.User, user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+    return user
+
+
+def load_tagged_posts(tag: str, db: DbSession) -> Sequence[models.Post]:
+    """Записи с тегом, иначе 404.
+
+    Пустая выборка и означает «такого тега нет»: отдельно проверять
+    существование тега незачем.
+    """
+    posts = (
+        db.execute(posts_query().join(models.Post.tags).where(models.Tag.name == tag))
+        .scalars()
+        .unique()
+        .all()
+    )
+    if not posts:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found"
+        )
+    return posts
+
+
+PostDep = Annotated[models.Post, Depends(load_post)]
+UserDep = Annotated[models.User, Depends(load_user)]
+TaggedPostsDep = Annotated[Sequence[models.Post], Depends(load_tagged_posts)]
+
+
 # --- Страницы ---------------------------------------------------------
 
 
@@ -292,13 +347,7 @@ def create_post_page(
 
 
 @app.get("/posts/{post_id}/edit", include_in_schema=False, name="edit_post")
-def edit_post_form(request: Request, post_id: int, db: DbSession):
-    post = db.execute(posts_query().where(models.Post.id == post_id)).scalars().first()
-    if post is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Post not found"
-        )
-
+def edit_post_form(request: Request, post: PostDep):
     return render_post_form(
         request,
         mode="edit",
@@ -315,19 +364,13 @@ def edit_post_form(request: Request, post_id: int, db: DbSession):
 @app.post("/posts/{post_id}/edit", include_in_schema=False, name="update_post")
 def update_post(
     request: Request,
-    post_id: int,
+    post: PostDep,
     db: DbSession,
     title: Annotated[str, Form()] = "",
     summary: Annotated[str, Form()] = "",
     content: Annotated[str, Form()] = "",
     tags: Annotated[str, Form()] = "",
 ):
-    post = db.execute(posts_query().where(models.Post.id == post_id)).scalars().first()
-    if post is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Post not found"
-        )
-
     values = {"title": title, "summary": summary, "content": content, "tags": tags}
     try:
         data = PostForm(
@@ -357,29 +400,17 @@ def update_post(
 # Отдельное действие, а не поле формы: закрепление — один щелчок, из-за
 # него не должно требоваться сохранять всю запись
 @app.post("/posts/{post_id}/pin", include_in_schema=False, name="toggle_pin")
-def toggle_pin(request: Request, post_id: int, db: DbSession):
-    post = db.get(models.Post, post_id)
-    if post is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Post not found"
-        )
-
+def toggle_pin(request: Request, post: PostDep, db: DbSession):
     set_pinned(db, post, not post.is_pinned)
     db.commit()
     return RedirectResponse(
-        request.url_for("edit_post", post_id=post_id),
+        request.url_for("edit_post", post_id=post.id),
         status_code=status.HTTP_303_SEE_OTHER,
     )
 
 
 @app.get("/posts/{post_id}", include_in_schema=False, name="post_page")
-def post_page(request: Request, post_id: int, db: DbSession):
-    post = db.execute(posts_query().where(models.Post.id == post_id)).scalars().first()
-    if post is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Post not found"
-        )
-
+def post_page(request: Request, post: PostDep, db: DbSession):
     related, related_label = find_related(db, post)
     return templates.TemplateResponse(
         request,
@@ -401,18 +432,7 @@ def tags_index(request: Request, db: DbSession):
 
 
 @app.get("/tags/{tag}", include_in_schema=False, name="get_tag")
-def get_tag(request: Request, tag: str, db: DbSession):
-    tagged = (
-        db.execute(posts_query().join(models.Post.tags).where(models.Tag.name == tag))
-        .scalars()
-        .unique()
-        .all()
-    )
-    if not tagged:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found"
-        )
-
+def get_tag(request: Request, tag: str, tagged: TaggedPostsDep):
     return templates.TemplateResponse(
         request,
         "home.html",
@@ -425,15 +445,9 @@ def get_tag(request: Request, tag: str, db: DbSession):
 
 
 @app.get("/users/{user_id}/posts", include_in_schema=False, name="user_posts")
-def user_posts_page(request: Request, user_id: int, db: DbSession):
-    user = db.get(models.User, user_id)
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
-
+def user_posts_page(request: Request, user: UserDep, db: DbSession):
     posts = (
-        db.execute(posts_query().where(models.Post.user_id == user_id))
+        db.execute(posts_query().where(models.Post.user_id == user.id))
         .scalars()
         .unique()
         .all()
@@ -456,13 +470,7 @@ def login(request: Request):
 
 
 @app.post("/posts/{post_id}/delete", include_in_schema=False, name="delete_post")
-def delete_post(post_id: int, db: DbSession):
-    post = db.get(models.Post, post_id)
-    if post is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Post not found"
-        )
-
+def delete_post(post: PostDep, db: DbSession):
     db.delete(post)
     db.commit()
     # 303, а не 302: только он гарантирует переход методом GET —
@@ -479,17 +487,15 @@ def list_posts(db: DbSession):
 
 
 @app.get("/api/posts/{post_id}", response_model=PostDetail)
-def get_post(post_id: int, db: DbSession):
-    post = db.execute(posts_query().where(models.Post.id == post_id)).scalars().first()
-    if post is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Post not found"
-        )
+def get_post(post: PostDep):
     return post
 
 
 @app.post("/api/posts", response_model=PostDetail, status_code=status.HTTP_201_CREATED)
 def create_post(post: PostCreate, db: DbSession):
+    # Единственная проверка «есть или 404», оставшаяся в роуте: автор
+    # приходит в теле запроса, а не в пути, и зависимость по параметру
+    # пути его не увидит.
     if db.get(models.User, post.user_id) is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
@@ -514,17 +520,7 @@ def list_tags(db: DbSession):
 
 
 @app.get("/api/tags/{tag}/posts", response_model=list[PostResponse])
-def get_tag_posts(tag: str, db: DbSession):
-    posts = (
-        db.execute(posts_query().join(models.Post.tags).where(models.Tag.name == tag))
-        .scalars()
-        .unique()
-        .all()
-    )
-    if not posts:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found"
-        )
+def get_tag_posts(posts: TaggedPostsDep):
     return posts
 
 
@@ -572,24 +568,14 @@ def create_user(user: UserCreate, db: DbSession):
 
 
 @app.get("/api/users/{user_id}", response_model=UserResponse)
-def get_user(user_id: int, db: DbSession):
-    user = db.get(models.User, user_id)
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
+def get_user(user: UserDep):
     return user
 
 
 @app.get("/api/users/{user_id}/posts", response_model=list[PostResponse])
-def get_user_posts(user_id: int, db: DbSession):
-    if db.get(models.User, user_id) is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
-
+def get_user_posts(user: UserDep, db: DbSession):
     return (
-        db.execute(posts_query().where(models.Post.user_id == user_id))
+        db.execute(posts_query().where(models.Post.user_id == user.id))
         .scalars()
         .unique()
         .all()
