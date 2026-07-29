@@ -18,3 +18,6 @@ wheels/
 # Машинное состояние Impeccable; config.json, design.json и разборы коммитятся
 .impeccable/live/sessions/
 .impeccable/hook.cache.json
+
+# Локальный конфиг design-хука Impeccable: ссылается на скилл вне репозитория
+.github/hooks/

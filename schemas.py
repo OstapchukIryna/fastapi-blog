@@ -45,6 +45,57 @@ class PostCreate(PostForm):
     user_id: int
 
 
+class PostFormInput(BaseModel):
+    """Raw input from the HTML form: exactly what the browser sent.
+
+    A separate type from PostForm because they are different things.
+    Everything here is a string and everything is optional — the form can
+    be submitted empty, and that is a person's mistake to be shown back,
+    not a programming error. Tags arrive as one string because HTML has
+    no "list" field.
+
+    The empty defaults are what makes a blank form: PostFormInput() with
+    no arguments.
+
+    Attributes:
+        title (str): the post title as typed.
+        summary (str): the summary as typed.
+        content (str): the markdown body as typed.
+        tags (str): tags as one comma-separated string.
+    """
+
+    title: str = ""
+    summary: str = ""
+    content: str = ""
+    tags: str = ""
+
+    def validated(self) -> PostForm:
+        """Turn the raw input into a validated post.
+
+        The tag string becomes a list here; the remaining rules are not
+        duplicated but taken from PostForm, the same model the API
+        validates against.
+
+        Returns:
+            PostForm: the validated fields, with tags split, lowercased
+            and de-duplicated.
+
+        Raises:
+            ValidationError: if any field fails validation. The caller
+                catches it and redraws the form with the errors.
+        """
+        return PostForm(
+            title=self.title,
+            summary=self.summary,
+            content=self.content,
+            tags=[
+                part
+                for part in (chunk.strip() for chunk in self.tags.split(","))
+                if part
+            ],
+        )
+
+
 class PostResponse(BaseModel):
     """Ответ API для списка. Без content: выдача из десяти записей
     иначе тащит десять полных статей ради заголовков."""

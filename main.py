@@ -1,8 +1,9 @@
 from collections.abc import Sequence
+from dataclasses import dataclass, field
 from typing import Annotated
 
 import bcrypt
-from fastapi import Depends, FastAPI, Form, HTTPException, Request, status
+from fastapi import Depends, FastAPI, Form, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
@@ -17,7 +18,7 @@ from models import get_or_create_tags
 from schemas import (
     PostCreate,
     PostDetail,
-    PostForm,
+    PostFormInput,
     PostResponse,
     TagCount,
     UserCreate,
@@ -25,7 +26,7 @@ from schemas import (
 )
 from templating import templates
 
-# TODO: заменить на Alembic — create_all не умеет менять существующие таблицы
+# TODO: replace with Alembic — create_all cannot alter existing tables
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
@@ -38,15 +39,18 @@ register_error_handlers(app)
 DbSession = Annotated[Session, Depends(get_db)]
 
 
-# --- Вспомогательное -------------------------------------------------
+# --- Helpers ---------------------------------------------------------
 
 
 def posts_query():
-    """Базовая выборка записей с подтянутыми связями.
+    """Build the base post query with its relations already loaded.
 
-    selectinload и joinedload здесь не оптимизация «на будущее»: без них
-    обращение к post.tags в шаблоне порождает отдельный запрос на каждую
-    запись — та самая проблема N+1.
+    selectinload and joinedload are not speculative optimisation: without
+    them, touching post.tags in a template issues one query per post,
+    which is the N+1 problem.
+
+    Returns:
+        Select: posts ordered newest first, with tags and author loaded.
     """
     return (
         select(models.Post)
@@ -150,20 +154,6 @@ def current_author(db: Session) -> models.User:
             detail="No author in the database. Run: uv run python seed.py",
         )
     return author
-
-
-def split_tags(raw: str) -> list[str]:
-    """
-    Split tags from a string and return them in a list.
-
-    Args:
-        raw (str): String of tags separated by comma
-
-    Returns:
-        list[str]: list of tags
-
-    """
-    return [part for part in (chunk.strip() for chunk in raw.split(",")) if part]
 
 
 def form_errors(exception: ValidationError) -> dict[str, str]:
@@ -292,61 +282,144 @@ def home(request: Request, db: DbSession):
     )
 
 
-def render_post_form(
-    request: Request,
-    *,
-    mode: str,
-    values: dict[str, str],
-    errors: dict[str, str] | None = None,
-    post: models.Post | None = None,
-    status_code: int = status.HTTP_200_OK,
-):
+@dataclass(slots=True)
+class PostFormView:
+    """State of the post form, from which the page is drawn.
+
+    Three fields instead of the previous six arguments. Two of the old
+    ones are derived rather than passed: editing means "there is a post",
+    and 422 means "there are errors". Before, `mode="edit"` with
+    `post=None`, or errors alongside a 200, were both constructible and
+    nothing prevented it.
+
+    Attributes:
+        values (PostFormInput): what the person typed. Returned to the
+            fields even when the post was not saved, so typed text is
+            never lost.
+        post (models.Post | None): the post being edited, or None when
+            creating a new one.
+        errors (dict[str, str]): field name to message, one per field.
+    """
+
+    values: PostFormInput
+    post: models.Post | None = None
+    errors: dict[str, str] = field(default_factory=dict)
+
+    @property
+    def editing(self) -> bool:
+        """Whether an existing post is being edited.
+
+        Returns:
+            bool: True when a post is present, which is what
+            distinguishes editing from creating.
+        """
+        return self.post is not None
+
+    @property
+    def title(self) -> str:
+        """Title for the page and the browser tab.
+
+        Returns:
+            str: "Edit post" when editing, otherwise "New post".
+        """
+        return "Edit post" if self.editing else "New post"
+
+    @property
+    def status_code(self) -> int:
+        """HTTP status the form should be returned with.
+
+        Returns:
+            int: 422 when there is something to fix, otherwise 200.
+        """
+        return (
+            status.HTTP_422_UNPROCESSABLE_CONTENT if self.errors else status.HTTP_200_OK
+        )
+
+
+def post_to_input(post: models.Post) -> PostFormInput:
+    """Convert an existing post into the values its form fields show.
+
+    Lives here rather than in schemas because turning tags back into a
+    string requires knowing the model, and schemas should not know about
+    models.
+
+    Args:
+        post (models.Post): the post being edited.
+
+    Returns:
+        PostFormInput: the post's fields as the form displays them, with
+        tags joined into a comma-separated string.
+    """
+    return PostFormInput(
+        title=post.title,
+        summary=post.summary,
+        content=post.content,
+        tags=", ".join(tag.name for tag in post.tags),
+    )
+
+
+def render_post_form(request: Request, view: PostFormView) -> Response:
+    """Draw the post form in the given state.
+
+    One form serves both creating and editing: the fields are identical,
+    and the differences — heading, submit target, button label — are
+    derived from the view.
+
+    Args:
+        request (Request): needed by Jinja2Templates and url_for.
+        view (PostFormView): what to show — typed values, the post being
+            edited, and any errors.
+
+    Returns:
+        Response: the form page, with status 422 if the view holds
+        errors.
+    """
     return templates.TemplateResponse(
         request,
         "post_form.html",
-        {
-            "mode": mode,
-            "values": values,
-            "errors": errors or {},
-            "post": post,
-            "title": "New post" if mode == "new" else "Edit post",
-        },
-        status_code=status_code,
+        {"view": view, "title": view.title},
+        status_code=view.status_code,
     )
 
 
 # Must be declared before /posts/{post_id} because FastAPI parses routes in the order of registration,
 # and "new" would otherwise match post_id: int and give 422
 @app.get("/posts/new", include_in_schema=False, name="new_post")
-def new_post_form(request: Request):
-    return render_post_form(
-        request,
-        mode="new",
-        values={"title": "", "summary": "", "content": "", "tags": ""},
-    )
+def new_post_form(request: Request) -> Response:
+    """Show an empty form for a new post.
+
+    Args:
+        request (Request): needed by the template.
+
+    Returns:
+        Response: the blank form page.
+    """
+    return render_post_form(request, PostFormView(values=PostFormInput()))
 
 
 @app.post("/posts/new", include_in_schema=False, name="create_post_page")
 def create_post_page(
-    request: Request,
-    db: DbSession,
-    title: Annotated[str, Form()] = "",
-    summary: Annotated[str, Form()] = "",
-    content: Annotated[str, Form()] = "",
-    tags: Annotated[str, Form()] = "",
-):
-    values = {"title": title, "summary": summary, "content": content, "tags": tags}
+    request: Request, db: DbSession, form: Annotated[PostFormInput, Form()]
+) -> Response:
+    """Create a post from the submitted form.
+
+    FastAPI fills PostFormInput itself: a model behind Form() describes a
+    form the way a model in the body describes JSON.
+
+    Args:
+        request (Request): needed by the template and by url_for.
+        db (DbSession): current database session.
+        form (PostFormInput): the submitted fields, unvalidated.
+
+    Returns:
+        Response: a 303 redirect to the new post, or the form again with
+        errors and the typed text if validation failed.
+    """
     try:
-        data = PostForm(
-            title=title, summary=summary, content=content, tags=split_tags(tags)
-        )
+        data = form.validated()
     except ValidationError as exception:
         return render_post_form(
-            request,
-            mode="new",
-            values=values,
-            errors=form_errors(exception),
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            request, PostFormView(values=form, errors=form_errors(exception))
         )
 
     post = models.Post(
@@ -366,17 +439,19 @@ def create_post_page(
 
 
 @app.get("/posts/{post_id}/edit", include_in_schema=False, name="edit_post")
-def edit_post_form(request: Request, post: PostDep):
+def edit_post_form(request: Request, post: PostDep) -> Response:
+    """Show the edit form filled with an existing post.
+
+    Args:
+        request (Request): needed by the template.
+        post (PostDep): the post being edited, resolved by the
+            dependency, which raises 404 when it does not exist.
+
+    Returns:
+        Response: the form page populated from the post.
+    """
     return render_post_form(
-        request,
-        mode="edit",
-        post=post,
-        values={
-            "title": post.title,
-            "summary": post.summary,
-            "content": post.content,
-            "tags": ", ".join(tag.name for tag in post.tags),
-        },
+        request, PostFormView(values=post_to_input(post), post=post)
     )
 
 
@@ -385,24 +460,28 @@ def update_post(
     request: Request,
     post: PostDep,
     db: DbSession,
-    title: Annotated[str, Form()] = "",
-    summary: Annotated[str, Form()] = "",
-    content: Annotated[str, Form()] = "",
-    tags: Annotated[str, Form()] = "",
-):
-    values = {"title": title, "summary": summary, "content": content, "tags": tags}
+    form: Annotated[PostFormInput, Form()],
+) -> Response:
+    """Save an edit to a post.
+
+    Args:
+        request (Request): needed by the template and by url_for.
+        post (PostDep): the post being edited.
+        db (DbSession): current database session.
+        form (PostFormInput): the submitted fields, unvalidated.
+
+    Returns:
+        Response: a 303 redirect to the post, or the form again with
+        errors and the typed text if validation failed. The post is
+        left untouched on failure, because assignment happens after
+        validation.
+    """
     try:
-        data = PostForm(
-            title=title, summary=summary, content=content, tags=split_tags(tags)
-        )
+        data = form.validated()
     except ValidationError as exception:
         return render_post_form(
             request,
-            mode="edit",
-            post=post,
-            values=values,
-            errors=form_errors(exception),
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            PostFormView(values=form, post=post, errors=form_errors(exception)),
         )
 
     post.title = data.title
@@ -419,7 +498,7 @@ def update_post(
 # One separate action, not a form field
 @app.post("/posts/{post_id}/pin", include_in_schema=False, name="toggle_pin")
 def toggle_pin(request: Request, post: PostDep, db: DbSession):
-    set_pinned(db, post, not post.is_pinned)
+    set_pinned(db, post, pinned=not post.is_pinned)
     db.commit()
     return RedirectResponse(
         request.url_for("edit_post", post_id=post.id),
