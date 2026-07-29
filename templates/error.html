@@ -1,8 +1,6 @@
 {% extends "layout.html" %}
 {% block content %}
     <section class="error-page">
-        {# Код нужен разработчику, поэтому он надзаголовком.
-           Заголовок отвечает на вопрос человека: что произошло. #}
         <span class="error-code eyebrow mono-label">Error {{ status_code }}</span>
 
         <h1 class="error-title">{{ message or "Something went wrong" }}</h1>
@@ -21,7 +19,6 @@
             {% endif %}
         </p>
 
-        {# Пустой экран без выхода — тупик. Здесь всегда есть куда пойти. #}
         <div class="error-actions mono-label">
             <a class="back-link" href="/">
                 <span class="arrow">&larr;</span> All posts

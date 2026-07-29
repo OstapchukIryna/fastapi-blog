@@ -1,5 +1,4 @@
-{# Базовый шаблон. Сайдбар убран: на индексе он занимал треть ширины
-   заглушками. Ширину теперь держит .container через --measure. #}
+
 {% import "_contact.html" as contact %}
 <!DOCTYPE html>
 <html lang="en" data-bs-theme="dark">
@@ -13,25 +12,22 @@
         {% else %}
             <title>Called Mad — notes on Python backend work</title>
         {% endif %}
-        <meta name="description" content="Notes on Python backend work — what broke, why, and what I understood afterwards.">
+        <meta name="description"
+              content="Notes on Python backend work — what broke, why, and what I understood afterwards.">
         <meta name="author" content="Called Mad">
 
-        {# Пустые og:url и og:image убраны намеренно: пустой тег ломает
-           превью сильнее, чем его отсутствие — источник обязан выбрать
-           запасной вариант сам. Вернуть, когда появятся домен и картинка. #}
         <!-- Open Graph -->
-        <meta property="og:title" content="{{ title ~ ' — ' ~ site.handle if title else site.handle }}">
+        <meta property="og:title"
+              content="{{ title ~ ' — ' ~ site.handle if title else site.handle }}">
         <meta property="og:type" content="website">
         <meta property="og:description"
               content="Notes on Python backend work — what broke, why, and what I understood afterwards.">
         <meta name="twitter:card" content="summary">
 
-        <!-- Fonts: Space Grotesk (display) / Newsreader (body) / JetBrains Mono (utility) -->
+        <!-- Fonts: Archivo (display) / Newsreader (body) / JetBrains Mono (utility) -->
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        {# Курсив Newsreader добавлен намеренно: в герое им выделено
-           «didn't work» — акцент без ещё одного цвета на странице #}
-        <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=JetBrains+Mono:wght@400;500&display=swap"
+        <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=JetBrains+Mono:wght@400;500&display=swap"
               rel="stylesheet">
 
         <!-- Bootstrap CSS -->
@@ -51,7 +47,8 @@
         <link rel="manifest" href="/static/site.webmanifest">
     </head>
     <body class="d-flex flex-column min-vh-100">
-        {% block reading_progress %}{% endblock reading_progress %}
+        {% block reading_progress %}
+        {% endblock reading_progress %}
         <header class="site-header">
             <nav class="navbar navbar-expand-md bg-steel fixed-top"
                  data-bs-theme="dark">
@@ -67,8 +64,6 @@
                         <span class="navbar-toggler-icon"></span>
                     </button>
                     <div class="collapse navbar-collapse" id="navbarToggle">
-                        {# active вычисляется из пути, а не прописан в разметке:
-                           иначе «Posts» горит на всех страницах сразу #}
                         <div class="navbar-nav me-auto">
                             {% set path = request.url.path %}
                             <a class="nav-link{{ ' active' if path in ('/', '/posts') }}"
@@ -81,6 +76,7 @@
                                {% if path.startswith('/about') %}aria-current="page"{% endif %}
                                href="{{ url_for('about') }}">About</a>
                         </div>
+                        {#TODO Signin button#}
                         {# «Sign in» убран из меню: он вёл на форму, honestly
                            подписанную «ещё не подключено», и занимал точку
                            выбора у аудитории, которой вход не нужен вовсе.
@@ -90,6 +86,9 @@
                             {% if is_author %}
                                 <a class="nav-link nav-write{{ ' active' if path.startswith('/posts/new') }}"
                                    href="{{ url_for('new_post') }}">Write</a>
+                                <a class="nav-link{{ ' active' if path.startswith('/profile') }}"
+                                   {% if path.startswith('/profile') %}aria-current="page"{% endif %}
+                                   href="{{ url_for('profile') }}">Profile</a>
                             {% endif %}
                             <div class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle"
@@ -123,14 +122,14 @@
             {% endblock content %}
         </main>
 
-        {# Контакты в подвале: последний экран любой страницы — всё ещё
-           точка выхода, и на ней должен быть способ написать #}
         <footer class="site-footer mt-5 py-4">
             <div class="container d-flex flex-wrap justify-content-between align-items-center gap-3">
                 <span class="mono-label">© <span id="year"></span> {{ site.handle }}</span>
                 {{ contact.channels() }}
             </div>
         </footer>
+
+        {% include "_modals.html" %}
 
         <script>
             document.getElementById('year').textContent = new Date().getFullYear();
@@ -150,7 +149,11 @@
                 }
                 localStorage.setItem('theme', theme);
 
-                const themeText = { light: 'Light', dark: 'Dark', auto: 'Auto' };
+                const themeText = {
+                    light: 'Light',
+                    dark: 'Dark',
+                    auto: 'Auto'
+                };
                 document.getElementById('bd-theme-text').textContent = themeText[theme];
             };
 
@@ -158,13 +161,10 @@
                 button.addEventListener('click', () => setTheme(button.getAttribute('data-bs-theme-value')));
             });
 
-            // Тёмная по умолчанию; data-bs-theme в <html> уже стоит, вспышки светлого не будет
             setTheme(localStorage.getItem('theme') || 'dark');
         </script>
 
         <script>
-            // Индикатор чтения. Есть только на странице записи —
-            // на остальных элемента нет и обработчики не вешаются.
             const progressBar = document.getElementById('reading-progress');
             if (progressBar) {
                 const updateProgress = () => {
@@ -173,9 +173,18 @@
                     progressBar.style.transform = `scaleX(${Math.min(ratio, 1)})`;
                 };
                 updateProgress();
-                window.addEventListener('scroll', updateProgress, { passive: true });
+                window.addEventListener('scroll', updateProgress, {
+                    passive: true
+                });
                 window.addEventListener('resize', updateProgress);
             }
         </script>
+
+        {# Скрипты страниц — модулями, после бандла Bootstrap: они
+           отложены до конца разбора документа, поэтому глобальный
+           `bootstrap` к их запуску уже существует. Общие функции берут
+           из /static/js/utils.js — файл один на весь сайт. #}
+        {% block scripts %}
+        {% endblock scripts %}
     </body>
 </html>

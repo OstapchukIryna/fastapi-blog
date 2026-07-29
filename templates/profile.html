@@ -1,0 +1,142 @@
+{% extends "layout.html" %}
+{% block content %}
+    <header class="masthead form-masthead">
+        <span class="eyebrow mono-label">Account</span>
+        <h1 class="masthead-title form-title">Profile</h1>
+        {# Оговорка про загрузку файла живёт здесь, в прозе, а не в
+           подписи к полю: .mono-label — служебная строка, а не место
+           для предложения на семьдесят восемь знаков капслоком. #}
+        <p class="masthead-tagline">
+            Name and address of the one author this blog has. Uploading an
+            avatar arrives with the file tutorial; for now the field takes a
+            file name.
+        </p>
+    </header>
+
+    <div class="profile-identity">
+        <img class="avatar"
+             src="{{ user.image_path }}"
+             alt="{{ user.username }}"
+             width="88"
+             height="88">
+        <div>
+            <p class="record-action-name">{{ user.username }}</p>
+            <p class="record-action-note">
+                <a href="{{ url_for('user_posts', user_id=user.id) }}">Public page</a>
+            </p>
+        </div>
+    </div>
+
+    {# У профиля нет серверного POST: правки уходят в PATCH /api/users,
+       чтобы не заводить вторую копию проверок уникальности и хеширования
+       пароля. Поэтому форма без action — без скрипта она бесполезна, и
+       noscript говорит это прямо, а не молча ломается. #}
+    <noscript>
+        <div class="form-summary" role="alert">
+            <span class="mono-label">Needs JavaScript</span>
+            <p>This form saves through the API from the browser.</p>
+        </div>
+    </noscript>
+
+    <form class="post-form" id="profileForm" data-user-id="{{ user.id }}">
+        <div class="field">
+            <label class="form-label mono-label" for="username">Username</label>
+            <input class="form-control"
+                   type="text"
+                   id="username"
+                   name="username"
+                   minlength="3"
+                   maxlength="50"
+                   autocomplete="username"
+                   aria-describedby="username-error"
+                   value="{{ user.username }}">
+            <p class="field-error mono-label" id="username-error" hidden></p>
+        </div>
+
+        <div class="field">
+            <label class="form-label mono-label" for="email">Email</label>
+            <input class="form-control"
+                   type="email"
+                   id="email"
+                   name="email"
+                   maxlength="120"
+                   autocomplete="email"
+                   aria-describedby="email-error"
+                   value="{{ user.email }}">
+            <p class="field-error mono-label" id="email-error" hidden></p>
+        </div>
+
+        <div class="field">
+            <label class="form-label mono-label" for="image_file">Avatar</label>
+            <input class="form-control"
+                   type="text"
+                   id="image_file"
+                   name="image_file"
+                   maxlength="200"
+                   aria-describedby="image_file-error"
+                   placeholder="avatar-256.jpg"
+                   value="{{ user.image_file or '' }}">
+            <p class="field-error mono-label" id="image_file-error" hidden></p>
+            <p class="field-hint mono-label">In /media/profile_pics</p>
+        </div>
+
+        <div class="field">
+            <label class="form-label mono-label" for="password">New password</label>
+            <input class="form-control"
+                   type="password"
+                   id="password"
+                   name="password"
+                   minlength="8"
+                   maxlength="128"
+                   autocomplete="new-password"
+                   aria-describedby="password-error">
+            <p class="field-error mono-label" id="password-error" hidden></p>
+            <p class="field-hint mono-label">Empty keeps the current</p>
+        </div>
+
+        <div class="form-actions">
+            <button class="btn btn-light write-btn" type="submit">Save changes</button>
+            <a class="back-link mono-label" href="/">Cancel</a>
+        </div>
+    </form>
+{% endblock content %}
+
+{% block scripts %}
+    <!-- Profile Form Handler -->
+    <script type="module">
+        import { wireForm } from "/static/js/utils.js";
+
+        const form = document.getElementById("profileForm");
+
+        wireForm(form, {
+            request: (fields) => {
+                // PATCH means "change these": an empty field is not a
+                // request to blank the column, it is a field left alone.
+                const changes = {};
+                const keep = (name, value) => {
+                    if (value) changes[name] = value;
+                };
+
+                keep("username", fields.get("username").trim());
+                keep("email", fields.get("email").trim());
+                keep("image_file", fields.get("image_file").trim());
+                // Not trimmed: spaces can be part of a password
+                keep("password", fields.get("password"));
+
+                return {
+                    url: `/api/users/${form.dataset.userId}`,
+                    method: "PATCH",
+                    payload: changes,
+                };
+            },
+            result: (user) => ({
+                title: "Saved",
+                message: `Profile of ${user.username} updated.`,
+                action: "Reload the page",
+            }),
+            after: () => window.location.reload(),
+            failure: { action: "Back to the form" },
+            busy: "Saving",
+        });
+    </script>
+{% endblock scripts %}

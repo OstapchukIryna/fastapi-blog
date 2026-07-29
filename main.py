@@ -24,10 +24,6 @@ from routers.posts import PostDep, arrange, find_related, posts_query, set_pinne
 from routers.tags import TaggedPostsDep, all_topics
 from routers.users import UserDep, current_author
 from schemas import PostFormInput
-
-# The configured instance, not a fresh one: templating.py is where the
-# `site` globals, the `markdown` filter and the is_author context
-# processor are attached. A bare Jinja2Templates() has none of them.
 from templating import templates
 
 
@@ -120,12 +116,30 @@ class PostFormView:
         post (models.Post | None): the post being edited, or None when
             creating a new one.
         errors (dict[str, str]): field name to message, one per field.
+        author (models.User | None): who a new post will belong to. Only
+            needed when creating: the JSON API takes the author in the
+            body, so the page has to carry it into the form.
 
     """
 
     values: PostFormInput
     post: models.Post | None = None
     errors: dict[str, str] = field(default_factory=dict)
+    author: models.User | None = None
+
+    @property
+    def author_id(self) -> int | None:
+        """
+        Id to send with a new post.
+
+        Returns:
+            int | None: the author's id, or None when editing — an
+            existing post keeps the author it already has.
+
+        """
+        if self.post is not None:
+            return None
+        return self.author.id if self.author else None
 
     @property
     def editing(self) -> bool:
@@ -217,18 +231,26 @@ def render_post_form(request: Request, view: PostFormView) -> Response:
 # Must be declared before /posts/{post_id} because FastAPI parses routes in the order of registration,
 # and "new" would otherwise match post_id: int and give 422
 @app.get("/posts/new", include_in_schema=False, name="new_post")
-def new_post_form(request: Request) -> Response:
+async def new_post_form(request: Request, db: DbSession) -> Response:
     """
     Show an empty form for a new post.
 
+    The author is looked up here rather than hardcoded in the page: the
+    form posts to /api/posts, which wants a user_id in the body, and the
+    only honest source of it is the same current_author the server-side
+    route uses.
+
     Args:
         request (Request): needed by the template.
+        db (DbSession): current database session.
 
     Returns:
         Response: the blank form page.
 
     """
-    return render_post_form(request, PostFormView(values=PostFormInput()))
+    return render_post_form(
+        request, PostFormView(values=PostFormInput(), author=await current_author(db))
+    )
 
 
 @app.post("/posts/new", include_in_schema=False, name="create_post_page")
@@ -255,7 +277,12 @@ async def create_post_page(
         data = form.validated()
     except ValidationError as exception:
         return render_post_form(
-            request, PostFormView(values=form, errors=form_errors(exception))
+            request,
+            PostFormView(
+                values=form,
+                errors=form_errors(exception),
+                author=await current_author(db),
+            ),
         )
 
     post = models.Post(
@@ -395,6 +422,32 @@ async def user_posts_page(request: Request, user: UserDep, db: DbSession):
 @app.get("/about", include_in_schema=False, name="about")
 def about(request: Request):
     return templates.TemplateResponse(request, "about.html", {"title": "About"})
+
+
+@app.get("/profile", include_in_schema=False, name="profile")
+async def profile(request: Request, db: DbSession):
+    """
+    Show the author's own details for editing.
+
+    There is one author, so the page needs no id in the path — it asks
+    current_author who that is, the same way the post routes do. Saving
+    happens from the browser against PATCH /api/users/{id}; there is no
+    POST route here to avoid a second copy of the uniqueness checks and
+    password hashing that the API already does.
+
+    Args:
+        request (Request): needed by the template.
+        db (DbSession): current database session.
+
+    Returns:
+        Response: the profile page.
+
+    """
+    return templates.TemplateResponse(
+        request,
+        "profile.html",
+        {"user": await current_author(db), "title": "Profile"},
+    )
 
 
 @app.get("/login", include_in_schema=False, name="login")

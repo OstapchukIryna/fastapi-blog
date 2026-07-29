@@ -10,7 +10,7 @@
     --accent: #ffb703;
     --accent-hot: #fb8500;
 
-    --font-display: "Space Grotesk", system-ui, sans-serif;
+    --font-display: "Archivo", system-ui, sans-serif;
     --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
     --bs-body-font-family: "Newsreader", Georgia, serif;
@@ -107,7 +107,10 @@
     /* заливка тёмная — текст светлый, 5.76 */
     --danger-hover-fg: #f8f8f2;
     /* 9.31 */
-    --overlay: #272822;
+    /* --overlay здесь не переопределяется: единственный её потребитель,
+       .modal-content, лежит внутри data-bs-theme="dark", так что светлое
+       значение было недостижимо. Окно — тёмный остров в обеих темах,
+       как навбар */
     --nav-bg: rgba(39, 40, 34, 0.92);
     --hairline-accent: rgba(143, 80, 0, 0.4);
     /* Кнопка следует за акцентом темы: янтарь на бумаге давал 1.64 при
@@ -928,6 +931,43 @@ h4 {
     color: var(--bs-emphasis-color);
 }
 
+/* Заголовок окна исхода несёт результат: акцент — сохранено,
+   danger — нет. Цвет, а не иконка: иконку пришлось бы дублировать
+   текстом ради читателя с экранным диктором */
+.modal-title.is-success {
+    color: var(--link);
+}
+
+.modal-title.is-danger {
+    color: var(--danger);
+}
+
+/* В окне исхода сообщение — единственное, зачем окно открылось.
+   Поэтому оно ярче обычного текста тела, а не приглушено до
+   вторичного, как поясняющие абзацы в окне подтверждения */
+.modal-body .modal-message {
+    color: var(--bs-emphasis-color);
+}
+
+/* Кнопки окна говорят тем же служебным голосом, что и остальные:
+   моноширинный капслок из .write-btn/.record-btn. Оставался
+   единственный экран, где кнопка была Bootstrap'овской — Newsreader
+   16px, а 16px вообще нет в рампе. min-height здесь, а не в каждом
+   классе: цель касания в 44px нужна обеим, и ghost её не несёт */
+.modal-footer .btn {
+    min-height: 44px;
+}
+
+/* Крестик был 33px при том же минимуме 44, ради которого в конце
+   файла расширены ссылки в тегах. Фон-иконку размер не тянет,
+   поэтому она задана явно */
+.modal-header .btn-close {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    background-size: 1em;
+}
+
 .btn-danger {
     --bs-btn-bg: var(--danger);
     --bs-btn-border-color: var(--danger);
@@ -1226,6 +1266,19 @@ h4 {
     gap: 1rem 1.75rem;
     padding-top: 1.5rem;
     border-top: 1px solid var(--bs-border-color);
+}
+
+/* --- Профиль автора ----------------------------------------------
+   Кто правится — видно до полей, а не выводится из них: аватар и имя
+   стоят над формой той же строкой, что и на публичной странице. */
+
+.profile-identity {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding-bottom: 2rem;
+    margin-bottom: 2.5rem;
+    border-bottom: 1px solid var(--bs-border-color);
 }
 
 /* --- Действия над записью ---------------------------------------

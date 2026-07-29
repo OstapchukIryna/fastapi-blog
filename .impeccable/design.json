@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-07-28T00:00:00.000Z",
+  "generatedAt": "2026-07-29T14:32:29.000Z",
   "title": "Design System: Called Mad",
   "extensions": {
     "colorMeta": {
@@ -206,7 +206,7 @@
       },
       "voice": {
         "displayName": "Voice",
-        "purpose": "The author speaking in first person at display size. Serif, not grotesque — real italics carry emphasis so no colour is spent on it."
+        "purpose": "The author speaking in first person at display size. Serif, not grotesque \u2014 real italics carry emphasis so no colour is spent on it."
       },
       "headline": {
         "displayName": "Headline",
@@ -320,14 +320,14 @@
       "refersTo": "card-surface",
       "description": "The single elevation step: raised ground plus a hairline. No shadow, ever. The border warms on hover.",
       "html": "<article class=\"ds-card\"><p class=\"ds-card-meta\">26 Jul 2026 / 2 min</p><h3 class=\"ds-card-title\">I replaced pip, black and mypy in one afternoon</h3><p class=\"ds-card-body\">uv, ruff and pyrefly in place of four older tools.</p></article>",
-      "css": ".ds-card { background: var(--bs-tertiary-bg, #272822); border: 1px solid var(--bs-border-color, #3e3d32); border-radius: 0.5rem; padding: 2rem; transition: border-color 0.2s ease; } .ds-card:hover { border-color: rgba(255, 183, 3, 0.4); } .ds-card-meta { margin: 0 0 0.7rem; font-family: var(--font-mono, 'JetBrains Mono', ui-monospace, monospace); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--bs-secondary-color, #a39e8b); } .ds-card-title { margin: 0 0 0.75rem; font-family: var(--font-display, 'Space Grotesk', system-ui, sans-serif); font-weight: 700; font-size: 1.5rem; line-height: 1.2; letter-spacing: -0.025em; color: var(--bs-emphasis-color, #ffffff); } .ds-card-body { margin: 0; font-family: var(--bs-body-font-family, 'Newsreader', Georgia, serif); font-size: 1.0625rem; line-height: 1.7; color: var(--bs-secondary-color, #a39e8b); }"
+      "css": ".ds-card { background: var(--bs-tertiary-bg, #272822); border: 1px solid var(--bs-border-color, #3e3d32); border-radius: 0.5rem; padding: 2rem; transition: border-color 0.2s ease; } .ds-card:hover { border-color: rgba(255, 183, 3, 0.4); } .ds-card-meta { margin: 0 0 0.7rem; font-family: var(--font-mono, 'JetBrains Mono', ui-monospace, monospace); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--bs-secondary-color, #a39e8b); } .ds-card-title { margin: 0 0 0.75rem; font-family: var(--font-display, 'Archivo', system-ui, sans-serif); font-weight: 700; font-size: 1.5rem; line-height: 1.2; letter-spacing: -0.025em; color: var(--bs-emphasis-color, #ffffff); } .ds-card-body { margin: 0; font-family: var(--bs-body-font-family, 'Newsreader', Georgia, serif); font-size: 1.0625rem; line-height: 1.7; color: var(--bs-secondary-color, #a39e8b); }"
     },
     {
       "name": "Now Panel",
       "kind": "custom",
       "refersTo": "panel-now",
       "description": "The signature component. Present-tense status with the primary contact action attached, marked by its amber Now label rather than a coloured edge. The date is hand-maintained, never generated.",
-      "html": "<section class=\"ds-now\"><div class=\"ds-now-head\"><span class=\"ds-now-title\">Now</span><span class=\"ds-now-date\">Updated 28 Jul 2026</span></div><dl class=\"ds-now-rows\"><dt>Building</dt><dd>This blog — FastAPI, SQLAlchemy, Jinja2</dd><dt>Next</dt><dd>JWT auth, file uploads, pagination</dd></dl></section>",
+      "html": "<section class=\"ds-now\"><div class=\"ds-now-head\"><span class=\"ds-now-title\">Now</span><span class=\"ds-now-date\">Updated 28 Jul 2026</span></div><dl class=\"ds-now-rows\"><dt>Building</dt><dd>This blog \u2014 FastAPI, SQLAlchemy, Jinja2</dd><dt>Next</dt><dd>JWT auth, file uploads, pagination</dd></dl></section>",
       "css": ".ds-now { background: var(--bs-tertiary-bg, #272822); border: 1px solid var(--bs-border-color, #3e3d32); border-radius: 0.5rem; padding: 1.5rem 1.75rem; } .ds-now-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; padding-bottom: 1rem; margin-bottom: 1.15rem; border-bottom: 1px solid var(--bs-border-color, #3e3d32); font-family: var(--font-mono, 'JetBrains Mono', ui-monospace, monospace); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.09em; } .ds-now-title { color: var(--accent, #ffb703); } .ds-now-date { color: var(--bs-secondary-color, #a39e8b); } .ds-now-rows { display: grid; grid-template-columns: minmax(76px, auto) 1fr; gap: 0.7rem 1.5rem; margin: 0; } .ds-now-rows dt { font-family: var(--font-mono, 'JetBrains Mono', ui-monospace, monospace); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.09em; color: var(--bs-secondary-color, #a39e8b); } .ds-now-rows dd { margin: 0; font-family: var(--bs-body-font-family, 'Newsreader', Georgia, serif); font-size: 1.0625rem; color: var(--bs-body-color, #f8f8f2); }"
     },
     {
@@ -336,7 +336,7 @@
       "refersTo": null,
       "description": "The only motion that draws rather than fades: an amber underline grown from 0% to 100% width on hover. text-decoration is suppressed or a second line renders over it.",
       "html": "<h2 class=\"ds-wipe-wrap\"><a class=\"ds-wipe\" href=\"#\">Why you can't filter a window function in WHERE</a></h2>",
-      "css": ".ds-wipe-wrap { margin: 0; font-family: var(--font-display, 'Space Grotesk', system-ui, sans-serif); font-weight: 700; font-size: 1.5rem; line-height: 1.2; letter-spacing: -0.025em; } .ds-wipe { display: inline; text-decoration: none; color: var(--bs-emphasis-color, #ffffff); background-image: linear-gradient(var(--accent, #ffb703), var(--accent, #ffb703)); background-repeat: no-repeat; background-position: 0 100%; background-size: 0% 2px; transition: background-size 0.28s ease; } .ds-wipe-wrap:hover .ds-wipe, .ds-wipe:focus-visible { background-size: 100% 2px; }"
+      "css": ".ds-wipe-wrap { margin: 0; font-family: var(--font-display, 'Archivo', system-ui, sans-serif); font-weight: 700; font-size: 1.5rem; line-height: 1.2; letter-spacing: -0.025em; } .ds-wipe { display: inline; text-decoration: none; color: var(--bs-emphasis-color, #ffffff); background-image: linear-gradient(var(--accent, #ffb703), var(--accent, #ffb703)); background-repeat: no-repeat; background-position: 0 100%; background-size: 0% 2px; transition: background-size 0.28s ease; } .ds-wipe-wrap:hover .ds-wipe, .ds-wipe:focus-visible { background-size: 100% 2px; }"
     },
     {
       "name": "Navigation",
@@ -345,22 +345,27 @@
       "description": "Fixed, translucent, blurred. Label typography; the active section takes the accent, and the author-only action is outlined rather than filled.",
       "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-brand\" href=\"#\">called_mad</a><a class=\"ds-nav-link ds-nav-active\" href=\"#\">Posts</a><a class=\"ds-nav-link\" href=\"#\">Topics</a><a class=\"ds-nav-link ds-nav-write\" href=\"#\">Write</a></nav>",
       "css": ".ds-nav { display: flex; align-items: center; gap: 1.25rem; padding: 0.6rem 1rem; background: rgba(30, 31, 28, 0.85); backdrop-filter: blur(10px); border-bottom: 1px solid var(--bs-border-color, #3e3d32); } .ds-nav-brand { font-family: var(--font-mono, 'JetBrains Mono', ui-monospace, monospace); font-size: 0.8rem; font-weight: 500; letter-spacing: 0.04em; color: #f8f8f2; text-decoration: none; } .ds-nav-link { font-family: var(--font-mono, 'JetBrains Mono', ui-monospace, monospace); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.09em; color: #a39e8b; text-decoration: none; transition: color 0.2s ease; } .ds-nav-link:hover { color: #f8f8f2; } .ds-nav-active { color: var(--accent, #ffb703); } .ds-nav-write { padding: 0.35rem 0.7rem; border: 1px solid rgba(255, 255, 255, 0.22); border-radius: 0.5rem; } .ds-nav-write:hover { color: var(--accent, #ffb703); border-color: var(--accent, #ffb703); }"
+    },
+    {
+      "name": "Result Window",
+      "description": "Shared success/error dialog on Deep Ink. Heading, message and button label are set per call; the primary action names where closing goes.",
+      "css": ".ds-result { background: var(--overlay, #14150f); border: 1px solid var(--bs-border-color, #3e3d32); border-radius: 0.5rem; } .ds-result-title { font-family: var(--font-display, 'Archivo', system-ui, sans-serif); font-weight: 700; font-size: 1.4rem; letter-spacing: -0.02em; } .ds-result-title.is-success { color: var(--link, #ffb703); } .ds-result-title.is-danger { color: var(--danger, #ff6188); } .ds-result-message { font-size: 1.0625rem; line-height: 1.6; color: var(--bs-emphasis-color, #ffffff); } .ds-result .btn { min-height: 44px; font-family: var(--font-mono, 'JetBrains Mono', ui-monospace, monospace); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.09em; }"
     }
   ],
   "narrative": {
     "northStar": "The Lit Terminal",
-    "overview": "Monokai is a code editor theme, and this site wears it on purpose. The ground is the editor's background, the text is its foreground, and the one accent is the warm highlight a syntax theme reserves for the thing that matters. But an editor is built for scanning code in short bursts, and this surface has to hold long prose. So the palette stays and the typography changes: an editorial serif is laid into the editor's dark, given a 68-character measure and a 1.7 line height, until the environment a backend engineer actually lives in becomes somewhere you can read a two-thousand-word post-mortem without leaving.\n\nEverything is flat. There is not a single box-shadow in the system — depth comes from a hairline border and a change of ground, never from a simulated light source. Elements are quiet at rest and answer only when touched, in 200ms, on colour or border. Nothing animates on its own, nothing floats, nothing pulses for attention.\n\nThe restraint is the argument. This site is a work sample for a backend engineer, so a decorative flourish that cannot be justified costs more than it adds. One accent, two themes, three typefaces, no shadows, and every contrast ratio written into the stylesheet next to the value it justifies.",
+    "overview": "Monokai is a code editor theme, and this site wears it on purpose. The ground is the editor's background, the text is its foreground, and the one accent is the warm highlight a syntax theme reserves for the thing that matters. But an editor is built for scanning code in short bursts, and this surface has to hold long prose. So the palette stays and the typography changes: an editorial serif is laid into the editor's dark, given a 68-character measure and a 1.7 line height, until the environment a backend engineer actually lives in becomes somewhere you can read a two-thousand-word post-mortem without leaving.\n\nEverything is flat. There is not a single box-shadow in the system \u2014 depth comes from a hairline border and a change of ground, never from a simulated light source. Elements are quiet at rest and answer only when touched, in 200ms, on colour or border. Nothing animates on its own, nothing floats, nothing pulses for attention.\n\nThe restraint is the argument. This site is a work sample for a backend engineer, so a decorative flourish that cannot be justified costs more than it adds. One accent, two themes, three typefaces, no shadows, and every contrast ratio written into the stylesheet next to the value it justifies.",
     "keyCharacteristics": [
       "One accent colour, used as a signal rather than as decoration",
       "Zero shadows; depth is border and ground only",
-      "Editorial serif for prose and for the author's voice, geometric sans for names, monospace for every service string",
+      "Editorial serif for prose and for the author's voice, a grotesque for names, monospace for every service string",
       "Dark is the canonical theme; light is a fully maintained alternative",
       "Motion is confirmation, never entertainment"
     ],
     "rules": [
       {
         "name": "The Single Filament Rule",
-        "body": "There is one accent. If a design needs a second hue to separate two things, the hierarchy is wrong — fix it with weight, position, or ground instead. The only sanctioned exception is Signal Rose, and only for destruction and error.",
+        "body": "There is one accent. If a design needs a second hue to separate two things, the hierarchy is wrong \u2014 fix it with weight, position, or ground instead. The only sanctioned exception is Signal Rose, and only for destruction and error.",
         "section": "colors"
       },
       {
@@ -375,7 +380,7 @@
       },
       {
         "name": "The Voice-Is-Serif Rule",
-        "body": "Wherever the page speaks in the first person at large size, it speaks in Newsreader, not Space Grotesk. The grotesque names things; the serif says them. This is a system rule, not a one-off for the hero.",
+        "body": "Wherever the page speaks in the first person at large size, it speaks in Newsreader, not Archivo. The grotesque names things; the serif says them. This is a system rule, not a one-off for the hero.",
         "section": "typography"
       },
       {
@@ -422,7 +427,7 @@
     "dos": [
       "Do put every colour in :root / [data-bs-theme] and reference the token.",
       "Do record the contrast ratio in a comment whenever a colour is chosen or adjusted, the way #a39e8b (6.17) and #ff6188 (5.77) already are.",
-      "Do set every service string — dates, counts, tags, nav, buttons, field labels — in .mono-label.",
+      "Do set every service string \u2014 dates, counts, tags, nav, buttons, field labels \u2014 in .mono-label.",
       "Do use Newsreader whenever the page speaks in first person at large size.",
       "Do keep prose at 68ch and the column at 760px.",
       "Do express depth with a hairline and a change of ground.",
@@ -437,10 +442,10 @@
       "Don't introduce a second accent hue. Signal Rose is for destruction and error only.",
       "Don't hardcode a hex value in a component or a template.",
       "Don't nest a card inside a card; there is one elevation step.",
-      "Don't animate anything on its own — no autoplay, no pulse, no bounce, no slide. Motion answers an action.",
+      "Don't animate anything on its own \u2014 no autoplay, no pulse, no bounce, no slide. Motion answers an action.",
       "Don't show progress, freshness or state the system has not actually measured. The reading bar starts at zero and the Now date is hand-set on purpose.",
-      "Don't reach for developer-portfolio clichés: terminal window mockups, typing animations, matrix rain, a hello world hero. The palette already says where this author works; acting it out is costume.",
-      "Don't drift toward a generic SaaS landing page — gradient hero, pastel illustrations, large rounded cards floating on shadows.",
+      "Don't reach for developer-portfolio clich\u00e9s: terminal window mockups, typing animations, matrix rain, a hello world hero. The palette already says where this author works; acting it out is costume.",
+      "Don't drift toward a generic SaaS landing page \u2014 gradient hero, pastel illustrations, large rounded cards floating on shadows.",
       "Don't leave anything looking like untouched Bootstrap: default blue buttons, default shadows, default radii."
     ]
   }

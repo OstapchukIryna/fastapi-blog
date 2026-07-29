@@ -1,0 +1,75 @@
+{# Два окна исхода на весь сайт. Лежат в layout, а не в страницах:
+   иначе каждая форма заводила бы своё, и «сохранено» на записи
+   выглядело бы иначе, чем «сохранено» в профиле.
+
+   Заголовок, текст и подпись кнопки пишет showSuccess/showError из
+   /static/js/utils.js — здесь только пустые места под них. Подпись
+   кнопки задаётся вызовом, потому что закрытие окна почти всегда
+   куда-то ведёт, а «Close» описывало бы виджет, а не последствие.
+
+   data-bs-theme="dark" — тот же приём, что у навбара: --overlay тёмный
+   в обеих темах, поэтому текст внутри должен брать токены тёмной темы,
+   а не страницы. Без этого в светлой теме заголовок и сообщение
+   оказывались почти чёрными на почти чёрном. #}
+
+<div class="modal fade"
+     id="successModal"
+     tabindex="-1"
+     data-bs-theme="dark"
+     aria-labelledby="successModalLabel"
+     aria-describedby="successMessage"
+     aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title is-success" id="successModalLabel">Saved</h2>
+                <button type="button"
+                        class="btn-close"
+                        data-bs-dismiss="modal"
+                        aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-message mb-0" id="successMessage"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button"
+                        class="btn btn-light write-btn"
+                        id="successAction"
+                        data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# role="alertdialog" — окно приходит не по просьбе читателя, а потому
+   что что-то не вышло; это тот случай, ради которого роль и существует:
+   она заставляет прочесть описание, а не только заголовок. #}
+<div class="modal fade"
+     id="errorModal"
+     tabindex="-1"
+     role="alertdialog"
+     data-bs-theme="dark"
+     aria-labelledby="errorModalLabel"
+     aria-describedby="errorMessage"
+     aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title is-danger" id="errorModalLabel">Not saved</h2>
+                <button type="button"
+                        class="btn-close"
+                        data-bs-dismiss="modal"
+                        aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-message mb-0" id="errorMessage"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button"
+                        class="btn record-btn"
+                        id="errorAction"
+                        data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>

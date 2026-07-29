@@ -16,12 +16,10 @@
         </div>
     </header>
 
-    {# Однородный список без ведущей карточки: сюда приходят просматривать
-       написанное автором, а не выбирать, с чего начать #}
     {% for post in posts %}
         <article class="archive-item">
             <p class="post-meta mono-label">
-                <span>{{ post.date_posted.strftime('%d %b %Y') }}</span>
+                <span>{{ post.date_posted.strftime('%d %b, %Y') }}</span>
                 <span class="sep">/</span>
                 <span>{{ post.reading_minutes }} min</span>
             </p>
