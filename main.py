@@ -24,10 +24,6 @@ from routers.posts import PostDep, arrange, find_related, posts_query, set_pinne
 from routers.tags import TaggedPostsDep, all_topics
 from routers.users import UserDep, current_author
 from schemas import PostFormInput
-
-# The configured instance, not a fresh one: templating.py is where the
-# `site` globals, the `markdown` filter and the is_author context
-# processor are attached. A bare Jinja2Templates() has none of them.
 from templating import templates
 
 
