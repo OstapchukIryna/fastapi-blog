@@ -460,10 +460,7 @@ async def create_post_page(
     )
     db.add(post)
     await db.commit()
-    # No refresh: the session is created with expire_on_commit=False, so
-    # the object keeps everything it holds after the commit. refresh()
-    # would expire the loaded relationships and leave them to load lazily
-    # during response serialisation, which in async raises MissingGreenlet.
+    await db.refresh(post, attribute_names=["author"])
     return RedirectResponse(
         request.url_for("post_page", post_id=post.id),
         status_code=status.HTTP_303_SEE_OTHER,
@@ -667,6 +664,7 @@ async def create_post(post: PostCreate, db: DbSession):
     )
     db.add(new_post)
     await db.commit()
+    await db.refresh(new_post, attribute_names=["author"])
     return new_post
 
 
@@ -753,6 +751,7 @@ async def update_post_fields(
         setattr(post, name, value)
 
     await db.commit()
+    await db.refresh(post, attribute_names=["author"])
     return post
 
 

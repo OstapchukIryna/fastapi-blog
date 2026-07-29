@@ -1,7 +1,9 @@
 from fastapi import FastAPI, Request, status
-from fastapi.encoders import jsonable_encoder
+from fastapi.exception_handlers import (
+    http_exception_handler,
+    request_validation_exception_handler,
+)
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from templating import templates
@@ -19,20 +21,18 @@ def register_error_handlers(app: FastAPI) -> None:
     """
 
     @app.exception_handler(StarletteHTTPException)
-    def general_http_exception_handler(
+    async def general_http_exception_handler(
         request: Request, exception: StarletteHTTPException
     ):
+
+        if request.url.path.startswith("/api/"):
+            return await http_exception_handler(request, exception)
+
         message = (
             exception.detail
             if exception.detail
             else "An error occurred. Please check your request and try again."
         )
-
-        if request.url.path.startswith("/api/"):
-            return JSONResponse(
-                status_code=exception.status_code,
-                content={"detail": message},
-            )
 
         return templates.TemplateResponse(
             request,
@@ -47,14 +47,11 @@ def register_error_handlers(app: FastAPI) -> None:
         )
 
     @app.exception_handler(RequestValidationError)
-    def validation_exception_handler(
+    async def validation_exception_handler(
         request: Request, exception: RequestValidationError
     ):
         if request.url.path.startswith("/api/"):
-            return JSONResponse(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                content={"detail": jsonable_encoder(exception.errors())},
-            )
+            return await request_validation_exception_handler(request, exception)
 
         return templates.TemplateResponse(
             request,
