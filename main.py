@@ -12,7 +12,6 @@ from fastapi import (
 )
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +24,11 @@ from routers.posts import PostDep, arrange, find_related, posts_query, set_pinne
 from routers.tags import TaggedPostsDep, all_topics
 from routers.users import UserDep, current_author
 from schemas import PostFormInput
+
+# The configured instance, not a fresh one: templating.py is where the
+# `site` globals, the `markdown` filter and the is_author context
+# processor are attached. A bare Jinja2Templates() has none of them.
+from templating import templates
 
 
 # async await of creating db tables if they're not exist
@@ -43,7 +47,6 @@ app = FastAPI(lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/media", StaticFiles(directory="media"), name="media")
 
-templates = Jinja2Templates(directory="templates")
 
 app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(posts.router, prefix="/api/posts", tags=["posts"])
