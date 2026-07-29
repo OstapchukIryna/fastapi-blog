@@ -12,6 +12,7 @@ from fastapi import (
 )
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,11 +20,11 @@ import models
 from database import Base, engine, get_db
 from error_handlers import register_error_handlers
 from models import get_or_create_tags
+from routers import posts, tags, users
 from routers.posts import PostDep, arrange, find_related, posts_query, set_pinned
 from routers.tags import TaggedPostsDep, all_topics
 from routers.users import UserDep, current_author
 from schemas import PostFormInput
-from templating import templates
 
 
 # async await of creating db tables if they're not exist
@@ -41,6 +42,12 @@ app = FastAPI(lifespan=lifespan)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/media", StaticFiles(directory="media"), name="media")
+
+templates = Jinja2Templates(directory="templates")
+
+app.include_router(users.router, prefix="/api/users", tags=["users"])
+app.include_router(posts.router, prefix="/api/posts", tags=["posts"])
+app.include_router(tags.router, prefix="/api/tags", tags=["tags"])
 
 register_error_handlers(app)
 
