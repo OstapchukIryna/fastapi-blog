@@ -248,6 +248,7 @@ dependencies = [
     { name = "aiosqlite" },
     { name = "bcrypt" },
     { name = "fastapi", extra = ["standard"] },
+    { name = "greenlet" },
     { name = "markdown" },
     { name = "sqlalchemy", extra = ["asyncio"] },
 ]
@@ -264,6 +265,7 @@ requires-dist = [
     { name = "aiosqlite", specifier = ">=0.22.1" },
     { name = "bcrypt", specifier = ">=5.0.0" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.140.0" },
+    { name = "greenlet", specifier = ">=3.5.4" },
     { name = "markdown", specifier = ">=3.10.2" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.51" },
 ]
