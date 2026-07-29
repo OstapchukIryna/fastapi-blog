@@ -44,7 +44,8 @@ DbSession = Annotated[Session, Depends(get_db)]
 
 
 def posts_query():
-    """Build the base post query with its relations already loaded.
+    """
+    Build the base post query with its relations already loaded.
 
     selectinload and joinedload are not speculative optimisation: without
     them, touching post.tags in a template issues one query per post,
@@ -52,6 +53,7 @@ def posts_query():
 
     Returns:
         Select: posts ordered newest first, with tags and author loaded.
+
     """
     return (
         select(models.Post)
@@ -285,7 +287,8 @@ def home(request: Request, db: DbSession):
 
 @dataclass(slots=True)
 class PostFormView:
-    """State of the post form, from which the page is drawn.
+    """
+    State of the post form, from which the page is drawn.
 
     Three fields instead of the previous six arguments. Two of the old
     ones are derived rather than passed: editing means "there is a post",
@@ -300,6 +303,7 @@ class PostFormView:
         post (models.Post | None): the post being edited, or None when
             creating a new one.
         errors (dict[str, str]): field name to message, one per field.
+
     """
 
     values: PostFormInput
@@ -308,29 +312,35 @@ class PostFormView:
 
     @property
     def editing(self) -> bool:
-        """Whether an existing post is being edited.
+        """
+        Whether an existing post is being edited.
 
         Returns:
             bool: True when a post is present, which is what
             distinguishes editing from creating.
+
         """
         return self.post is not None
 
     @property
     def title(self) -> str:
-        """Title for the page and the browser tab.
+        """
+        Title for the page and the browser tab.
 
         Returns:
             str: "Edit post" when editing, otherwise "New post".
+
         """
         return "Edit post" if self.editing else "New post"
 
     @property
     def status_code(self) -> int:
-        """HTTP status the form should be returned with.
+        """
+        HTTP status the form should be returned with.
 
         Returns:
             int: 422 when there is something to fix, otherwise 200.
+
         """
         return (
             status.HTTP_422_UNPROCESSABLE_CONTENT if self.errors else status.HTTP_200_OK
@@ -338,7 +348,8 @@ class PostFormView:
 
 
 def post_to_input(post: models.Post) -> PostFormInput:
-    """Convert an existing post into the values its form fields show.
+    """
+    Convert an existing post into the values its form fields show.
 
     Lives here rather than in schemas because turning tags back into a
     string requires knowing the model, and schemas should not know about
@@ -350,6 +361,7 @@ def post_to_input(post: models.Post) -> PostFormInput:
     Returns:
         PostFormInput: the post's fields as the form displays them, with
         tags joined into a comma-separated string.
+
     """
     return PostFormInput(
         title=post.title,
@@ -360,7 +372,8 @@ def post_to_input(post: models.Post) -> PostFormInput:
 
 
 def render_post_form(request: Request, view: PostFormView) -> Response:
-    """Draw the post form in the given state.
+    """
+    Draw the post form in the given state.
 
     One form serves both creating and editing: the fields are identical,
     and the differences — heading, submit target, button label — are
@@ -374,6 +387,7 @@ def render_post_form(request: Request, view: PostFormView) -> Response:
     Returns:
         Response: the form page, with status 422 if the view holds
         errors.
+
     """
     return templates.TemplateResponse(
         request,
@@ -387,13 +401,15 @@ def render_post_form(request: Request, view: PostFormView) -> Response:
 # and "new" would otherwise match post_id: int and give 422
 @app.get("/posts/new", include_in_schema=False, name="new_post")
 def new_post_form(request: Request) -> Response:
-    """Show an empty form for a new post.
+    """
+    Show an empty form for a new post.
 
     Args:
         request (Request): needed by the template.
 
     Returns:
         Response: the blank form page.
+
     """
     return render_post_form(request, PostFormView(values=PostFormInput()))
 
@@ -402,7 +418,8 @@ def new_post_form(request: Request) -> Response:
 def create_post_page(
     request: Request, db: DbSession, form: Annotated[PostFormInput, Form()]
 ) -> Response:
-    """Create a post from the submitted form.
+    """
+    Create a post from the submitted form.
 
     FastAPI fills PostFormInput itself: a model behind Form() describes a
     form the way a model in the body describes JSON.
@@ -415,6 +432,7 @@ def create_post_page(
     Returns:
         Response: a 303 redirect to the new post, or the form again with
         errors and the typed text if validation failed.
+
     """
     try:
         data = form.validated()
@@ -441,7 +459,8 @@ def create_post_page(
 
 @app.get("/posts/{post_id}/edit", include_in_schema=False, name="edit_post")
 def edit_post_form(request: Request, post: PostDep) -> Response:
-    """Show the edit form filled with an existing post.
+    """
+    Show the edit form filled with an existing post.
 
     Args:
         request (Request): needed by the template.
@@ -450,6 +469,7 @@ def edit_post_form(request: Request, post: PostDep) -> Response:
 
     Returns:
         Response: the form page populated from the post.
+
     """
     return render_post_form(
         request, PostFormView(values=post_to_input(post), post=post)
@@ -463,7 +483,8 @@ def update_post(
     db: DbSession,
     form: Annotated[PostFormInput, Form()],
 ) -> Response:
-    """Save an edit to a post.
+    """
+    Save an edit to a post.
 
     Args:
         request (Request): needed by the template and by url_for.
@@ -476,6 +497,7 @@ def update_post(
         errors and the typed text if validation failed. The post is
         left untouched on failure, because assignment happens after
         validation.
+
     """
     try:
         data = form.validated()
@@ -609,12 +631,57 @@ def create_post(post: PostCreate, db: DbSession):
     return new_post
 
 
+@app.put("/api/posts/{post_id}", response_model=PostDetail)
+def update_all_post_fields(
+    post: PostDep, data: PostCreate, db: DbSession
+) -> models.Post:
+    """
+    Replace every editable field of a post.
+
+    PUT is a full replacement, so the body must carry the whole post.
+    Unlike the PATCH below it, nothing is left alone: a field the client
+    omits is not "unchanged", it becomes whatever PostCreate defaults it
+    to. That is why the dump has no exclude_unset — with it, PUT would
+    quietly behave like PATCH and the two endpoints would be the same.
+
+    user_id is part of the body, so a PUT can hand the post to another
+    author. That user has to exist. Checking the post's own author would
+    prove nothing: it exists by definition, or the post would not have
+    been found.
+
+    Args:
+        post (PostDep): the post being replaced; the dependency raises
+            404 when the id does not exist.
+        data (PostCreate): the complete replacement, already validated.
+        db (DbSession): current database session.
+
+    Raises:
+        HTTPException: 404 when data.user_id names a user that does not
+            exist.
+
+    Returns:
+        models.Post: the post as stored after the replacement.
+
+    """
+    if db.get(models.User, data.user_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+
+    replacement = data.model_dump()
+    post.tags = get_or_create_tags(db, replacement.pop("tags"))
+    for name, value in replacement.items():
+        setattr(post, name, value)
+
+    db.commit()
+    db.refresh(post)
+    return post
+
+
 @app.patch("/api/posts/{post_id}", response_model=PostDetail)
 def update_post_fields(post: PostDep, data: PostUpdate, db: DbSession) -> models.Post:
-    """Change some fields of a post, leaving the rest alone.
-
-    PATCH rather than PUT: a client fixing a typo in the title should
-    not have to resend the whole article to avoid blanking it.
+    """
+    Change some fields of a post, leaving the rest alone.
 
     Which fields to touch comes from exclude_unset, so an omitted field
     and a field sent as null both mean "leave it alone". The keys can
@@ -636,6 +703,7 @@ def update_post_fields(post: PostDep, data: PostUpdate, db: DbSession) -> models
 
     Returns:
         models.Post: the post as stored after the change.
+
     """
     changes = data.model_dump(exclude_unset=True, exclude_none=True)
 
