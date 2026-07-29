@@ -16,7 +16,7 @@ colors:
   signal-rose-deep: "#c9134e"
 typography:
   display:
-    fontFamily: "Space Grotesk, system-ui, sans-serif"
+    fontFamily: "Archivo, system-ui, sans-serif"
     fontSize: "clamp(2.75rem, 9vw, 4.25rem)"
     fontWeight: 700
     lineHeight: 0.92
@@ -28,13 +28,13 @@ typography:
     lineHeight: 1.14
     letterSpacing: "-0.02em"
   headline:
-    fontFamily: "Space Grotesk, system-ui, sans-serif"
+    fontFamily: "Archivo, system-ui, sans-serif"
     fontSize: "clamp(2rem, 6vw, 3rem)"
     fontWeight: 700
     lineHeight: 1.2
     letterSpacing: "-0.04em"
   title:
-    fontFamily: "Space Grotesk, system-ui, sans-serif"
+    fontFamily: "Archivo, system-ui, sans-serif"
     fontSize: "clamp(1.6rem, 4.5vw, 2.15rem)"
     fontWeight: 700
     lineHeight: 1.2
@@ -138,7 +138,7 @@ ratio written into the stylesheet next to the value it justifies.
 **Key Characteristics:**
 - One accent colour, used as a signal rather than as decoration
 - Zero shadows; depth is border and ground only
-- Editorial serif for prose and for the author's voice, geometric sans for names, monospace for every service string
+- Editorial serif for prose and for the author's voice, a grotesque for names, monospace for every service string
 - Dark is the canonical theme; light is a fully maintained alternative
 - Motion is confirmation, never entertainment
 
@@ -199,14 +199,22 @@ been checked.
 
 ## Typography
 
-**Display Font:** Space Grotesk (with system-ui, sans-serif)
+**Display Font:** Archivo (with system-ui, sans-serif)
 **Body Font:** Newsreader (with Georgia, serif)
 **Label/Mono Font:** JetBrains Mono (with ui-monospace, monospace)
 
-**Character:** A geometric grotesque names things, a literary serif says them,
-and a monospace handles everything the machine knows. The three-way split does
-the hierarchy work, which is why body copy never needs a third weight or a
-fourth size to be readable.
+**Character:** A grotesque names things, a literary serif says them, and a
+monospace handles everything the machine knows. The three-way split does the
+hierarchy work, which is why body copy never needs a third weight or a fourth
+size to be readable.
+
+Archivo replaced Space Grotesk as the display face on 29 Jul 2026. Space
+Grotesk had become one of the handful of faces every generated interface
+reaches for, and a work sample whose argument is deliberate choice cannot be
+set in the default of the moment. Archivo keeps the job description — a
+grotesque, engineered rather than styled — and holds the hero's -0.045em
+tracking better, being the narrower and sturdier of the two. Nothing else in
+the system moved: the serif and the monospace were never the problem.
 
 ### The scale
 
@@ -228,15 +236,15 @@ nothing outside them. The single exception is documented under Code below.
 | `--display-hero` | `clamp(2.75rem, 9vw, 4.25rem)` | front-page masthead |
 
 ### Hierarchy
-- **Display** (Space Grotesk 700, `--display-hero`, line-height 0.92, tracking
+- **Display** (Archivo 700, `--display-hero`, line-height 0.92, tracking
   -0.045em): page mastheads. One per page, and only where the page names itself.
 - **Voice** (Newsreader 400, `--display-voice`, line-height 1.14, tracking
   -0.02em): the author speaking in first person at display size. Real italics
   carry the emphasis inside it, so no colour is spent on the accent word.
-- **Headline** (Space Grotesk 700, `--display-page`, tracking -0.04em): a page's
+- **Headline** (Archivo 700, `--display-page`, tracking -0.04em): a page's
   own title — post, error, form, author. One definition, four surfaces; they
   used to be four near-identical clamps.
-- **Title** (Space Grotesk 700, `--display-card`): the lead post's heading;
+- **Title** (Archivo 700, `--display-card`): the lead post's heading;
   `--text-lg` for archive rows.
 - **Body** (Newsreader 400, `--text-base`; `--text-md` for post prose,
   line-height 1.7): all reading text. Post bodies are capped at 68ch, which
@@ -257,7 +265,7 @@ step is missing, add it to the ramp and to this table; do not solve it locally.
 ### Named Rules
 
 **The Voice-Is-Serif Rule.** Wherever the page speaks in the first person at
-large size, it speaks in Newsreader, not Space Grotesk. The grotesque names
+large size, it speaks in Newsreader, not Archivo. The grotesque names
 things; the serif says them. This is why the front page's thesis reads as a
 person talking rather than a brand announcing, and it is a system rule, not a
 one-off for the hero.
@@ -404,6 +412,33 @@ down here.
   filled, so it reads as available without competing with the site's own
   sections.
 - **Mobile:** collapses to a borderless toggler below 768px.
+
+### Dialogs and result windows
+- **Ground:** `Deep Ink`, a hairline border, the shared 0.5rem radius. Every
+  dialog carries `data-bs-theme="dark"` for the same reason the navbar does:
+  the surface is dark in both themes, so the text inside must take the dark
+  theme's tokens rather than the page's. Without it the light theme printed a
+  near-black heading on a near-black ground.
+- **Two windows, not many.** `#successModal` and `#errorModal` live in the
+  layout and serve every form on the site, so "saved" looks the same on a post
+  as in the profile. Their heading, message and button label are written per
+  call — a deletion is not "Saved", and a button that navigates does not say
+  "Close".
+- **Heading:** display face at `--text-lg`, coloured by outcome — `Filament
+  Amber` for success, `Signal Rose` for failure. Colour rather than an icon,
+  because an icon would have to be duplicated in text for a screen reader.
+- **Buttons:** the same two the rest of the system uses — primary fill for the
+  action, ghost for dismissal — in label typography at the 44px floor. A
+  dialog is the one screen a person is made to look at, and it is the last
+  place to leave a Bootstrap default.
+- **Failure:** `role="alertdialog"` with the message wired through
+  `aria-describedby`, so it is read out and not just named. Refused fields
+  carry `aria-invalid` alongside the rose border, because the border is colour
+  and colour alone says nothing.
+- **Never two at once.** A confirmation hands over to a result window only
+  after `hidden.bs.modal`. Bootstrap counts one backdrop and one scroll lock
+  per open dialog, and overlapping them leaves the page scroll-locked with no
+  way out but a reload.
 
 ### The Now Panel (signature)
 A status card carrying what the author is building, what is next, and a link to

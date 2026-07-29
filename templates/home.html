@@ -2,7 +2,6 @@
 {% import "_contact.html" as contact %}
 {% block content %}
     {% if filter_tag %}
-        {# Личная шапка на странице тега неуместна: это выборка, а не главная #}
         <header class="masthead">
             <span class="eyebrow mono-label">Tagged</span>
             <h1 class="masthead-title">#{{ filter_tag }}</h1>
@@ -11,10 +10,7 @@
             </p>
         </header>
     {% else %}
-        {# Герой сжат до личности и тезиса. Панель Now переехала в конец
-           страницы: сюда приходят оценить работу, и она должна быть
-           видна сразу, а «чем я занят сейчас» лучше читается как
-           закрывающая реплика, чем как преграда перед первой записью. #}
+
         <header class="hero">
             <div class="hero-identity">
                 <img class="avatar hero-avatar"
@@ -24,7 +20,7 @@
                      height="72">
                 <div>
                     <p class="hero-handle">{{ site.handle }}</p>
-                    <p class="hero-role">{{ site.name }} — {{ site.role }}. FastAPI, SQLAlchemy, SQLite.</p>
+                    <p class="hero-role">{{ site.name }} — {{ site.role }}. FastAPI web applications</p>
                 </div>
             </div>
 
@@ -35,13 +31,9 @@
     {% endif %}
 
     {% if lead %}
-        {# article, а не a: внутри есть свои ссылки на теги, а вложенные
-           ссылки в HTML недопустимы. Область клика по карточке
-           сохраняется через перекрытие на заголовке. #}
+
         <article class="lead-post{% if pinned %} is-pinned{% endif %}">
             {% if pinned %}
-                {# Метка обязательна: без неё старая запись в верхнем слоте
-                   читается как самая свежая #}
                 <span class="pin-label mono-label">Pinned</span>
             {% endif %}
             <p class="post-meta mono-label">
@@ -67,13 +59,12 @@
         </article>
 
         {% if rest %}
-            {# Под закреплённой записью идёт самая свежая, поэтому «Archive» там был бы неверен #}
             <p class="section-rule mono-label">{{ 'Latest' if pinned else 'Archive' }}</p>
 
             {% for post in rest %}
                 <article class="archive-item">
                     <p class="post-meta mono-label">
-                        <span>{{ post.date_posted.strftime('%d %b %Y') }}</span>
+                        <span>{{ post.date_posted.strftime('%d %b, %Y') }}</span>
                         <span class="sep">/</span>
                         <span>{{ post.reading_minutes }} min</span>
                     </p>
@@ -81,9 +72,7 @@
                         <a class="post-title stretched"
                            href="{{ url_for('post_page', post_id=post.id) }}">{{ post.title }}</a>
                     </h2>
-                    {# Скелет разбора вместо аннотации: он показывает, как
-                       автор шёл к ответу. Порядок несёт смысл, поэтому ol.
-                       Записи без разделов откатываются на аннотацию. #}
+            
                     {% if post.outline %}
                         <ol class="post-outline mono-label">
                             {% for heading in post.outline %}<li>{{ heading }}</li>{% endfor %}
@@ -109,9 +98,6 @@
     {% endif %}
 
     {% if not filter_tag %}
-        {# Закрывающая реплика: состояние работы правится руками вместе
-           с датой в SITE. Стоит после записей, потому что «напишите мне»
-           имеет смысл только когда есть за что. #}
         <section class="now-panel closing-panel" aria-label="What I'm working on now">
             <div class="now-head">
                 <span class="mono-label now-title">Now</span>
@@ -119,7 +105,7 @@
             </div>
             <dl class="now-rows">
                 <dt class="mono-label">Building</dt>
-                <dd>This blog — FastAPI, SQLAlchemy, Jinja2</dd>
+                <dd>This blog — FastAPI, Python, REST API architecture</dd>
                 <dt class="mono-label">Next</dt>
                 <dd>JWT auth, file uploads, pagination</dd>
                 <dt class="mono-label">Source</dt>
