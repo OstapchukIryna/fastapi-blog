@@ -162,12 +162,19 @@ export function showError(
 /**
  * Send a body to the API and hand back both outcomes the same way.
  *
+ * Returns {ok, status, data}. `status` is there because 401 is not just
+ * another failure: it means the token is gone or stale, and the caller
+ * has to stop trusting it rather than only show a message.
+ *
  * `encoding` is "json" everywhere except the token endpoint:
  * OAuth2PasswordRequestForm reads the credentials from a form body, not
  * from JSON, so signing in has to be sent the other way. It is the one
- * exception, which is why it is a parameter rather than a second helper.
+ * exception, which is why it is an option rather than a second helper.
  */
-export async function sendJSON(url, method, payload, encoding = "json") {
+export async function sendJSON(
+  url,
+  { method = "GET", payload, encoding = "json", headers = {} } = {},
+) {
   const form = encoding === "form";
   const response = await fetch(url, {
     method,
@@ -175,6 +182,7 @@ export async function sendJSON(url, method, payload, encoding = "json") {
       "Content-Type": form
         ? "application/x-www-form-urlencoded"
         : "application/json",
+      ...headers,
     },
     body:
       payload === undefined
@@ -186,7 +194,7 @@ export async function sendJSON(url, method, payload, encoding = "json") {
 
   const data =
     response.status === 204 ? null : await response.json().catch(() => null);
-  return { ok: response.ok, data };
+  return { ok: response.ok, status: response.status, data };
 }
 
 //  Mark the fields the API refused and clear the previous marks
@@ -220,8 +228,8 @@ const inFlight = new WeakSet();
  *
  * @param {HTMLFormElement} form
  * @param {object} options
- * @param {(fields: FormData) => {url: string, method: string, payload?: object, encoding?: "json"|"form"}} options.request
- *   what to send.
+ * @param {(fields: FormData) => {url: string, method: string, payload?: object, encoding?: "json"|"form", headers?: object}} options.request
+ *   what to send. Everything but `url` is handed to sendJSON as is.
  * @param {(data: object|null) => {title: string, message: string, action: string}|null} options.result
  *   the whole success window: its heading, its line, and what its button
  *   will do when pressed. Return null to open no window at all, for a
@@ -274,8 +282,8 @@ export function wireForm(
     };
 
     try {
-      const { url, method, payload, encoding } = request(new FormData(form));
-      const { ok, data } = await sendJSON(url, method, payload, encoding);
+      const { url, ...options } = request(new FormData(form));
+      const { ok, data } = await sendJSON(url, options);
 
       if (ok) {
         markFields(form);

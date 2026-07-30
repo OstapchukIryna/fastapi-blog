@@ -86,10 +86,17 @@
                                href="{{ url_for('about') }}">About</a>
                         </div>
                         <div class="navbar-nav align-items-md-center">
+                            {# is_author пока захардкожен в True, поэтому
+                               «Write» и «Profile» показывались и тем, кто не
+                               входил, а профиль без токена показать нечего.
+                               Второй затвор — на клиенте, по тому же флагу,
+                               что и вход. Это только внешность: сами адреса
+                               и API остаются открытыми, пока их не закроет
+                               зависимость на сервере. #}
                             {% if is_author %}
-                                <a class="nav-link nav-write{{ ' active' if path.startswith('/posts/new') }}"
+                                <a class="nav-link nav-auth nav-write{{ ' active' if path.startswith('/posts/new') }}"
                                    href="{{ url_for('new_post') }}">Write</a>
-                                <a class="nav-link{{ ' active' if path.startswith('/profile') }}"
+                                <a class="nav-link nav-auth{{ ' active' if path.startswith('/profile') }}"
                                    {% if path.startswith('/profile') %}aria-current="page"{% endif %}
                                    href="{{ url_for('profile') }}">Profile</a>
                             {% endif %}
