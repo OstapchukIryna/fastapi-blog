@@ -13,6 +13,9 @@ description: |-
 variables:
   baseUrl: http://127.0.0.1:8000
   seededUsername: called_mad
+  newUsername: ""
+  newEmail: ""
+  userId: ""
 scripts:
   - type: http:afterResponse
     code: |-

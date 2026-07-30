@@ -17,8 +17,13 @@ postman/
 
 That seeds a throwaway database in a temp directory, starts the app
 against it, runs the collection with Newman, and tears everything down.
-`blog.db` is committed, so nothing in an automated run may write to it —
-the CI job asserts that afterwards with `git diff --exit-code`.
+`blog.db` is committed, so the run must not write to it — `git status`
+after a run should be clean, and that is worth glancing at.
+
+Nothing runs this automatically at the moment. There is no CI workflow
+in the repository: the old one checked lint and this collection, and was
+removed until a proper one is set up alongside pytest. Until then this
+is a command to run by hand before pushing.
 
 Newman is fetched by `npx` on demand; there is no `package.json` and
 nothing to install. Node is the only requirement beyond the Python
