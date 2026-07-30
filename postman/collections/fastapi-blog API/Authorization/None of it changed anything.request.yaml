@@ -1,0 +1,45 @@
+$kind: http-request
+description: "The refusals above return 403, but a status code only says what the API answered — not what it did before answering. This reads the post back and checks the password still works, because a rejected write that quietly landed would look exactly the same from the outside."
+url: "{{baseUrl}}/api/posts/{{guardedPostId}}"
+method: GET
+scripts:
+  - type: beforeRequest
+    code: |-
+      // Signing in again is how the password is checked: the profile
+      // attempt above tried to set it to something else, and a 403 that
+      // still wrote would show up here as a refused sign-in.
+      pm.sendRequest({
+          url: `${pm.variables.get("baseUrl")}/api/users/token`,
+          method: "POST",
+          header: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: {
+              mode: "urlencoded",
+              urlencoded: [
+                  { key: "username", value: pm.collectionVariables.get("newEmail") },
+                  { key: "password", value: "correct-horse-battery" },
+              ],
+          },
+      }, (_e, res) => pm.collectionVariables.set("reloginCode", res.code));
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      pm.test("200 OK - the post is still there", () =>
+          pm.response.to.have.status(200));
+
+      const post = pm.response.json();
+
+      pm.test("nothing was overwritten", () => {
+          pm.expect(post.title).to.eql("Guarded post");
+          pm.expect(post.content).to.eql("Original body.");
+          pm.expect(post.tags).to.eql(["python"]);
+      });
+
+      pm.test("still owned by this run's account", () =>
+          pm.expect(post.author.id).to.eql(Number(pm.collectionVariables.get("userId"))));
+
+      pm.test("the password was not changed either", () =>
+          pm.expect(Number(pm.collectionVariables.get("reloginCode"))).to.eql(200));
+
+      pm.collectionVariables.unset("reloginCode");
+    language: text/javascript
+order: 7000

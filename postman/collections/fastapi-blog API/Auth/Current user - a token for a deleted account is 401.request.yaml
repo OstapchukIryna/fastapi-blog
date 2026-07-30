@@ -1,0 +1,62 @@
+$kind: http-request
+description: "Nothing revokes a token when the account behind it goes, so the signature stays valid for the rest of its thirty minutes. What stops it is the lookup finding nobody - a different reason from every other refusal here, and the only one that needs the database. Uses a throwaway account that deletes itself."
+url: "{{baseUrl}}/api/users/me"
+method: GET
+headers:
+  Authorization: Bearer {{orphanToken}}
+scripts:
+  - type: beforeRequest
+    code: |-
+      // Nested callbacks: Newman's sandbox rejects top-level await, and
+      // waits for pm.sendRequest to settle before sending this request.
+      const base = pm.variables.get("baseUrl");
+      const stamp = Date.now();
+      const email = `pm_orphan_${stamp}@example.com`;
+      const password = "correct-horse-battery";
+
+      pm.sendRequest({
+          url: `${base}/api/users`,
+          method: "POST",
+          header: { "Content-Type": "application/json" },
+          body: {
+              mode: "raw",
+              raw: JSON.stringify({ username: `pm_orphan_${stamp}`, email, password }),
+          },
+      }, (_e, registered) => {
+          const id = registered.json().id;
+
+          pm.sendRequest({
+              url: `${base}/api/users/token`,
+              method: "POST",
+              header: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: {
+                  mode: "urlencoded",
+                  urlencoded: [
+                      { key: "username", value: email },
+                      { key: "password", value: password },
+                  ],
+              },
+          }, (_te, issued) => {
+              const token = issued.json().access_token;
+              pm.collectionVariables.set("orphanToken", token);
+
+              // They remove themselves, which the API allows, and the
+              // token outlives them.
+              pm.sendRequest({
+                  url: `${base}/api/users/${id}`,
+                  method: "DELETE",
+                  header: { Authorization: `Bearer ${token}` },
+              }, () => {});
+          });
+      });
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      pm.test("401 Unauthorized", () => pm.response.to.have.status(401));
+
+      pm.test("refused for the account being gone, not the token being bad", () =>
+          pm.expect(pm.response.json().detail).to.eql("User not found"));
+
+      pm.collectionVariables.unset("orphanToken");
+    language: text/javascript
+order: 5500

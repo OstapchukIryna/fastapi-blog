@@ -1,0 +1,25 @@
+$kind: http-request
+description: "PUT replaces every editable field at once, so it is the most damaging of the three and gets its own check rather than being assumed to behave like PATCH."
+url: "{{baseUrl}}/api/posts/{{guardedPostId}}"
+method: PUT
+headers:
+  Authorization: Bearer {{intruderToken}}
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "title": "Replaced by a stranger",
+      "summary": "Should never be stored.",
+      "content": "x",
+      "tags": []
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("403 Forbidden, not 401", () => pm.response.to.have.status(403));
+
+      pm.test("refused for permission, not identity", () =>
+          pm.expect(pm.response.json().detail).to.eql("Not authorize to change this post"));
+    language: text/javascript
+order: 3000

@@ -1,0 +1,15 @@
+$kind: http-request
+description: "OAuth2PasswordBearer accepts one scheme. A perfectly good token announced as Basic is not a bearer token, and the header has to be read rather than merely contain something that looks right."
+url: "{{baseUrl}}/api/users/me"
+method: GET
+headers:
+  Authorization: Basic {{accessToken}}
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("401 Unauthorized", () => pm.response.to.have.status(401));
+
+      pm.test("asks for Bearer", () =>
+          pm.expect(pm.response.headers.get("WWW-Authenticate")).to.eql("Bearer"));
+    language: text/javascript
+order: 4900

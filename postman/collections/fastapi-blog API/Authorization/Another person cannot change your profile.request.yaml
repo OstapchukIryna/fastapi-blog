@@ -1,0 +1,22 @@
+$kind: http-request
+description: "The same rule on the other router: users.check_current_user. Its message differs from the posts one, which is worth pinning — the two are separate functions and could drift."
+url: "{{baseUrl}}/api/users/{{userId}}"
+method: PATCH
+headers:
+  Authorization: Bearer {{intruderToken}}
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "password": "hijacked-password"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("403 Forbidden, not 401", () => pm.response.to.have.status(403));
+
+      pm.test("refused for permission, not identity", () =>
+          pm.expect(pm.response.json().detail).to.eql("Not authorize to change profile"));
+    language: text/javascript
+order: 5000

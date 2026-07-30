@@ -1,0 +1,72 @@
+$kind: http-request
+description: "Sets the scene for the folder: a post that belongs to this run's account, and a second account with a token of its own. Made here rather than borrowed from the Posts folder, which deletes its post on the way out."
+url: "{{baseUrl}}/api/posts"
+method: POST
+headers:
+  Authorization: Bearer {{accessToken}}
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "title": "Guarded post",
+      "summary": "Exists so that someone else can fail to change it.",
+      "content": "Original body.",
+      "tags": ["python"]
+    }
+scripts:
+  - type: beforeRequest
+    code: |-
+      // Nested callbacks: Newman's sandbox rejects top-level await, and
+      // waits for pm.sendRequest to settle before sending this request.
+      // baseUrl is read with pm.variables, which sees the environment —
+      // pm.collectionVariables would return the committed default and
+      // quietly talk to whatever else is listening on that port.
+      const base = pm.variables.get("baseUrl");
+      const stamp = Date.now();
+      const email = `pm_intruder_${stamp}@example.com`;
+      const password = "correct-horse-battery";
+
+      pm.sendRequest({
+          url: `${base}/api/users`,
+          method: "POST",
+          header: { "Content-Type": "application/json" },
+          body: {
+              mode: "raw",
+              raw: JSON.stringify({ username: `pm_intruder_${stamp}`, email, password }),
+          },
+      }, (_e, registered) => {
+          pm.collectionVariables.set("intruderId", registered.json().id);
+
+          pm.sendRequest({
+              url: `${base}/api/users/token`,
+              method: "POST",
+              header: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: {
+                  mode: "urlencoded",
+                  urlencoded: [
+                      { key: "username", value: email },
+                      { key: "password", value: password },
+                  ],
+              },
+          }, (_te, issued) => {
+              pm.collectionVariables.set("intruderToken", issued.json().access_token);
+          });
+      });
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      pm.test("201 Created", () => pm.response.to.have.status(201));
+
+      const post = pm.response.json();
+
+      pm.test("belongs to this run's account", () =>
+          pm.expect(post.author.id).to.eql(Number(pm.collectionVariables.get("userId"))));
+
+      pm.test("the second account got a token of its own", () =>
+          pm.expect(pm.collectionVariables.get("intruderToken"))
+              .to.be.a("string").and.not.empty);
+
+      pm.collectionVariables.set("guardedPostId", post.id);
+    language: text/javascript
+order: 1000
