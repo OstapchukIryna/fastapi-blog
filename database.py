@@ -1,5 +1,7 @@
 import os
+from typing import Annotated
 
+from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -25,3 +27,10 @@ class Base(DeclarativeBase):
 async def get_db():
     async with AsyncSessionLocal() as session:
         yield session
+
+
+# Один псевдоним на весь проект. Раньше эта строка стояла пятью
+# одинаковыми копиями — в каждом роутере, в auth и в main; сессия у
+# приложения одна, и объявлять её заново на каждый модуль значило дать
+# пяти копиям возможность разойтись.
+DbSession = Annotated[AsyncSession, Depends(get_db)]

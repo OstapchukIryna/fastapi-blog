@@ -2,7 +2,6 @@ from contextlib import asynccontextmanager
 from typing import Annotated
 
 from fastapi import (
-    Depends,
     FastAPI,
     Form,
     Request,
@@ -12,11 +11,10 @@ from fastapi import (
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
-from sqlalchemy.ext.asyncio import AsyncSession
 
 import models
 from auth import CurrentUser
-from database import Base, engine, get_db
+from database import Base, DbSession, engine
 from error_handlers import register_error_handlers
 from models import get_or_create_tags
 from routers import posts, tags, users
@@ -57,8 +55,6 @@ app.include_router(posts.router, prefix="/api/posts", tags=["posts"])
 app.include_router(tags.router, prefix="/api/tags", tags=["tags"])
 
 register_error_handlers(app)
-
-DbSession = Annotated[AsyncSession, Depends(get_db)]
 
 
 # --- Helpers ---------------------------------------------------------

@@ -11,7 +11,6 @@ from fastapi import (
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
 
 import models
 from auth import (
@@ -21,22 +20,11 @@ from auth import (
     verify_password,
 )
 from config import settings
-from database import get_db
+from database import DbSession
 from routers.posts import posts_query
 from schemas import PostResponse, Token, UserCreate, UserPrivate, UserPublic, UserUpdate
 
 router = APIRouter()
-
-DbSession = Annotated[AsyncSession, Depends(get_db)]
-
-
-# --- Helpers ---------------------------------------------------------
-def check_current_user(user: UserDep, current_user: CurrentUser):
-    if user.id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorize to change profile",
-        )
 
 
 # --- Dependencies ------------------------------------------------------
@@ -54,6 +42,38 @@ async def load_user(user_id: int, db: DbSession) -> models.User:
 
 
 UserDep = Annotated[models.User, Depends(load_user)]
+
+
+def own_account(user: UserDep, current_user: CurrentUser) -> models.User:
+    """
+    The user at this id, once it is established that it is the caller.
+
+    The same precondition posts have, and a dependency for the same
+    reason: changing an account is only ever your own, so `user:
+    OwnAccount` says the account exists and belongs to whoever asked.
+
+    Args:
+        user (UserDep): the account, already loaded or already a 404.
+        current_user (CurrentUser): whoever the token belongs to.
+
+    Raises:
+        HTTPException: 403 when it is somebody else's account. The
+            wording differs from the posts one because the thing being
+            refused differs; both are pinned by the collection.
+
+    Returns:
+        models.User: the same account, now known to be theirs.
+
+    """
+    if user.id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorize to change profile",
+        )
+    return user
+
+
+OwnAccount = Annotated[models.User, Depends(own_account)]
 
 # --- Routes ---------------------------------------------------------
 
@@ -142,7 +162,7 @@ async def get_user_posts(user: UserDep, db: DbSession):
 
 @router.patch("/{user_id}", response_model=UserPublic)
 async def update_user_fields(
-    user: UserDep, current_user: CurrentUser, data: UserUpdate, db: DbSession
+    user: OwnAccount, data: UserUpdate, db: DbSession
 ) -> models.User:
     """
     Change some fields of a user, leaving the rest alone.
@@ -176,7 +196,6 @@ async def update_user_fields(
         models.User: the user as stored after the change.
 
     """
-    check_current_user(user, current_user)
     changes = data.model_dump(exclude_unset=True, exclude_none=True)
 
     wanted = {
@@ -218,11 +237,8 @@ async def update_user_fields(
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user(
-    user: UserDep, current_user: CurrentUser, db: DbSession
-) -> Response:
+async def delete_user(user: OwnAccount, db: DbSession) -> Response:
     """Cascading deletion of a user. All posts will be delete as well. Returns an empty 204."""
-    check_current_user(user, current_user)
     await db.delete(user)
     await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
