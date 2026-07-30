@@ -197,7 +197,16 @@
         </script>
 
         <script type="module">
-            import { clearToken } from "/static/js/auth.js";
+            import { clearToken, currentUserId } from "/static/js/auth.js";
+
+            // Элементы с data-author-only приходят скрытыми и открываются
+            // только своему автору: в атрибуте лежит id автора записи.
+            // Одно место на весь сайт, чтобы следующая такая кнопка не
+            // завела себе вторую проверку.
+            const me = currentUserId();
+            for (const el of document.querySelectorAll('[data-author-only]')) {
+                el.hidden = me === null || Number(el.dataset.authorOnly) !== me;
+            }
 
             // Выход — только на клиенте: сервер сессии не держит, поэтому
             // достаточно убрать токен. Перезагрузка, а не переход, чтобы

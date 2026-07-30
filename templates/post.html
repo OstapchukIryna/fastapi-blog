@@ -26,8 +26,15 @@
             {{ post.content | markdown | safe }}
         </div>
 
+        {# Виден только автору этой записи. Сервер решить не может — токен
+           лежит в localStorage, — поэтому разметка приходит скрытой, а
+           открывает её скрипт в layout, сверив id автора с тем, кто вошёл.
+           Это внешность, а не запрет: /posts/{id}/edit и API остаются
+           открытыми, пока их не закроет зависимость на сервере. #}
         {% if is_author %}
-            <div class="post-actions mono-label">
+            <div class="post-actions mono-label"
+                 data-author-only="{{ post.author.id }}"
+                 hidden>
                 <a href="{{ url_for('edit_post', post_id=post.id) }}">Edit</a>
             </div>
         {% endif %}
