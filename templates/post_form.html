@@ -161,6 +161,7 @@
 {% block scripts %}
     <!-- Post Form Handler -->
     <script type="module">
+        import { authHeaders } from "/static/js/auth.js";
         import { wireForm } from "/static/js/utils.js";
 
         const form = document.getElementById("postForm");
@@ -180,15 +181,15 @@
                     tags: splitTags(fields.get("tags")),
                 };
 
-                // PATCH: the post already knows its author. POST: the API
-                // takes the author in the body.
-                return editing
-                    ? { url: `/api/posts/${postId}`, method: "PATCH", payload: post }
-                    : {
-                        url: "/api/posts",
-                        method: "POST",
-                        payload: { ...post, user_id: Number(form.dataset.authorId) },
-                    };
+                // Both routes need the token now, and the author is no
+                // longer sent: the API takes it from the token, which is
+                // the only version of it a client cannot lie about.
+                return {
+                    url: editing ? `/api/posts/${postId}` : "/api/posts",
+                    method: editing ? "PATCH" : "POST",
+                    payload: post,
+                    headers: authHeaders(),
+                };
             },
             // The button label names where closing the window goes,
             // because that is what pressing it actually does
@@ -211,6 +212,7 @@
                 request: () => ({
                     url: `/api/posts/${deleteForm.dataset.postId}`,
                     method: "DELETE",
+                    headers: authHeaders(),
                 }),
                 result: () => ({
                     title: "Deleted",

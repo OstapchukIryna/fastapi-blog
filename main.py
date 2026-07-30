@@ -163,6 +163,14 @@ async def create_post_page(
     FastAPI fills PostFormInput itself: a model behind Form() describes a
     form the way a model in the body describes JSON.
 
+    Unreachable from a browser at the moment, and kept rather than deleted
+    because that is a property of where the token lives, not of this
+    route. A plain form POST carries no Authorization header, and the token
+    sits in localStorage, so CurrentUser can never be satisfied here — the
+    page's own script sends the fields to /api/posts instead. Moving the
+    token into a cookie brings this path back with no change to the code
+    below, which is why it stays.
+
     Args:
         request (Request): needed by the template and by url_for.
         current_user (CurrentUser): authorized current user.
@@ -185,7 +193,9 @@ async def create_post_page(
         title=data.title,
         summary=data.summary,
         content=data.content,
-        author=current_user.id,
+        # The relationship wants the User, not its id — assigning the id
+        # here made SQLAlchemy try to treat an int as a User.
+        author=current_user,
         tags=await get_or_create_tags(db, data.tags),
     )
     db.add(post)

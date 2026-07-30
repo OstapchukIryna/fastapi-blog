@@ -1,8 +1,9 @@
 $kind: http-request
-description: "The tags sent here are deliberately messy: mixed case, padded, and a duplicate. normalise_tags trims, lowercases and de-duplicates while keeping order."
+description: "The author is not in the body any more: the API takes it from the token, which is the one version of it a client cannot lie about. The tags sent here are deliberately messy: mixed case, padded, and a duplicate. normalise_tags trims, lowercases and de-duplicates while keeping order."
 url: "{{baseUrl}}/api/posts"
 method: POST
 headers:
+  Authorization: Bearer {{accessToken}}
   Content-Type: application/json
 body:
   type: json
@@ -15,18 +16,9 @@ body:
         "Python",
         "  python  ",
         "Async"
-      ],
-      "user_id": "{{userId}}"
+      ]
     }
 scripts:
-  - type: beforeRequest
-    code: |-
-      // user_id is an integer in the schema, and a collection variable
-      // interpolates as a string. Substituted into the body as a number.
-      const body = JSON.parse(pm.request.body.raw);
-      body.user_id = Number(pm.collectionVariables.get("userId"));
-      pm.request.body.raw = JSON.stringify(body);
-    language: text/javascript
   - type: afterResponse
     code: |-
       pm.test("201 Created", () => pm.response.to.have.status(201));

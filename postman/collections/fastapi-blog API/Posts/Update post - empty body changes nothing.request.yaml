@@ -3,6 +3,7 @@ description: exclude_unset means an absent field is not a change. An empty body 
 url: "{{baseUrl}}/api/posts/{{postId}}"
 method: PATCH
 headers:
+  Authorization: Bearer {{accessToken}}
   Content-Type: application/json
 body:
   type: json

@@ -3,6 +3,7 @@ description: Tags are replaced wholesale rather than merged, so sending [] clear
 url: "{{baseUrl}}/api/posts/{{postId}}"
 method: PATCH
 headers:
+  Authorization: Bearer {{accessToken}}
   Content-Type: application/json
 body:
   type: json
