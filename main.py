@@ -15,6 +15,7 @@ from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import models
+from auth import CurrentUser
 from database import Base, engine, get_db
 from error_handlers import register_error_handlers
 from models import get_or_create_tags
@@ -29,7 +30,7 @@ from routers.posts import (
     set_pinned,
 )
 from routers.tags import TaggedPostsDep, all_topics
-from routers.users import UserDep, current_author
+from routers.users import UserDep
 from schemas import PostFormInput
 from templating import templates
 
@@ -151,7 +152,10 @@ def new_post_form(request: Request) -> Response:
 
 @app.post("/posts/new", include_in_schema=False, name="create_post_page")
 async def create_post_page(
-    request: Request, db: DbSession, form: Annotated[PostFormInput, Form()]
+    request: Request,
+    current_user: CurrentUser,
+    db: DbSession,
+    form: Annotated[PostFormInput, Form()],
 ) -> Response:
     """
     Create a post from the submitted form.
@@ -161,6 +165,7 @@ async def create_post_page(
 
     Args:
         request (Request): needed by the template and by url_for.
+        current_user (CurrentUser): authorized current user.
         db (DbSession): current database session.
         form (PostFormInput): the submitted fields, unvalidated.
 
@@ -180,7 +185,7 @@ async def create_post_page(
         title=data.title,
         summary=data.summary,
         content=data.content,
-        author=await current_author(db),
+        author=current_user.id,
         tags=await get_or_create_tags(db, data.tags),
     )
     db.add(post)

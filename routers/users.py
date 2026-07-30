@@ -15,10 +15,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import models
 from auth import (
+    CurrentUser,
     create_access_token,
     hash_password,
-    oauth2_scheme,
-    verify_access_token,
     verify_password,
 )
 from config import settings
@@ -32,28 +31,12 @@ DbSession = Annotated[AsyncSession, Depends(get_db)]
 
 
 # --- Helpers ---------------------------------------------------------
-async def current_author(db: AsyncSession) -> models.User:
-    """
-    Get author of current post.
-
-    Args:
-        db (AsyncSession): current database session
-
-    Raises:
-        HTTPException: If no author is found in the database, raises a 500 Internal Server Error with a message to run the seed script.
-
-    Returns:
-        models.User: The first user found in the database, representing the author of the current post.
-
-    """
-    result = await db.execute(select(models.User).order_by(models.User.id))
-    author = result.scalars().first()
-    if author is None:
+def check_current_user(user: UserDep, current_user: CurrentUser):
+    if user.id != current_user.id:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="No author in the database. Run: uv run python seed.py",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorize to change profile",
         )
-    return author
 
 
 # --- Dependencies ------------------------------------------------------
@@ -141,35 +124,9 @@ async def login_for_access_token(
 
 # Frontend get current user endpoint
 @router.get("/me", response_model=UserPrivate)
-async def get_current_user(
-    token: Annotated[str, Depends(oauth2_scheme)], db: DbSession
-):
+async def get_current_user(current_user: CurrentUser):
     """Get the currently authenticated user"""
-    user_id = verify_access_token(token)
-    if user_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    # Validate user id is valid integer (defense against malformed JWT)
-    try:
-        user_id_int = int(user_id)
-    except TypeError, ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    result = await db.execute(select(models.User).where(models.User.id == user_id_int))
-    user = result.scalars().first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    return user
+    return current_user
 
 
 @router.get("/{user_id}", response_model=UserPublic)
@@ -185,7 +142,7 @@ async def get_user_posts(user: UserDep, db: DbSession):
 
 @router.patch("/{user_id}", response_model=UserPublic)
 async def update_user_fields(
-    user: UserDep, data: UserUpdate, db: DbSession
+    user: UserDep, current_user: CurrentUser, data: UserUpdate, db: DbSession
 ) -> models.User:
     """
     Change some fields of a user, leaving the rest alone.
@@ -219,6 +176,7 @@ async def update_user_fields(
         models.User: the user as stored after the change.
 
     """
+    check_current_user(user, current_user)
     changes = data.model_dump(exclude_unset=True, exclude_none=True)
 
     wanted = {
@@ -243,10 +201,6 @@ async def update_user_fields(
         user.password_hash = hash_password(changes.pop("password"))
 
     for name, value in changes.items():
-        # Только адрес приводится к нижнему регистру — так же, как при
-        # регистрации. Раньше .lower() применялся ко всем полям подряд:
-        # имя теряло выбранный регистр, а image_file вида «Avatar.JPG»
-        # превращался в путь к несуществующему файлу.
         setattr(user, name, value.lower() if name == "email" else value)
 
     try:
@@ -264,8 +218,11 @@ async def update_user_fields(
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user(user: UserDep, db: DbSession) -> Response:
+async def delete_user(
+    user: UserDep, current_user: CurrentUser, db: DbSession
+) -> Response:
     """Cascading deletion of a user. All posts will be delete as well. Returns an empty 204."""
+    check_current_user(user, current_user)
     await db.delete(user)
     await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
