@@ -4,101 +4,190 @@
         <span class="eyebrow mono-label">Account</span>
         <h1 class="masthead-title form-title">Profile</h1>
         <p class="masthead-tagline">
-            Name and address of the one author this blog has. Uploading an
-            avatar arrives later; for now the field takes a
-            file name. Coming soon and TODO
+            The account you are signed in as, and the details it holds.
         </p>
     </header>
 
-    <div class="profile-identity">
-        <img class="avatar"
-             src="{{ user.image_path }}"
-             alt="{{ user.username }}"
-             width="88"
-             height="88">
-        <div>
-            <p class="record-action-name">{{ user.username }}</p>
-            <p class="record-action-note">
-                <a href="{{ url_for('user_posts', user_id=user.id) }}">Public page</a>
-            </p>
-        </div>
-    </div>
     <noscript>
         <div class="form-summary" role="alert">
             <span class="mono-label">Needs JavaScript</span>
-            <p>This form saves through the API from the browser.</p>
+            <p>This page reads and saves through the API from the browser.</p>
         </div>
     </noscript>
 
-    <form class="post-form" id="profileForm" data-user-id="{{ user.id }}">
-        <div class="field">
-            <label class="form-label mono-label" for="username">Username</label>
-            <input class="form-control"
-                   type="text"
-                   id="username"
-                   name="username"
-                   minlength="3"
-                   maxlength="50"
-                   autocomplete="username"
-                   aria-describedby="username-error"
-                   value="{{ user.username }}">
-            <p class="field-error mono-label" id="username-error" hidden></p>
+    {# Три состояния, потому что до ответа /me страница ничего не знает:
+       токен лежит в localStorage, сервер его не видит и подставить данные
+       в шаблон не может. Пока ответа нет — не показываем ни форму, ни
+       «вы не вошли»: и то и другое было бы догадкой. #}
+    <div id="profileLoading" class="empty-state is-leading">
+        <p class="mono-label mb-0">Loading your account…</p>
+    </div>
+
+    <div id="profileAnon" class="empty-state is-leading" hidden>
+        <p class="mono-label mb-2" id="anonReason">Not signed in</p>
+        <p class="mb-0">
+            <a href="{{ url_for('login') }}">Sign in</a> to change your name, address or password.
+        </p>
+    </div>
+
+    <div id="profileBody" hidden>
+        <div class="profile-identity">
+            <img class="avatar"
+                 id="identityAvatar"
+                 src="/static/profile_pics/avatar-256.jpg"
+                 alt=""
+                 width="88"
+                 height="88">
+            <div>
+                <p class="record-action-name" id="identityName"></p>
+                <p class="record-action-note" id="identityEmail"></p>
+                {# Список постов уже есть на публичной странице автора —
+                   здесь ссылка с настоящим числом, а не второй архив. #}
+                <p class="record-action-note">
+                    <a id="identityPosts" href="#"></a>
+                </p>
+            </div>
         </div>
 
-        <div class="field">
-            <label class="form-label mono-label" for="email">Email</label>
-            <input class="form-control"
-                   type="email"
-                   id="email"
-                   name="email"
-                   maxlength="120"
-                   autocomplete="email"
-                   aria-describedby="email-error"
-                   value="{{ user.email }}">
-            <p class="field-error mono-label" id="email-error" hidden></p>
-        </div>
+        <form class="post-form" id="profileForm" data-user-id="">
+            <div class="field">
+                <label class="form-label mono-label" for="username">Username</label>
+                <input class="form-control"
+                       type="text"
+                       id="username"
+                       name="username"
+                       minlength="3"
+                       maxlength="50"
+                       autocomplete="username"
+                       aria-describedby="username-error">
+                <p class="field-error mono-label" id="username-error" hidden></p>
+            </div>
 
-        <div class="field">
-            <label class="form-label mono-label" for="image_file">Avatar</label>
-            <input class="form-control"
-                   type="text"
-                   id="image_file"
-                   name="image_file"
-                   maxlength="200"
-                   aria-describedby="image_file-error"
-                   placeholder="avatar-256.jpg"
-                   value="{{ user.image_file or '' }}">
-            <p class="field-error mono-label" id="image_file-error" hidden></p>
-            <p class="field-hint mono-label">In /media/profile_pics</p>
-        </div>
+            <div class="field">
+                <label class="form-label mono-label" for="email">Email</label>
+                <input class="form-control"
+                       type="email"
+                       id="email"
+                       name="email"
+                       maxlength="120"
+                       autocomplete="email"
+                       aria-describedby="email-error">
+                <p class="field-error mono-label" id="email-error" hidden></p>
+                <p class="field-hint mono-label">You sign in with this</p>
+            </div>
 
-        <div class="field">
-            <label class="form-label mono-label" for="password">New password</label>
-            <input class="form-control"
-                   type="password"
-                   id="password"
-                   name="password"
-                   minlength="8"
-                   maxlength="128"
-                   autocomplete="new-password"
-                   aria-describedby="password-error">
-            <p class="field-error mono-label" id="password-error" hidden></p>
-            <p class="field-hint mono-label">Empty keeps the current</p>
-        </div>
+            <div class="field">
+                <label class="form-label mono-label" for="image_file">Avatar</label>
+                <input class="form-control"
+                       type="text"
+                       id="image_file"
+                       name="image_file"
+                       maxlength="200"
+                       aria-describedby="image_file-error"
+                       placeholder="avatar-256.jpg">
+                <p class="field-error mono-label" id="image_file-error" hidden></p>
+                <p class="field-hint mono-label">File name in /media/profile_pics</p>
+            </div>
 
-        <div class="form-actions">
-            <button class="btn btn-light write-btn" type="submit">Save changes</button>
-            <a class="back-link mono-label" href="/">Cancel</a>
-        </div>
-    </form>
+            <div class="field">
+                <label class="form-label mono-label" for="password">New password</label>
+                <input class="form-control"
+                       type="password"
+                       id="password"
+                       name="password"
+                       minlength="8"
+                       maxlength="128"
+                       autocomplete="new-password"
+                       aria-describedby="password-error">
+                <p class="field-error mono-label" id="password-error" hidden></p>
+                <p class="field-hint mono-label">Empty keeps the current</p>
+            </div>
+
+            <div class="form-actions">
+                <button class="btn btn-light write-btn" type="submit">Save changes</button>
+                <a class="back-link mono-label" href="/">Cancel</a>
+            </div>
+        </form>
+    </div>
 {% endblock content %}
 
 {% block scripts %}
-    <!-- Profile Form Handler -->
+    <!-- Profile Handler -->
     <script type="module">
-        import { wireForm } from "/static/js/utils.js";
+        import { authHeaders, clearToken, isSignedIn } from "/static/js/auth.js";
+        import { sendJSON, wireForm } from "/static/js/utils.js";
 
+        const loading = document.getElementById("profileLoading");
+        const anon = document.getElementById("profileAnon");
+        const body = document.getElementById("profileBody");
         const form = document.getElementById("profileForm");
+
+        const show = (which) => {
+            loading.hidden = which !== "loading";
+            anon.hidden = which !== "anon";
+            body.hidden = which !== "body";
+        };
+
+        const showAnon = (reason) => {
+            document.getElementById("anonReason").textContent = reason;
+            show("anon");
+        };
+
+        function fill(user) {
+            document.getElementById("identityName").textContent = user.username;
+            document.getElementById("identityEmail").textContent = user.email;
+
+            const avatar = document.getElementById("identityAvatar");
+            avatar.src = user.image_path;
+            avatar.alt = user.username;
+
+            form.dataset.userId = user.id;
+            form.username.value = user.username;
+            form.email.value = user.email;
+            form.image_file.value = user.image_file ?? "";
+            form.password.value = "";
+
+            show("body");
+        }
+
+        // A real count or nothing: an invented number on a page that is
+        // itself a work sample is worse than a plain link.
+        async function fillPostCount(userId) {
+            const link = document.getElementById("identityPosts");
+            link.href = `/users/${userId}/posts`;
+            link.textContent = "Your posts";
+
+            const { ok, data } = await sendJSON(`/api/users/${userId}/posts`);
+            if (!ok || !Array.isArray(data)) return;
+            link.textContent = data.length === 1 ? "1 post" : `${data.length} posts`;
+        }
+
+        async function load() {
+            if (!isSignedIn()) {
+                showAnon("Not signed in");
+                return;
+            }
+
+            const { ok, status, data } = await sendJSON("/api/users/me", {
+                headers: authHeaders(),
+            });
+
+            if (ok) {
+                fill(data);
+                fillPostCount(data.id);
+                return;
+            }
+
+            // A token is worth nothing 30 minutes after it was issued.
+            // Dropping it here is what stops the menu claiming otherwise.
+            if (status === 401) {
+                clearToken();
+                showAnon("Your session has expired");
+                return;
+            }
+
+            showAnon("Could not load your account");
+        }
 
         wireForm(form, {
             request: (fields) => {
@@ -119,16 +208,23 @@
                     url: `/api/users/${form.dataset.userId}`,
                     method: "PATCH",
                     payload: changes,
+                    // The endpoint does not check the token yet. Sent anyway,
+                    // so the page is already right when it starts to.
+                    headers: authHeaders(),
                 };
             },
             result: (user) => ({
                 title: "Saved",
                 message: `Profile of ${user.username} updated.`,
-                action: "Reload the page",
+                action: "Close",
             }),
-            after: () => window.location.reload(),
+            // Re-read rather than reload: the form is filled from /me, so a
+            // full page start-over would buy nothing.
+            after: () => load(),
             failure: { action: "Back to the form" },
             busy: "Saving",
         });
+
+        load();
     </script>
 {% endblock scripts %}
