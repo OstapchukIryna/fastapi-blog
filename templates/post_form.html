@@ -20,9 +20,6 @@
         </div>
     {% endif %}
 
-    {# action и method остаются настоящими: без JS форма уходит на
-       серверный маршрут, как раньше. Скрипт внизу перехватывает submit
-       и шлёт то же самое в /api, чтобы показать окно с исходом. #}
     <form class="post-form"
           id="postForm"
           method="post"
@@ -184,7 +181,7 @@
                 };
 
                 // PATCH: the post already knows its author. POST: the API
-                // takes the author in the body, so the page carries it.
+                // takes the author in the body.
                 return editing
                     ? { url: `/api/posts/${postId}`, method: "PATCH", payload: post }
                     : {
@@ -200,16 +197,14 @@
                 message: editing
                     ? `Changes to "${post.title}" saved.`
                     : `Post "${post.title}" published.`,
-                action: "Open the post",
+                action: "See post",
             }),
             after: (post) => window.location.assign(`/posts/${post.id}`),
-            failure: { action: "Back to the form" },
+            failure: { action: "Back" },
             busy: editing ? "Saving" : "Publishing",
         });
 
-        // Delete lives in its own window, so that one is closed before
-        // the result window opens. Its own nouns too: a deletion that
-        // failed is not "not saved", and there is no form to go back to.
+        // Delete has its own window, so that one is closed before the result window opens.
         const deleteForm = document.getElementById("deletePostForm");
         if (deleteForm) {
             wireForm(deleteForm, {
@@ -220,7 +215,7 @@
                 result: () => ({
                     title: "Deleted",
                     message: `Post "${deleteForm.dataset.postTitle}" deleted.`,
-                    action: "Back to the blog",
+                    action: "Back",
                 }),
                 after: () => window.location.assign("/"),
                 failure: { title: "Not deleted", action: "Close" },

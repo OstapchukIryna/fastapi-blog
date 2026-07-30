@@ -6,23 +6,28 @@ dist/
 wheels/
 *.egg-info
 .DS_Store
+.AppleDouble
+.LsOverride
 *.py[cod]
 
 # Virtual environments
 .venv
 .env
 
-# Локальные настройки инструментов и git-worktree'ы
+# Local Claude settings
 .claude/
 
 .postman/
 postman/
 
-blog.db
+# Database files
+*.sqlite3
+*.db
 
-# Машинное состояние Impeccable; config.json, design.json и разборы коммитятся
+# Machine state of Impeccable; config.json, design.json are commited
 .impeccable/live/sessions/
 .impeccable/hook.cache.json
 
-# Локальный конфиг design-хука Impeccable: ссылается на скилл вне репозитория
 .github/hooks/
+
+Icon

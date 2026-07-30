@@ -2,12 +2,16 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
+from routers.tags import normalise_tags
 
-class UserCreate(BaseModel):
+
+class UserBase(BaseModel):
     username: str = Field(min_length=3, max_length=50)
     email: EmailStr = Field(min_length=3, max_length=120)
+
+
+class UserCreate(UserBase):
     password: str = Field(min_length=8, max_length=128)
-    image_file: str | None = Field(default=None, min_length=3, max_length=200)
 
 
 class UserUpdate(BaseModel):
@@ -17,32 +21,24 @@ class UserUpdate(BaseModel):
     image_file: str | None = Field(default=None, min_length=3, max_length=200)
 
 
-class UserResponse(BaseModel):
+class UserPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     username: str
-    email: str
+    image_file: str | None
     image_path: str
 
 
-def normalise_tags(value: list[str]) -> list[str]:
-    """
-    Strip, lowercase and de-duplicate a list of tag names.
+class UserPrivate(UserPublic):
+    model_config = ConfigDict(from_attributes=True)
 
-    Shared by every schema that accepts tags, so the rules cannot drift
-    apart between creating and updating a post.
+    email: EmailStr
 
-    Args:
-        value (list[str]): tag names as received.
 
-    Returns:
-        list[str]: cleaned names, blanks dropped, order preserved.
-
-    """
-    cleaned = [tag.strip().lower() for tag in value if tag.strip()]
-    # dict.fromkeys rather than set: drops duplicates but keeps order
-    return list(dict.fromkeys(cleaned))
+class Token(BaseModel):
+    access_token: str
+    token_type: str
 
 
 class PostForm(BaseModel):
@@ -54,7 +50,6 @@ class PostForm(BaseModel):
     @field_validator("tags")
     @classmethod
     def clean_tags(cls, value: list[str]) -> list[str]:
-        """Normalise submitted tags. See normalise_tags."""
         return normalise_tags(value)
 
 
@@ -93,7 +88,7 @@ class PostUpdate(BaseModel):
     @field_validator("tags")
     @classmethod
     def clean_tags(cls, value: list[str] | None) -> list[str] | None:
-        """Normalise submitted tags, leaving an absent field absent."""
+        # Normalise submitted tags
         return None if value is None else normalise_tags(value)
 
 
@@ -156,7 +151,7 @@ class PostResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    author: UserResponse
+    author: UserPublic
     title: str
     summary: str
     date_posted: datetime
@@ -166,8 +161,6 @@ class PostResponse(BaseModel):
     @field_validator("tags", mode="before")
     @classmethod
     def flatten_tags(cls, value):
-        # mode="before" получает список объектов Tag из связи.
-        # Наружу отдаём плоские строки: клиенту не нужна форма [{"name": ...}]
         return [t.name if hasattr(t, "name") else t for t in value]
 
 
