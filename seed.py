@@ -25,8 +25,8 @@ CONTENT_DIR = Path(__file__).parent / "content"
 
 AUTHOR = {
     "username": "called_mad",
-    "email": "hello@example.com",
-    "password": "change-me-please",  # TODO: не для боевого окружения
+    "email": "blue.hunde@gmail.com",
+    "password": "TestPassword123",  # TODO: не для боевого окружения
 }
 
 
