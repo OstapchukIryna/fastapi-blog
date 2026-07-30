@@ -1,0 +1,3 @@
+$kind: collection
+description: Checks the API's own description before anything is exercised against it.
+order: 1000

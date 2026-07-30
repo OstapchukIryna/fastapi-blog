@@ -1,0 +1,35 @@
+$kind: http-request
+description: "OAuth2PasswordRequestForm insists on a field called username, but this API authenticates by email - the form field carries the address. The lookup is case-insensitive, so the mixed-case address registered earlier signs in as typed."
+url: "{{baseUrl}}/api/users/token"
+method: POST
+headers:
+  Content-Type: application/x-www-form-urlencoded
+body:
+  type: urlencoded
+  content: |-
+    username={{newEmail}}&password=correct-horse-battery
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("200 OK", () => pm.response.to.have.status(200));
+
+      const body = pm.response.json();
+
+      pm.test("returns a bearer token", () => {
+          pm.expect(body.token_type).to.eql("bearer");
+          pm.expect(body.access_token).to.be.a("string").and.not.empty;
+      });
+
+      pm.test("the token is a three-part JWT", () =>
+          pm.expect(body.access_token.split(".")).to.have.lengthOf(3));
+
+      // The subject is the user id, as a string - jwt requires it.
+      pm.test("carries this user as its subject", () => {
+          const payload = JSON.parse(atob(body.access_token.split(".")[1]));
+          pm.expect(payload.sub).to.eql(String(pm.collectionVariables.get("userId")));
+          pm.expect(payload.exp, "no expiry claim").to.be.a("number");
+      });
+
+      pm.collectionVariables.set("accessToken", body.access_token);
+    language: text/javascript
+order: 1000

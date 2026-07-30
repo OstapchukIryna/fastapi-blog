@@ -1,0 +1,39 @@
+$kind: http-request
+description: "PUT is a full replacement: nothing is left alone, which is what separates it from the PATCH above."
+url: "{{baseUrl}}/api/posts/{{postId}}"
+method: PUT
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "title": "Replaced by Postman",
+      "summary": "Whole-post replacement.",
+      "content": "Replaced body.",
+      "tags": [
+        "sql"
+      ],
+      "user_id": "{{userId}}"
+    }
+scripts:
+  - type: beforeRequest
+    code: |-
+      const body = JSON.parse(pm.request.body.raw);
+      body.user_id = Number(pm.collectionVariables.get("userId"));
+      pm.request.body.raw = JSON.stringify(body);
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      pm.test("200 OK", () => pm.response.to.have.status(200));
+
+      const post = pm.response.json();
+
+      pm.test("every field is the one just sent", () => {
+          pm.expect(post.title).to.eql("Replaced by Postman");
+          pm.expect(post.summary).to.eql("Whole-post replacement.");
+          pm.expect(post.content).to.eql("Replaced body.");
+          pm.expect(post.tags).to.eql(["sql"]);
+      });
+    language: text/javascript
+order: 10000

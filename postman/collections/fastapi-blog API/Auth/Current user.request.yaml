@@ -1,0 +1,26 @@
+$kind: http-request
+description: "/me is the private view: unlike a public read of the same user it carries the email, because the token proves who is asking."
+url: "{{baseUrl}}/api/users/me"
+method: GET
+headers:
+  Authorization: Bearer {{accessToken}}
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("200 OK", () => pm.response.to.have.status(200));
+
+      const user = pm.response.json();
+
+      pm.test("is the user the token was issued for", () =>
+          pm.expect(user.id).to.eql(Number(pm.collectionVariables.get("userId"))));
+
+      pm.test("shape is UserPrivate - the email is included here", () => {
+          pm.expect(Object.keys(user).sort()).to.eql(
+              ["email", "id", "image_file", "image_path", "username"]);
+          pm.expect(user.email).to.eql(pm.collectionVariables.get("newEmail").toLowerCase());
+      });
+
+      pm.test("still never the password hash", () =>
+          pm.expect(user).to.not.have.property("password_hash"));
+    language: text/javascript
+order: 4000

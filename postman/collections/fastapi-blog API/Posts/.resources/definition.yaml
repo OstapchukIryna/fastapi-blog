@@ -1,0 +1,3 @@
+$kind: collection
+description: The full life of a post, plus the PATCH/PUT distinction and the 422 shape the browser depends on.
+order: 3000

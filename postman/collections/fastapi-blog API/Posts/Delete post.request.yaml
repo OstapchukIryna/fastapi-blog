@@ -1,0 +1,12 @@
+$kind: http-request
+url: "{{baseUrl}}/api/posts/{{postId}}"
+method: DELETE
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("204 No Content", () => pm.response.to.have.status(204));
+
+      pm.test("no body - there is nothing to say about a post that is gone", () =>
+          pm.expect(pm.response.text()).to.be.empty);
+    language: text/javascript
+order: 11000

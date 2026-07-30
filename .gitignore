@@ -17,10 +17,14 @@ wheels/
 # Local Claude settings
 .claude/
 
+# Machine state of the Postman extension: workspace links and auth.
+# The collection itself lives under postman/ and is committed — CI builds
+# the Newman JSON from it, so ignoring it turned the api job red.
 .postman/
-postman/
+postman/collection.json
 
-# Database files
+# Database files. blog.db is still tracked from before this rule; see
+# `git ls-files blog.db`. Ignoring a tracked file does not untrack it.
 *.sqlite3
 *.db
 

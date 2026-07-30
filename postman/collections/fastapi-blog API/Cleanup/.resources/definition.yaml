@@ -1,0 +1,3 @@
+$kind: collection
+description: Removes what the run created. Runs last, and the cascade takes the posts with it.
+order: 5000

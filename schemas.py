@@ -2,7 +2,30 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-from routers.tags import normalise_tags
+
+def normalise_tags(value: list[str]) -> list[str]:
+    """
+    Strip, lowercase and de-duplicate a list of tag names.
+
+    Shared by every schema that accepts tags, so the rules cannot drift
+    apart between creating and updating a post.
+
+    Lives here rather than in routers/tags.py because it is pure data
+    cleaning: no session, no request, nothing a router owns. Keeping it
+    in the router meant schemas had to import a router, and that router
+    imports schemas back by way of routers/posts.py — so importing the
+    application at all failed on a partially initialised module.
+
+    Args:
+        value (list[str]): tag names as received.
+
+    Returns:
+        list[str]: cleaned names, blanks dropped, order preserved.
+
+    """
+    cleaned = [tag.strip().lower() for tag in value if tag.strip()]
+    # dict keeps order
+    return list(dict.fromkeys(cleaned))
 
 
 class UserBase(BaseModel):

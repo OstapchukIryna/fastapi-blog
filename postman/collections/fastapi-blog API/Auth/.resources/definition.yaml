@@ -1,0 +1,3 @@
+$kind: collection
+description: The JWT endpoints. Runs after Users, because it signs in as the user that folder created.
+order: 2500

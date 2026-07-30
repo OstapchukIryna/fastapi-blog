@@ -1,0 +1,26 @@
+$kind: http-request
+url: "{{baseUrl}}/api/posts/{{postId}}"
+method: PATCH
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "title": "Retitled by Postman"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("200 OK", () => pm.response.to.have.status(200));
+
+      const post = pm.response.json();
+
+      pm.test("the sent field changed", () => pm.expect(post.title).to.eql("Retitled by Postman"));
+
+      pm.test("the fields that were not sent are untouched", () => {
+          pm.expect(post.summary).to.eql("Created by the collection run.");
+          pm.expect(post.tags).to.eql(["python", "async"]);
+      });
+    language: text/javascript
+order: 7000

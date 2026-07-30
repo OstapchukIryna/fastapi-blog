@@ -1,0 +1,14 @@
+$kind: http-request
+url: "{{baseUrl}}/api/users/{{userId}}"
+method: GET
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("404 Not Found", () => pm.response.to.have.status(404));
+
+      // Leave no run-specific state behind, so a second run in the same Postman
+      // session starts from the same place as the first.
+      ["userId", "postId", "newUsername", "newEmail", "knownTag"].forEach((v) =>
+          pm.collectionVariables.unset(v));
+    language: text/javascript
+order: 2000

@@ -1,0 +1,32 @@
+$kind: http-request
+description: PATCH applies only the fields that arrived. An omitted field is left alone rather than nulled. The response is UserPublic, so the change has to be asserted on a field a public read actually shows.
+url: "{{baseUrl}}/api/users/{{userId}}"
+method: PATCH
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "image_file": "Avatar-256.JPG"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("200 OK", () => pm.response.to.have.status(200));
+
+      const user = pm.response.json();
+
+      pm.test("changes the field that was sent", () =>
+          pm.expect(user.image_file).to.eql("Avatar-256.JPG"));
+
+      // Only the email is lower-cased on the way in, the way registration
+      // does it. Everything else is stored as typed: lower-casing a file
+      // name would point image_path at a file that is not there.
+      pm.test("does not mangle the case of a file name", () =>
+          pm.expect(user.image_path).to.eql("/media/profile_pics/Avatar-256.JPG"));
+
+      pm.test("leaves the field that was not sent alone", () =>
+          pm.expect(user.username).to.eql(pm.collectionVariables.get("newUsername")));
+    language: text/javascript
+order: 7000

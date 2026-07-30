@@ -362,6 +362,7 @@ dependencies = [
 dev = [
     { name = "djlint" },
     { name = "pyrefly" },
+    { name = "pyyaml" },
     { name = "ruff" },
 ]
 
@@ -382,6 +383,7 @@ requires-dist = [
 dev = [
     { name = "djlint", specifier = ">=1.42.3" },
     { name = "pyrefly", specifier = ">=1.1.0" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "ruff", specifier = ">=0.16.0" },
 ]
 

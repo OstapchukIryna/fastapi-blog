@@ -1,0 +1,41 @@
+$kind: http-request
+description: "This is the exact response the browser turns into field errors: static/js/utils.js reads loc for the field name and ctx for the limit. If this shape changes, the form stops explaining itself."
+url: "{{baseUrl}}/api/posts"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "title": "",
+      "summary": "",
+      "content": "",
+      "tags": [],
+      "user_id": 1
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("422 Unprocessable Content", () => pm.response.to.have.status(422));
+
+      const detail = pm.response.json().detail;
+
+      pm.test("all three empty fields are reported", () => {
+          const fields = detail.map((e) => e.loc[e.loc.length - 1]);
+          ["title", "summary", "content"].forEach((f) => pm.expect(fields).to.include(f));
+      });
+
+      pm.test("loc is [body, field] so the browser can find the input", () =>
+          detail.forEach((e) => {
+              pm.expect(e.loc[0]).to.eql("body");
+              pm.expect(e.loc.length).to.be.at.least(2);
+          }));
+
+      pm.test("carries type and ctx, which the browser turns into wording", () => {
+          const title = detail.find((e) => e.loc[e.loc.length - 1] === "title");
+          pm.expect(title.type).to.eql("string_too_short");
+          pm.expect(title.ctx.min_length).to.eql(1);
+      });
+    language: text/javascript
+order: 4000

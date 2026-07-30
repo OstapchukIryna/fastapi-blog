@@ -1,0 +1,22 @@
+$kind: http-request
+description: exclude_unset means an absent field is not a change. An empty body is a legitimate no-op, not an error.
+url: "{{baseUrl}}/api/posts/{{postId}}"
+method: PATCH
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: "{}"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("200 OK", () => pm.response.to.have.status(200));
+
+      const post = pm.response.json();
+
+      pm.test("still the values from the previous request", () => {
+          pm.expect(post.title).to.eql("Retitled by Postman");
+          pm.expect(post.tags).to.eql(["python", "async"]);
+      });
+    language: text/javascript
+order: 8000
