@@ -1,0 +1,35 @@
+$kind: http-request
+description: "The shape of a JWT is public and anyone can build one. This is a correct HS256 token over honest claims, signed with a secret that is not the server's - the single thing standing between a stranger and any account."
+url: "{{baseUrl}}/api/users/me"
+method: GET
+headers:
+  Authorization: Bearer {{mintedToken}}
+scripts:
+  - type: beforeRequest
+    code: |-
+      // CryptoJS is already a global here. Declaring it again — with
+      // require("crypto-js") — is a SyntaxError that takes the script
+      // down before anything runs, and the request then goes out with an
+      // unresolved variable and fails for the wrong reason.
+      const b64url = (w) => CryptoJS.enc.Base64.stringify(w)
+          .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      const encode = (o) => b64url(CryptoJS.enc.Utf8.parse(JSON.stringify(o)));
+      const mint = (claims, secret) => {
+          const head = encode({ alg: "HS256", typ: "JWT" });
+          const body = encode(claims);
+          return `${head}.${body}.${b64url(CryptoJS.HmacSHA256(head + "." + body, secret))}`;
+      };
+      const now = Math.floor(Date.now() / 1000);
+      const subject = String(pm.collectionVariables.get("userId"));
+      pm.collectionVariables.set("mintedToken", mint({ sub: subject, exp: now + 600 }, "not-the-servers-secret"));
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      pm.test("401 Unauthorized", () => pm.response.to.have.status(401));
+
+      pm.test("refused for not being ours", () =>
+          pm.expect(pm.response.json().detail).to.eql("Invalid or expired token"));
+
+      pm.collectionVariables.unset("mintedToken");
+    language: text/javascript
+order: 4600

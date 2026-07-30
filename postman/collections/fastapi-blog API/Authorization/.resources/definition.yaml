@@ -1,0 +1,3 @@
+$kind: collection
+description: Being signed in is not the same as being allowed. Everything here holds a real, valid token and is still refused — 403 rather than 401, which is the distinction check_current_user exists to make. The folder brings its own second account and its own post to defend, so it does not depend on what ran before it.
+order: 4500

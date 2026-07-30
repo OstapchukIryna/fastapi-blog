@@ -1,0 +1,22 @@
+$kind: http-request
+description: "A valid token is not ownership. PATCH is the one a stranger would reach for first."
+url: "{{baseUrl}}/api/posts/{{guardedPostId}}"
+method: PATCH
+headers:
+  Authorization: Bearer {{intruderToken}}
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "title": "Taken over"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("403 Forbidden, not 401", () => pm.response.to.have.status(403));
+
+      pm.test("refused for permission, not identity", () =>
+          pm.expect(pm.response.json().detail).to.eql("Not authorize to change this post"));
+    language: text/javascript
+order: 2000

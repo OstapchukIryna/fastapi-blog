@@ -89,6 +89,7 @@ uv run python scripts/build_postman_collection.py "$COLLECTION"
 echo "==> running the collection against ${BASE_URL}"
 npx --yes newman@6 run "$COLLECTION" \
     --env-var "baseUrl=${BASE_URL}" \
+    --env-var "jwtSecret=${SECRET_KEY}" \
     --reporters cli \
     --color auto \
     "$@"

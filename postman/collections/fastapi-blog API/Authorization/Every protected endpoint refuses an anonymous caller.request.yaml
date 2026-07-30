@@ -1,0 +1,57 @@
+$kind: http-request
+description: "One request per endpoint would say the same thing seven times, so the sweep is done in the setup and asserted here. Its value is not any single 401 but the list itself: an endpoint added later without a token check shows up as a gap the moment someone adds it to this list — and forgetting to add it is caught by the Contract folder instead."
+url: "{{baseUrl}}/api/posts"
+method: GET
+scripts:
+  - type: beforeRequest
+    code: |-
+      // Sequential rather than parallel: each callback starts the next,
+      // which is the shape Newman reliably waits for.
+      const base = pm.variables.get("baseUrl");
+      const post = pm.collectionVariables.get("guardedPostId");
+      const user = pm.collectionVariables.get("userId");
+
+      const guarded = [
+          { name: "POST /api/posts", method: "POST", url: `${base}/api/posts` },
+          { name: "PUT /api/posts/{id}", method: "PUT", url: `${base}/api/posts/${post}` },
+          { name: "PATCH /api/posts/{id}", method: "PATCH", url: `${base}/api/posts/${post}` },
+          { name: "DELETE /api/posts/{id}", method: "DELETE", url: `${base}/api/posts/${post}` },
+          { name: "GET /api/users/me", method: "GET", url: `${base}/api/users/me` },
+          { name: "PATCH /api/users/{id}", method: "PATCH", url: `${base}/api/users/${user}` },
+          { name: "DELETE /api/users/{id}", method: "DELETE", url: `${base}/api/users/${user}` },
+      ];
+
+      const seen = [];
+      const next = (i) => {
+          if (i === guarded.length) {
+              pm.collectionVariables.set("anonSweep", JSON.stringify(seen));
+              return;
+          }
+          const it = guarded[i];
+          pm.sendRequest({
+              url: it.url,
+              method: it.method,
+              header: { "Content-Type": "application/json" },
+              body: it.method === "GET" || it.method === "DELETE"
+                  ? undefined
+                  : { mode: "raw", raw: JSON.stringify({ title: "x", summary: "x", content: "x", tags: [] }) },
+          }, (_e, res) => {
+              seen.push({ name: it.name, code: res ? res.code : 0 });
+              next(i + 1);
+          });
+      };
+      next(0);
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      const seen = JSON.parse(pm.collectionVariables.get("anonSweep") || "[]");
+
+      pm.test("all seven were tried", () => pm.expect(seen).to.have.lengthOf(7));
+
+      seen.forEach((it) =>
+          pm.test(`${it.name} refuses an anonymous caller`, () =>
+              pm.expect(it.code, `${it.name} answered ${it.code}`).to.eql(401)));
+
+      pm.collectionVariables.unset("anonSweep");
+    language: text/javascript
+order: 8000

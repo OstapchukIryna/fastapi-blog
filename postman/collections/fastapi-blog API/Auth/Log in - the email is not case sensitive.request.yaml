@@ -1,0 +1,27 @@
+$kind: http-request
+description: "Addresses are stored lower-cased and looked up with func.lower on both sides, so the case someone types is not a way to fail to sign in. Sends the same address the account was made with, shouted."
+url: "{{baseUrl}}/api/users/token"
+method: POST
+headers:
+  Content-Type: application/x-www-form-urlencoded
+body:
+  type: urlencoded
+  content: |-
+    username={{shoutedEmail}}&password=correct-horse-battery
+scripts:
+  - type: beforeRequest
+    code: |-
+      pm.collectionVariables.set(
+          "shoutedEmail",
+          pm.collectionVariables.get("newEmail").toUpperCase());
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      pm.test("200 OK", () => pm.response.to.have.status(200));
+
+      pm.test("issues a token all the same", () =>
+          pm.expect(pm.response.json().access_token).to.be.a("string").and.not.empty);
+
+      pm.collectionVariables.unset("shoutedEmail");
+    language: text/javascript
+order: 1700
