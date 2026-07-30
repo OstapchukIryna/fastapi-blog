@@ -1,12 +1,5 @@
-/**
- * Shared helpers for the pages that talk to /api directly.
- *
- * The two result windows — #successModal and #errorModal — live in
- * layout.html, so every page reports the outcome the same way and there
- * is one place to change how that looks. Their title and their button
- * label are set per call: a delete is not "Saved", and a button that
- * navigates does not say "Close".
- */
+//Shared helpers for the pages that talk to /api directly.
+//The two result windows — #successModal and #errorModal are in layout.html.
 
 const NETWORK_ERROR =
   "Network error. Please check your connection and try again.";
@@ -21,14 +14,7 @@ export function getErrorMessage(error) {
   return "An error occurred. Please try again.";
 }
 
-/**
- * Say a validation failure the way the person hears it.
- *
- * Mirrors form_errors() in main.py on purpose: the same field can be
- * refused by the API here or by the server-side route without this
- * script, and hearing two different sentences for one mistake is worse
- * than either of them.
- */
+// Say a validation failure the way the person hears it.
 function humaniseFieldError(item) {
   const limit = item.ctx ?? {};
 
@@ -46,13 +32,7 @@ function humaniseFieldError(item) {
   }
 }
 
-/**
- * Field name to message, taken from FastAPI's 422 body.
- *
- * loc is ["body", "title"], so the field is its last element. Errors
- * about the body as a whole land under "body" and match no input, which
- * is why markFields looks controls up rather than trusting the key.
- */
+// Field name to message, taken from FastAPI's 422 body.
 export function getFieldErrors(error) {
   if (!Array.isArray(error?.detail)) return {};
 
@@ -66,16 +46,7 @@ export function getFieldErrors(error) {
   return fields;
 }
 
-/**
- * One line for the error window when the refusal is about fields.
- *
- * Names the fields rather than repeating their messages: those are
- * already under the inputs, and three copies of "Required." say less
- * than a list of what to look at.
- *
- * Returns null when nothing matched an input on this form — then the
- * caller falls back to getErrorMessage, which handles a 400 or a 404.
- */
+// One line for the error window when the refusal is about fields.
 export function describeFieldErrors(form, errors) {
   const named = Object.keys(errors).filter((name) => form.elements[name]);
   if (named.length === 0) return null;
@@ -105,17 +76,7 @@ export function hideModal(modalId) {
   if (modal) modal.hide();
 }
 
-/**
- * Dialogs that are open, or on their way to being open.
- *
- * Neither `display` nor the `show` class answers that question. Bootstrap
- * shows the backdrop first and displays the dialog itself a moment later,
- * so for the whole opening stretch a dialog that is already committed to
- * appearing still reads as closed — and acting on that reading is what
- * put two dialogs on screen at once. show.bs.modal fires at the very
- * start of that stretch and hidden.bs.modal at the end of the other one,
- * so the pair of events is the only honest record of the state.
- */
+// Dialogs that are open, or on their way to being open.
 const opening = new WeakSet();
 
 function trackModal(element) {
@@ -125,22 +86,7 @@ function trackModal(element) {
   element.addEventListener("hidden.bs.modal", () => opening.delete(element));
 }
 
-/**
- * Close one window, then open the next — never both at once.
- *
- * Bootstrap counts one backdrop and one scroll lock per open dialog and
- * does that bookkeeping across the transitions. Overlapping them left
- * the closing dialog on screen with two backdrops behind it and the page
- * scroll-locked for good; the only way out was a reload. Waiting for
- * hidden.bs.modal makes the handover a sequence.
- *
- * The retry is the other half of the same problem: hide() is ignored
- * outright while a dialog is still animating in, and an ignored hide
- * emits no hidden.bs.modal. Someone who confirms a delete before the
- * confirmation has finished appearing would otherwise wait on an event
- * that never arrives and see no result at all. Hiding again on shown
- * covers exactly that window — once the entrance is over, hide() takes.
- */
+//  Close one window, then open the next and never both at once.
 function replaceModal(closingId, open) {
   const closing = closingId && document.getElementById(closingId);
   const instance = closing && bootstrap.Modal.getInstance(closing);
@@ -167,12 +113,7 @@ function replaceModal(closingId, open) {
   });
 }
 
-/**
- * Fill one of the shared windows and show it.
- *
- * `then` runs after the window is closed, not when it opens: navigating
- * straight away would leave the message unread.
- */
+// Fill one of the shared windows and show it.
 function showResult(kind, { title, message, action, then }) {
   const name = kind === "success" ? "success" : "error";
   const modal = document.getElementById(`${name}Modal`);
@@ -186,20 +127,12 @@ function showResult(kind, { title, message, action, then }) {
   }
 
   if (kind === "success") {
-    // One action, so put the keyboard on it: Bootstrap focuses the
-    // container, which costs two tabs to reach the only thing there is
-    // to do — and that thing is opening the post you just wrote.
     modal.addEventListener(
       "shown.bs.modal",
       () => document.getElementById("successAction").focus(),
       { once: true },
     );
   } else {
-    // Bootstrap writes role="dialog" itself while opening, which drops
-    // the alertdialog set in the markup. Restored afterwards: a window
-    // that arrives because something failed should have its message read
-    // out, not just its heading. Focus stays on the dialog for the same
-    // reason — the message is the point, not the button.
     modal.addEventListener(
       "shown.bs.modal",
       () => modal.setAttribute("role", "alertdialog"),
@@ -226,13 +159,7 @@ export function showError(
   showResult("error", { title, message, action, then });
 }
 
-/**
- * Send JSON to the API.
- *
- * Returns {ok, data} rather than throwing: a 400 is an answer, not a
- * breakdown, and the caller wants the body either way. data is null for
- * 204 and for anything that is not JSON.
- */
+// Send JSON to the API.
 export async function sendJSON(url, method, payload) {
   const response = await fetch(url, {
     method,
@@ -245,14 +172,7 @@ export async function sendJSON(url, method, payload) {
   return { ok: response.ok, data };
 }
 
-/**
- * Mark the fields the API refused and clear the previous marks.
- *
- * Every field renders its error paragraph up front, hidden while empty,
- * so this only fills text in — no markup is built here. aria-invalid
- * goes with the class: the rose border is colour, and colour on its own
- * tells a screen reader nothing.
- */
+//  Mark the fields the API refused and clear the previous marks
 export function markFields(form, errors = {}) {
   for (const control of form.querySelectorAll("[name]")) {
     const message = errors[control.name];
@@ -271,7 +191,7 @@ export function markFields(form, errors = {}) {
   }
 }
 
-// One request per form at a time. See the guard in wireForm.
+// One request per form at a time
 const inFlight = new WeakSet();
 
 /**
@@ -309,11 +229,8 @@ export function wireForm(
   if (closes) trackModal(document.getElementById(closes));
 
   form.addEventListener("submit", async (event) => {
-    // Stop default form submission - we'll handle it with JavaScript
     event.preventDefault();
 
-    // A form submitted with Enter has no event.submitter, so the button
-    // is not a reliable latch — the flag is on the form itself.
     if (inFlight.has(form)) return;
     inFlight.add(form);
 
@@ -326,12 +243,7 @@ export function wireForm(
     form.setAttribute("aria-busy", "true");
 
     // Send the reader back to the thing they have to fix, or to the
-    // control they pressed. Bootstrap restores neither, and a modal shown
-    // from script has no trigger to return focus to, so without this the
-    // keyboard lands on <body> and has to tab in from the top of the page.
-    // When the form itself lived in a dialog that has now closed, its
-    // submit button is unfocusable, and the control that opened it is the
-    // only place left that means anything.
+    // control they pressed.
     const recoverFocus = () => {
       const invalid = form.querySelector(".is-invalid");
       const reachable = submitter?.offsetParent ? submitter : null;

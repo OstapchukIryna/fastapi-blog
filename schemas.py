@@ -7,6 +7,7 @@ class UserCreate(BaseModel):
     username: str = Field(min_length=3, max_length=50)
     email: EmailStr = Field(min_length=3, max_length=120)
     password: str = Field(min_length=8, max_length=128)
+    image_file: str | None = Field(default=None, min_length=3, max_length=200)
 
 
 class UserUpdate(BaseModel):
