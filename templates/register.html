@@ -1,0 +1,159 @@
+{% extends "layout.html" %}
+{% block content %}
+    <div class="auth-page">
+        <header class="masthead">
+            <span class="eyebrow mono-label">Account</span>
+            <h1 class="masthead-title auth-title">Create an account</h1>
+            <p class="masthead-tagline">Reading needs no account. This one is for writing.</p>
+        </header>
+
+        {# Как и профиль, форма живёт только на API: серверного POST нет,
+           чтобы не держать вторую копию проверок уникальности и хеширования
+           пароля. Без скрипта она бесполезна — noscript говорит это прямо. #}
+        <noscript>
+            <div class="form-summary" role="alert">
+                <span class="mono-label">Needs JavaScript</span>
+                <p>This form registers through the API from the browser.</p>
+            </div>
+        </noscript>
+
+        <form class="auth-form content-section" id="registerForm">
+            <div class="field">
+                <label class="form-label mono-label" for="username">Username</label>
+                <input class="form-control"
+                       type="text"
+                       id="username"
+                       name="username"
+                       minlength="3"
+                       maxlength="50"
+                       autocomplete="username"
+                       aria-describedby="username-error"
+                       autofocus>
+                <p class="field-error mono-label" id="username-error" hidden></p>
+                <p class="field-hint mono-label">Shown on your posts</p>
+            </div>
+
+            <div class="field">
+                <label class="form-label mono-label" for="email">Email</label>
+                <input class="form-control"
+                       type="email"
+                       id="email"
+                       name="email"
+                       maxlength="120"
+                       autocomplete="email"
+                       aria-describedby="email-error">
+                <p class="field-error mono-label" id="email-error" hidden></p>
+                <p class="field-hint mono-label">You sign in with this</p>
+            </div>
+
+            <div class="field">
+                <label class="form-label mono-label" for="password">Password</label>
+                <input class="form-control"
+                       type="password"
+                       id="password"
+                       name="password"
+                       minlength="8"
+                       maxlength="128"
+                       autocomplete="new-password"
+                       aria-describedby="password-error">
+                <p class="field-error mono-label" id="password-error" hidden></p>
+                <p class="field-hint mono-label">At least 8 characters</p>
+            </div>
+
+            <div class="field">
+                <label class="form-label mono-label" for="confirmPassword">Repeat password</label>
+                <input class="form-control"
+                       type="password"
+                       id="confirmPassword"
+                       name="confirmPassword"
+                       autocomplete="new-password"
+                       aria-describedby="confirmPassword-error">
+                <p class="field-error mono-label" id="confirmPassword-error" hidden></p>
+            </div>
+
+            <button class="btn btn-light write-btn w-100" type="submit">Create account</button>
+            <p class="auth-note mono-label">
+                Already have one? <a href="{{ url_for('login') }}">Sign in</a>
+            </p>
+        </form>
+
+        <p class="mt-4">
+            <a class="back-link mono-label" href="/">
+                <span class="arrow">&larr;</span> All posts
+            </a>
+        </p>
+    </div>
+{% endblock content %}
+
+{% block scripts %}
+    <!-- Register Form Handler -->
+    <script type="module">
+        import { markFields, wireForm } from "/static/js/utils.js";
+
+        const form = document.getElementById("registerForm");
+        const password = document.getElementById("password");
+        const confirmation = document.getElementById("confirmPassword");
+        const note = document.getElementById("confirmPassword-error");
+
+        const matches = () => password.value === confirmation.value;
+
+        const showMismatch = (show) => {
+            note.textContent = show ? "Does not match the password above." : "";
+            note.hidden = !show;
+            confirmation.classList.toggle("is-invalid", show);
+            if (show) {
+                confirmation.setAttribute("aria-invalid", "true");
+            } else {
+                confirmation.removeAttribute("aria-invalid");
+            }
+        };
+
+        // While typing this only ever relaxes: telling someone a password
+        // does not match before they have finished typing it is nagging.
+        confirmation.addEventListener("input", () => {
+            if (matches()) showMismatch(false);
+        });
+        confirmation.addEventListener("blur", () => {
+            if (confirmation.value) showMismatch(!matches());
+        });
+
+        // Registered before wireForm, so stopping the event here keeps the
+        // request from being sent at all. The repeat field is the one rule
+        // the API cannot check, because it never receives it.
+        form.addEventListener("submit", (event) => {
+            if (matches()) return;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            showMismatch(true);
+            confirmation.focus();
+        });
+
+        wireForm(form, {
+            request: (fields) => ({
+                url: "/api/users",
+                method: "POST",
+                payload: {
+                    username: fields.get("username").trim(),
+                    email: fields.get("email").trim(),
+                    password: fields.get("password"),
+                },
+            }),
+            result: (user) => ({
+                title: "Registered",
+                message: `Account ${user.username} created. Sign in to start writing.`,
+                action: "Go to sign in",
+            }),
+            after: () => window.location.assign("{{ url_for('login') }}"),
+            failure: { title: "Not registered", action: "Back to the form" },
+            busy: "Creating",
+        });
+
+        // A duplicate is one 400 that names neither field, so the marks are
+        // cleared by hand as soon as either one is edited.
+        for (const field of [password.form.username, password.form.email]) {
+            field.addEventListener("input", () => {
+                if (field.classList.contains("is-invalid")) markFields(form);
+            });
+        }
+    </script>
+{% endblock scripts %}

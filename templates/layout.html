@@ -45,6 +45,15 @@
         <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
         <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/icon.png">
         <link rel="manifest" href="/static/site.webmanifest">
+
+        {# Вход — единственное состояние меню, которого сервер не знает:
+           токен лежит в localStorage, Jinja его не видит. Флаг ставится
+           здесь, до разбора body, иначе навигация успевала бы мигнуть
+           неверной надписью. Тот же приём, что у темы. #}
+        <script>
+            document.documentElement.dataset.signedIn =
+                String(Boolean(localStorage.getItem('accessToken')));
+        </script>
     </head>
     <body class="d-flex flex-column min-vh-100">
         {% block reading_progress %}
@@ -76,12 +85,6 @@
                                {% if path.startswith('/about') %}aria-current="page"{% endif %}
                                href="{{ url_for('about') }}">About</a>
                         </div>
-                        {#TODO Signin button#}
-                        {# «Sign in» убран из меню: он вёл на форму, honestly
-                           подписанную «ещё не подключено», и занимал точку
-                           выбора у аудитории, которой вход не нужен вовсе.
-                           Страница /login осталась — на неё просто нет ссылки
-                           до появления JWT. #}
                         <div class="navbar-nav align-items-md-center">
                             {% if is_author %}
                                 <a class="nav-link nav-write{{ ' active' if path.startswith('/posts/new') }}"
@@ -90,6 +93,12 @@
                                    {% if path.startswith('/profile') %}aria-current="page"{% endif %}
                                    href="{{ url_for('profile') }}">Profile</a>
                             {% endif %}
+                            {# Обе ссылки рендерятся, показывается нужная —
+                               см. data-signed-in в <head>. Выход не ведёт на
+                               адрес, поэтому это button, а не <a href="#">. #}
+                            <a class="nav-link nav-anon{{ ' active' if path.startswith('/login') or path.startswith('/register') }}"
+                               href="{{ url_for('login') }}">Sign in</a>
+                            <button class="nav-link nav-auth" type="button" id="signOut">Sign out</button>
                             <div class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle"
                                    href="#"
@@ -178,6 +187,18 @@
                 });
                 window.addEventListener('resize', updateProgress);
             }
+        </script>
+
+        <script type="module">
+            import { clearToken } from "/static/js/auth.js";
+
+            // Выход — только на клиенте: сервер сессии не держит, поэтому
+            // достаточно убрать токен. Перезагрузка, а не переход, чтобы
+            // человек остался там, где был.
+            document.getElementById('signOut')?.addEventListener('click', () => {
+                clearToken();
+                window.location.reload();
+            });
         </script>
 
         {# Скрипты страниц — модулями, после бандла Bootstrap: они
