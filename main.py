@@ -1,5 +1,4 @@
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
 from typing import Annotated
 
 from fastapi import (
@@ -20,7 +19,15 @@ from database import Base, engine, get_db
 from error_handlers import register_error_handlers
 from models import get_or_create_tags
 from routers import posts, tags, users
-from routers.posts import PostDep, arrange, find_related, posts_query, set_pinned
+from routers.posts import (
+    PostDep,
+    PostFormView,
+    arrange,
+    find_related,
+    post_to_input,
+    posts_query,
+    set_pinned,
+)
 from routers.tags import TaggedPostsDep, all_topics
 from routers.users import UserDep, current_author
 from schemas import PostFormInput
@@ -53,6 +60,9 @@ register_error_handlers(app)
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 
 
+# --- Helpers ---------------------------------------------------------
+
+
 def form_errors(exception: ValidationError) -> dict[str, str]:
     """
     Generate human-readable exeptions
@@ -83,6 +93,30 @@ def form_errors(exception: ValidationError) -> dict[str, str]:
     return errors
 
 
+def render_post_form(request: Request, view: PostFormView) -> Response:
+    """
+    Draw the post form in the given state.
+
+    Serves both creating and editing: the fields are identical,
+    and the differences — heading, submit target, button label — are
+    derived from the view.
+
+    Args:
+        request (Request): needed by Jinja2Templates and url_for.
+        view (PostFormView): typed values, the post being edited, and errors if exist.
+
+    Returns:
+        Response: the form page, with status 422 if the view holds errors.
+
+    """
+    return templates.TemplateResponse(
+        request,
+        "post_form.html",
+        {"view": view, "title": view.title},
+        status_code=view.status_code,
+    )
+
+
 # --- Routes ---------------------------------------------------------
 
 
@@ -98,159 +132,21 @@ async def home(request: Request, db: DbSession):
     )
 
 
-@dataclass(slots=True)
-class PostFormView:
-    """
-    State of the post form, from which the page is drawn.
-
-    Three fields instead of the previous six arguments. Two of the old
-    ones are derived rather than passed: editing means "there is a post",
-    and 422 means "there are errors". Before, `mode="edit"` with
-    `post=None`, or errors alongside a 200, were both constructible and
-    nothing prevented it.
-
-    Attributes:
-        values (PostFormInput): what the person typed. Returned to the
-            fields even when the post was not saved, so typed text is
-            never lost.
-        post (models.Post | None): the post being edited, or None when
-            creating a new one.
-        errors (dict[str, str]): field name to message, one per field.
-        author (models.User | None): who a new post will belong to. Only
-            needed when creating: the JSON API takes the author in the
-            body, so the page has to carry it into the form.
-
-    """
-
-    values: PostFormInput
-    post: models.Post | None = None
-    errors: dict[str, str] = field(default_factory=dict)
-    author: models.User | None = None
-
-    @property
-    def author_id(self) -> int | None:
-        """
-        Id to send with a new post.
-
-        Returns:
-            int | None: the author's id, or None when editing — an
-            existing post keeps the author it already has.
-
-        """
-        if self.post is not None:
-            return None
-        return self.author.id if self.author else None
-
-    @property
-    def editing(self) -> bool:
-        """
-        Whether an existing post is being edited.
-
-        Returns:
-            bool: True when a post is present, which is what
-            distinguishes editing from creating.
-
-        """
-        return self.post is not None
-
-    @property
-    def title(self) -> str:
-        """
-        Title for the page and the browser tab.
-
-        Returns:
-            str: "Edit post" when editing, otherwise "New post".
-
-        """
-        return "Edit post" if self.editing else "New post"
-
-    @property
-    def status_code(self) -> int:
-        """
-        HTTP status the form should be returned with.
-
-        Returns:
-            int: 422 when there is something to fix, otherwise 200.
-
-        """
-        return (
-            status.HTTP_422_UNPROCESSABLE_CONTENT if self.errors else status.HTTP_200_OK
-        )
-
-
-def post_to_input(post: models.Post) -> PostFormInput:
-    """
-    Convert an existing post into the values its form fields show.
-
-    Lives here rather than in schemas because turning tags back into a
-    string requires knowing the model, and schemas should not know about
-    models.
-
-    Args:
-        post (models.Post): the post being edited.
-
-    Returns:
-        PostFormInput: the post's fields as the form displays them, with
-        tags joined into a comma-separated string.
-
-    """
-    return PostFormInput(
-        title=post.title,
-        summary=post.summary,
-        content=post.content,
-        tags=", ".join(tag.name for tag in post.tags),
-    )
-
-
-def render_post_form(request: Request, view: PostFormView) -> Response:
-    """
-    Draw the post form in the given state.
-
-    One form serves both creating and editing: the fields are identical,
-    and the differences — heading, submit target, button label — are
-    derived from the view.
-
-    Args:
-        request (Request): needed by Jinja2Templates and url_for.
-        view (PostFormView): what to show — typed values, the post being
-            edited, and any errors.
-
-    Returns:
-        Response: the form page, with status 422 if the view holds
-        errors.
-
-    """
-    return templates.TemplateResponse(
-        request,
-        "post_form.html",
-        {"view": view, "title": view.title},
-        status_code=view.status_code,
-    )
-
-
 # Must be declared before /posts/{post_id} because FastAPI parses routes in the order of registration,
 # and "new" would otherwise match post_id: int and give 422
 @app.get("/posts/new", include_in_schema=False, name="new_post")
-async def new_post_form(request: Request, db: DbSession) -> Response:
+def new_post_form(request: Request) -> Response:
     """
     Show an empty form for a new post.
 
-    The author is looked up here rather than hardcoded in the page: the
-    form posts to /api/posts, which wants a user_id in the body, and the
-    only honest source of it is the same current_author the server-side
-    route uses.
-
     Args:
         request (Request): needed by the template.
-        db (DbSession): current database session.
 
     Returns:
         Response: the blank form page.
 
     """
-    return render_post_form(
-        request, PostFormView(values=PostFormInput(), author=await current_author(db))
-    )
+    return render_post_form(request, PostFormView(values=PostFormInput()))
 
 
 @app.post("/posts/new", include_in_schema=False, name="create_post_page")
@@ -277,12 +173,7 @@ async def create_post_page(
         data = form.validated()
     except ValidationError as exception:
         return render_post_form(
-            request,
-            PostFormView(
-                values=form,
-                errors=form_errors(exception),
-                author=await current_author(db),
-            ),
+            request, PostFormView(values=form, errors=form_errors(exception))
         )
 
     post = models.Post(
@@ -422,32 +313,6 @@ async def user_posts_page(request: Request, user: UserDep, db: DbSession):
 @app.get("/about", include_in_schema=False, name="about")
 def about(request: Request):
     return templates.TemplateResponse(request, "about.html", {"title": "About"})
-
-
-@app.get("/profile", include_in_schema=False, name="profile")
-async def profile(request: Request, db: DbSession):
-    """
-    Show the author's own details for editing.
-
-    There is one author, so the page needs no id in the path — it asks
-    current_author who that is, the same way the post routes do. Saving
-    happens from the browser against PATCH /api/users/{id}; there is no
-    POST route here to avoid a second copy of the uniqueness checks and
-    password hashing that the API already does.
-
-    Args:
-        request (Request): needed by the template.
-        db (DbSession): current database session.
-
-    Returns:
-        Response: the profile page.
-
-    """
-    return templates.TemplateResponse(
-        request,
-        "profile.html",
-        {"user": await current_author(db), "title": "Profile"},
-    )
 
 
 @app.get("/login", include_in_schema=False, name="login")

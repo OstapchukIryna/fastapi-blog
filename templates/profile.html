@@ -3,13 +3,10 @@
     <header class="masthead form-masthead">
         <span class="eyebrow mono-label">Account</span>
         <h1 class="masthead-title form-title">Profile</h1>
-        {# Оговорка про загрузку файла живёт здесь, в прозе, а не в
-           подписи к полю: .mono-label — служебная строка, а не место
-           для предложения на семьдесят восемь знаков капслоком. #}
         <p class="masthead-tagline">
             Name and address of the one author this blog has. Uploading an
-            avatar arrives with the file tutorial; for now the field takes a
-            file name.
+            avatar arrives later; for now the field takes a
+            file name. Coming soon and TODO
         </p>
     </header>
 
@@ -26,11 +23,6 @@
             </p>
         </div>
     </div>
-
-    {# У профиля нет серверного POST: правки уходят в PATCH /api/users,
-       чтобы не заводить вторую копию проверок уникальности и хеширования
-       пароля. Поэтому форма без action — без скрипта она бесполезна, и
-       noscript говорит это прямо, а не молча ломается. #}
     <noscript>
         <div class="form-summary" role="alert">
             <span class="mono-label">Needs JavaScript</span>

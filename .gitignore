@@ -15,6 +15,11 @@ wheels/
 # Локальные настройки инструментов и git-worktree'ы
 .claude/
 
+.postman/
+postman/
+
+blog.db
+
 # Машинное состояние Impeccable; config.json, design.json и разборы коммитятся
 .impeccable/live/sessions/
 .impeccable/hook.cache.json
