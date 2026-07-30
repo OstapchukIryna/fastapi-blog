@@ -19,6 +19,13 @@ BASE_URL=""
 SERVER_PID=""
 WORK_DIR=""
 
+# config.py requires a secret and reads it from .env, which is not in the
+# repository — so a fresh clone, and CI, have none and the app refuses to
+# start. The run supplies its own: it signs tokens that live exactly as
+# long as the server started below, and is overridden by a real SECRET_KEY
+# if one is already set.
+export SECRET_KEY="${SECRET_KEY:-throwaway-secret-for-the-api-test-run}"
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --url) BASE_URL="$2"; shift 2 ;;
