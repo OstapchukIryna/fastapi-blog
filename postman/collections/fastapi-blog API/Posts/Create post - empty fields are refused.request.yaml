@@ -3,6 +3,7 @@ description: "This is the exact response the browser turns into field errors: st
 url: "{{baseUrl}}/api/posts"
 method: POST
 headers:
+  Authorization: Bearer {{accessToken}}
   Content-Type: application/json
 body:
   type: json
@@ -11,8 +12,7 @@ body:
       "title": "",
       "summary": "",
       "content": "",
-      "tags": [],
-      "user_id": 1
+      "tags": []
     }
 scripts:
   - type: afterResponse

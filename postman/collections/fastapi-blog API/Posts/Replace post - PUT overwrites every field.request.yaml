@@ -1,8 +1,9 @@
 $kind: http-request
-description: "PUT is a full replacement: nothing is left alone, which is what separates it from the PATCH above."
+description: "The author is not in the body: PUT replaces the editable fields, not the ownership. PUT is a full replacement: nothing is left alone, which is what separates it from the PATCH above."
 url: "{{baseUrl}}/api/posts/{{postId}}"
 method: PUT
 headers:
+  Authorization: Bearer {{accessToken}}
   Content-Type: application/json
 body:
   type: json
@@ -13,16 +14,9 @@ body:
       "content": "Replaced body.",
       "tags": [
         "sql"
-      ],
-      "user_id": "{{userId}}"
+      ]
     }
 scripts:
-  - type: beforeRequest
-    code: |-
-      const body = JSON.parse(pm.request.body.raw);
-      body.user_id = Number(pm.collectionVariables.get("userId"));
-      pm.request.body.raw = JSON.stringify(body);
-    language: text/javascript
   - type: afterResponse
     code: |-
       pm.test("200 OK", () => pm.response.to.have.status(200));

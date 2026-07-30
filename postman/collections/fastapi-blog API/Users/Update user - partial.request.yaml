@@ -3,6 +3,7 @@ description: PATCH applies only the fields that arrived. An omitted field is lef
 url: "{{baseUrl}}/api/users/{{userId}}"
 method: PATCH
 headers:
+  Authorization: Bearer {{accessToken}}
   Content-Type: application/json
 body:
   type: json

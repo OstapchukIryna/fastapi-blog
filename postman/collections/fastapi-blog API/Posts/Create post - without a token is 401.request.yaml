@@ -1,0 +1,32 @@
+$kind: http-request
+description: "Writing is no longer open. There is no author field to get wrong any more - the API reads the author from the token - so the way to get this wrong is to bring no token at all. This request deliberately sends none."
+url: "{{baseUrl}}/api/posts"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "title": "Should never be stored",
+      "summary": "Sent with no credentials.",
+      "content": "x",
+      "tags": []
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("401 Unauthorized", () => pm.response.to.have.status(401));
+
+      pm.test("challenges with Bearer", () =>
+          pm.expect(pm.response.headers.get("WWW-Authenticate")).to.eql("Bearer"));
+
+      pm.test("nothing was stored", async () => {
+          const listing = await new Promise((resolve) =>
+              pm.sendRequest(`${pm.variables.get("baseUrl")}/api/posts`,
+                  (_err, res) => resolve(res)));
+          const titles = listing.json().map((p) => p.title);
+          pm.expect(titles).to.not.include("Should never be stored");
+      });
+    language: text/javascript
+order: 2500

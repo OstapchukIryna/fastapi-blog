@@ -1,0 +1,69 @@
+$kind: http-request
+description: "Holding a valid token is not the same as owning the post. check_current_user compares the post's author with the caller, and this is the request that proves it: a second account, freshly made, with a real token of its own, trying to edit the first account's post."
+url: "{{baseUrl}}/api/posts/{{postId}}"
+method: PATCH
+headers:
+  Authorization: Bearer {{intruderToken}}
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "title": "Taken over"
+    }
+scripts:
+  - type: beforeRequest
+    code: |-
+      // A second person, made here rather than in the folder above, so the
+      // test carries its own setup and cannot be broken by reordering.
+      //
+      // Nested callbacks rather than await: Newman's sandbox rejects
+      // top-level await outright, and it waits for pm.sendRequest to
+      // settle before it sends the request this script belongs to.
+      const base = pm.variables.get("baseUrl");
+      const stamp = Date.now();
+      const email = `pm_intruder_${stamp}@example.com`;
+      const password = "correct-horse-battery";
+
+      pm.sendRequest({
+          url: `${base}/api/users`,
+          method: "POST",
+          header: { "Content-Type": "application/json" },
+          body: {
+              mode: "raw",
+              raw: JSON.stringify({ username: `pm_intruder_${stamp}`, email, password }),
+          },
+      }, (_regErr, registered) => {
+          // Kept so Cleanup can remove them without asking who they are.
+          pm.collectionVariables.set("intruderId", registered.json().id);
+
+          pm.sendRequest({
+              url: `${base}/api/users/token`,
+              method: "POST",
+              header: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: {
+                  mode: "urlencoded",
+                  urlencoded: [
+                      { key: "username", value: email },
+                      { key: "password", value: password },
+                  ],
+              },
+          }, (_tokenErr, issued) => {
+              pm.collectionVariables.set("intruderToken", issued.json().access_token);
+          });
+      });
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      pm.test("403 Forbidden, not 401", () => pm.response.to.have.status(403));
+
+      pm.test("says it is about permission, not identity", () =>
+          pm.expect(pm.response.json().detail).to.eql("Not authorize to change this post"));
+
+      pm.test("the post was left alone", () => {
+          pm.sendRequest(
+              `${pm.variables.get("baseUrl")}/api/posts/${pm.collectionVariables.get("postId")}`,
+              (_err, post) => pm.expect(post.json().title).to.not.eql("Taken over"));
+      });
+    language: text/javascript
+order: 5500

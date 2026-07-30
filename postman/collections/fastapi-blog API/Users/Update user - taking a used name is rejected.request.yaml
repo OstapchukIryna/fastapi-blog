@@ -3,6 +3,7 @@ description: The uniqueness check runs against the other rows, so claiming a nam
 url: "{{baseUrl}}/api/users/{{userId}}"
 method: PATCH
 headers:
+  Authorization: Bearer {{accessToken}}
   Content-Type: application/json
 body:
   type: json
