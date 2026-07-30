@@ -44,6 +44,25 @@ async def all_topics(db: AsyncSession) -> list[tuple[str, int]]:
     return [(name, count) for name, count in rows]
 
 
+def normalise_tags(value: list[str]) -> list[str]:
+    """
+    Strip, lowercase and de-duplicate a list of tag names.
+
+    Shared by every schema that accepts tags, so the rules cannot drift
+    apart between creating and updating a post.
+
+    Args:
+        value (list[str]): tag names as received.
+
+    Returns:
+        list[str]: cleaned names, blanks dropped, order preserved.
+
+    """
+    cleaned = [tag.strip().lower() for tag in value if tag.strip()]
+    # dict keeps order
+    return list(dict.fromkeys(cleaned))
+
+
 # --- Dependencies ------------------------------------------------------
 # Create dependencies for tagged posts from the database.
 # These dependencies will be used in the route handlers to fetch the required data based on the provided parameters.

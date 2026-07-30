@@ -10,6 +10,9 @@ dependencies = [
     "fastapi[standard]>=0.140.0",
     "greenlet>=3.5.4",
     "markdown>=3.10.2",
+    "pwdlib[argon2]>=0.3.0",
+    "pydantic-settings>=2.14.2",
+    "pyjwt>=2.13.0",
     "sqlalchemy[asyncio]>=2.0.51",
 ]
 

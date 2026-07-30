@@ -315,6 +315,11 @@ def about(request: Request):
     return templates.TemplateResponse(request, "about.html", {"title": "About"})
 
 
+@app.get("/profile", include_in_schema=False, name="profile")
+def profile(request: Request):
+    return templates.TemplateResponse(request, "profile.html", {"title": "Profile"})
+
+
 @app.get("/login", include_in_schema=False, name="login")
 def login(request: Request):
     return templates.TemplateResponse(request, "login.html", {"title": "Login"})

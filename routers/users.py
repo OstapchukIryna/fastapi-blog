@@ -1,6 +1,6 @@
+from datetime import timedelta
 from typing import Annotated
 
-import bcrypt
 from fastapi import (
     APIRouter,
     Depends,
@@ -8,19 +8,23 @@ from fastapi import (
     Response,
     status,
 )
-from sqlalchemy import or_, select
+from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import models
+from auth import (
+    create_access_token,
+    hash_password,
+    oauth2_scheme,
+    verify_access_token,
+    verify_password,
+)
+from config import settings
 from database import get_db
 from routers.posts import posts_query
-from schemas import (
-    PostResponse,
-    UserCreate,
-    UserResponse,
-    UserUpdate,
-)
+from schemas import PostResponse, Token, UserCreate, UserPrivate, UserPublic, UserUpdate
 
 router = APIRouter()
 
@@ -71,11 +75,12 @@ UserDep = Annotated[models.User, Depends(load_user)]
 # --- Routes ---------------------------------------------------------
 
 
-@router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=UserPrivate, status_code=status.HTTP_201_CREATED)
 async def create_user(user: UserCreate, db: DbSession):
     result = await db.execute(
         select(models.User).where(
-            (models.User.username == user.username) | (models.User.email == user.email)
+            func.lowe((models.User.username) == user.username.lower())
+            | (func.lower(models.User.email) == user.email.lower())
         )
     )
     clash = result.scalars().first()
@@ -88,8 +93,8 @@ async def create_user(user: UserCreate, db: DbSession):
 
     new_user = models.User(
         username=user.username,
-        email=user.email,
-        password_hash=bcrypt.hashpw(user.password.encode(), bcrypt.gensalt()).decode(),
+        email=user.email.lower(),
+        password_hash=hash_password(user.password),
     )
     db.add(new_user)
     try:
@@ -104,7 +109,70 @@ async def create_user(user: UserCreate, db: DbSession):
     return new_user
 
 
-@router.get("/{user_id}", response_model=UserResponse)
+@router.post("/token", response_model=Token)
+async def login_for_access_token(
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: DbSession
+):
+    # Look up user by case-**insensitive** email
+    # NOTE: OAuth2PasswordRequestForm requires username field, but we treat it as email
+    result = await db.execute(
+        select(models.User).where(
+            func.lower(models.User.email) == form_data.username.lower()
+        )
+    )
+    user = result.scalars().first()
+
+    # Verify user exists and password is correct
+    # Don't reveal which one is failed if one was (security best practice)
+    if not user or not verify_password(form_data.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect password or email",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Create access token with user id as subject
+    access_token_expires = timedelta(minutes=settings.accesse_token_expire_minutes)
+    access_token = create_access_token(
+        data={"sub": str(user.id)}, expires_delta=access_token_expires
+    )
+    return Token(access_token=access_token, token_type="bearer")
+
+
+# Frontend get current user endpoint
+@router.get("/me", response_model=UserPrivate)
+async def get_current_user(
+    token: Annotated[str, Depends(oauth2_scheme)], db: DbSession
+):
+    """Get the currently authenticated user"""
+    user_id = verify_access_token(token)
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    # Validate user id is valid integer (defense against malformed JWT)
+    try:
+        user_id_int = int(user_id)
+    except TypeError, ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    result = await db.execute(select(models.User).where(models.User.id == user_id_int))
+    user = result.scalars().first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user
+
+
+@router.get("/{user_id}", response_model=UserPublic)
 def get_user(user: UserDep):
     return user
 
@@ -115,7 +183,7 @@ async def get_user_posts(user: UserDep, db: DbSession):
     return result.scalars().unique().all()
 
 
-@router.patch("/{user_id}", response_model=UserResponse)
+@router.patch("/{user_id}", response_model=UserPublic)
 async def update_user_fields(
     user: UserDep, data: UserUpdate, db: DbSession
 ) -> models.User:
@@ -156,7 +224,7 @@ async def update_user_fields(
     wanted = {
         name: value
         for name, value in changes.items()
-        if name in {"username", "email"} and value != getattr(user, name)
+        if name.lower() in {"username", "email"} and value != getattr(user, name)
     }
     if wanted:
         result = await db.execute(
@@ -172,12 +240,10 @@ async def update_user_fields(
             )
 
     if "password" in changes:
-        user.password_hash = bcrypt.hashpw(
-            changes.pop("password").encode(), bcrypt.gensalt()
-        ).decode()
+        user.password_hash = hash_password(changes.pop("password"))
 
     for name, value in changes.items():
-        setattr(user, name, value)
+        setattr(user, name, value.lower())
 
     try:
         await db.commit()
