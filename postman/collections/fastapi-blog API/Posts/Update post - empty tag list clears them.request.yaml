@@ -1,0 +1,19 @@
+$kind: http-request
+description: Tags are replaced wholesale rather than merged, so sending [] clears them while omitting the key keeps them.
+url: "{{baseUrl}}/api/posts/{{postId}}"
+method: PATCH
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "tags": []
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("200 OK", () => pm.response.to.have.status(200));
+      pm.test("tags are gone", () => pm.expect(pm.response.json().tags).to.eql([]));
+    language: text/javascript
+order: 9000

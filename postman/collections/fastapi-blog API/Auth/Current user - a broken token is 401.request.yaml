@@ -1,0 +1,15 @@
+$kind: http-request
+description: A token that is not a JWT at all must be refused rather than raising out of the decoder as a 500.
+url: "{{baseUrl}}/api/users/me"
+method: GET
+headers:
+  Authorization: Bearer not.a.real.token
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("401 Unauthorized, not 500", () => pm.response.to.have.status(401));
+
+      pm.test("says the token is the problem", () =>
+          pm.expect(pm.response.json().detail).to.eql("Invalid or expired token"));
+    language: text/javascript
+order: 6000

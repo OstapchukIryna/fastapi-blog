@@ -1,0 +1,34 @@
+$kind: collection
+name: fastapi-blog API
+description: |-
+  The JSON API behind called_mad.
+
+  Every request asserts the behaviour the routers document, not just the status code: PATCH leaves absent fields alone, PUT replaces everything, tags are normalised and replaced wholesale, a second DELETE is a 404, and a duplicate username is a 400 rather than a 500.
+
+  The run is self-contained. It creates its own user, works through that user's post, and deletes the user at the end - the cascade takes the post with it - so it can be run repeatedly against the same database without leaving anything behind.
+
+  Run it from the repository root with `./scripts/api-tests.sh`, which starts the app against a throwaway database first. Against an already-running server, point the `baseUrl` environment variable at it.
+
+  Known contract wart: `date_posted` comes back with a `Z` suffix from POST /api/posts and without one everywhere else, because on create the value is still the timezone-aware object in memory while every other route reads it back from SQLite, which stores it naive. The tests assert only that it parses, so they stay green either way.
+variables:
+  baseUrl: http://127.0.0.1:8000
+  seededUsername: called_mad
+  newUsername: ""
+  newEmail: ""
+  userId: ""
+scripts:
+  - type: http:afterResponse
+    code: |-
+      // Runs after every request in the collection, so these three never have
+      // to be repeated in an individual test tab.
+      pm.test("responds within 2s", () => pm.expect(pm.response.responseTime).to.be.below(2000));
+
+      pm.test("never a 5xx", () =>
+          pm.expect(pm.response.code, `server error: ${pm.response.text().slice(0, 200)}`)
+              .to.be.below(500));
+
+      const type = pm.response.headers.get("Content-Type") || "";
+      if (type.includes("application/json")) {
+          pm.test("body is valid JSON", () => pm.response.to.be.json);
+      }
+    language: text/javascript

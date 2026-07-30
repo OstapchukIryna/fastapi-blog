@@ -1,0 +1,9 @@
+$kind: http-request
+description: Deleting a user cascades to their posts, so the run leaves the database as it found it.
+url: "{{baseUrl}}/api/users/{{userId}}"
+method: DELETE
+scripts:
+  - type: afterResponse
+    code: pm.test("204 No Content", () => pm.response.to.have.status(204));
+    language: text/javascript
+order: 1000

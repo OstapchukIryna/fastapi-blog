@@ -1,0 +1,51 @@
+$kind: http-request
+description: Creates the user the rest of the run hangs off. The name carries a timestamp so the collection can be run repeatedly against the same database.
+url: "{{baseUrl}}/api/users"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "username": "{{newUsername}}",
+      "email": "{{newEmail}}",
+      "password": "correct-horse-battery"
+    }
+scripts:
+  - type: beforeRequest
+    code: |-
+      // Unique per run, so re-running against a persistent database does not
+      // collide with the user the previous run left behind.
+      const stamp = Date.now();
+      pm.collectionVariables.set("newUsername", `pm_user_${stamp}`);
+      pm.collectionVariables.set("newEmail", `pm_user_${stamp}@example.com`);
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      pm.test("201 Created", () => pm.response.to.have.status(201));
+
+      const user = pm.response.json();
+
+      pm.test("echoes what was sent", () => {
+          pm.expect(user.username).to.eql(pm.collectionVariables.get("newUsername"));
+          pm.expect(user.email).to.eql(pm.collectionVariables.get("newEmail"));
+      });
+
+      pm.test("id is a number", () => pm.expect(user.id).to.be.a("number"));
+
+      pm.test("falls back to the default avatar", () =>
+          pm.expect(user.image_path).to.eql("/static/profile_pics/avatar-256.jpg"));
+
+      // The response model is UserResponse, which has no password field at all.
+      // Asserted anyway: this is the one leak that would matter, and a response
+      // model is easy to widen by accident.
+      pm.test("never returns the password or its hash", () => {
+          pm.expect(user).to.not.have.property("password");
+          pm.expect(user).to.not.have.property("password_hash");
+          pm.expect(JSON.stringify(user)).to.not.include("correct-horse-battery");
+      });
+
+      pm.collectionVariables.set("userId", user.id);
+    language: text/javascript
+order: 1000

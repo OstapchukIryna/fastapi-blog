@@ -1,0 +1,28 @@
+$kind: http-request
+url: "{{baseUrl}}/api/users"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "username": "pm_invalid_email",
+      "email": "not-an-email",
+      "password": "correct-horse-battery"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("422 Unprocessable Content", () => pm.response.to.have.status(422));
+
+      const detail = pm.response.json().detail;
+
+      pm.test("detail is a list of field errors", () => pm.expect(detail).to.be.an("array"));
+
+      pm.test("names the field that failed", () => {
+          const fields = detail.map((e) => e.loc[e.loc.length - 1]);
+          pm.expect(fields).to.include("email");
+      });
+    language: text/javascript
+order: 3000

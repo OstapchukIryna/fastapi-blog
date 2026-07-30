@@ -1,0 +1,17 @@
+$kind: http-request
+url: "{{baseUrl}}/api/tags/{{knownTag}}/posts"
+method: GET
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("200 OK", () => pm.response.to.have.status(200));
+
+      const posts = pm.response.json();
+      const tag = pm.collectionVariables.get("knownTag");
+
+      pm.test("returns a list", () => pm.expect(posts).to.be.an("array"));
+
+      pm.test("every post really carries the tag", () =>
+          posts.forEach((p) => pm.expect(p.tags).to.include(tag)));
+    language: text/javascript
+order: 2000

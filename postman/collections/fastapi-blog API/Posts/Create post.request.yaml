@@ -1,0 +1,52 @@
+$kind: http-request
+description: "The tags sent here are deliberately messy: mixed case, padded, and a duplicate. normalise_tags trims, lowercases and de-duplicates while keeping order."
+url: "{{baseUrl}}/api/posts"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "title": "Posted from Postman",
+      "summary": "Created by the collection run.",
+      "content": "## Heading\n\nBody text.",
+      "tags": [
+        "Python",
+        "  python  ",
+        "Async"
+      ],
+      "user_id": "{{userId}}"
+    }
+scripts:
+  - type: beforeRequest
+    code: |-
+      // user_id is an integer in the schema, and a collection variable
+      // interpolates as a string. Substituted into the body as a number.
+      const body = JSON.parse(pm.request.body.raw);
+      body.user_id = Number(pm.collectionVariables.get("userId"));
+      pm.request.body.raw = JSON.stringify(body);
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      pm.test("201 Created", () => pm.response.to.have.status(201));
+
+      const post = pm.response.json();
+
+      pm.test("tags are trimmed, lowercased and de-duplicated, order kept", () =>
+          pm.expect(post.tags).to.eql(["python", "async"]));
+
+      pm.test("belongs to the user this run created", () =>
+          pm.expect(post.author.id).to.eql(Number(pm.collectionVariables.get("userId"))));
+
+      pm.test("a new post is not pinned", () => pm.expect(post.is_pinned).to.be.false);
+
+      pm.test("detail carries the body text", () =>
+          pm.expect(post.content).to.include("Body text."));
+
+      pm.test("date_posted parses as a date", () =>
+          pm.expect(Date.parse(post.date_posted)).to.be.a("number").and.not.NaN);
+
+      pm.collectionVariables.set("postId", post.id);
+    language: text/javascript
+order: 2000

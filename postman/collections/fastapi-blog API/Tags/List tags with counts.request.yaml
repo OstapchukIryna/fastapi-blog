@@ -1,0 +1,27 @@
+$kind: http-request
+description: Ordered by count descending, then by name, so the ordering is defined even when counts tie.
+url: "{{baseUrl}}/api/tags"
+method: GET
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("200 OK", () => pm.response.to.have.status(200));
+
+      const tags = pm.response.json();
+
+      pm.test("returns a list of name and count", () => {
+          pm.expect(tags).to.be.an("array");
+          if (tags.length) pm.expect(Object.keys(tags[0]).sort()).to.eql(["count", "name"]);
+      });
+
+      pm.test("sorted by count desc, then name asc", () => {
+          const sorted = [...tags].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+          pm.expect(tags).to.eql(sorted);
+      });
+
+      pm.test("only tags that are actually used appear", () =>
+          tags.forEach((t) => pm.expect(t.count).to.be.above(0)));
+
+      if (tags.length) pm.collectionVariables.set("knownTag", tags[0].name);
+    language: text/javascript
+order: 1000

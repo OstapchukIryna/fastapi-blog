@@ -1,0 +1,19 @@
+$kind: http-request
+description: An address nobody registered is refused with the same wording as a wrong password, and must not reach the hasher and raise.
+url: "{{baseUrl}}/api/users/token"
+method: POST
+headers:
+  Content-Type: application/x-www-form-urlencoded
+body:
+  type: urlencoded
+  content: |-
+    username=nobody-at-all@example.com&password=correct-horse-battery
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("401 Unauthorized, not 500", () => pm.response.to.have.status(401));
+
+      pm.test("same wording as a wrong password", () =>
+          pm.expect(pm.response.json().detail).to.eql("Incorrect password or email"));
+    language: text/javascript
+order: 3000

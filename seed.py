@@ -13,11 +13,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import NotRequired, TypedDict
 
-import bcrypt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import models
+from auth import hash_password
 from database import AsyncSessionLocal, Base, engine
 from models import get_or_create_tags
 
@@ -113,11 +113,13 @@ async def get_or_create_author(db: AsyncSession) -> models.User:
         return user
 
     user = models.User(
+        # Хеш считает та же функция, что и регистрация: pwdlib собран
+        # только с Argon2, поэтому bcrypt-хеш он не опознаёт и verify
+        # не возвращает False, а падает — засеянный автор не мог войти
+        # вообще, и это была 500, а не 401.
         username=AUTHOR["username"],
-        email=AUTHOR["email"],
-        password_hash=bcrypt.hashpw(
-            AUTHOR["password"].encode(), bcrypt.gensalt()
-        ).decode(),
+        email=AUTHOR["email"].lower(),
+        password_hash=hash_password(AUTHOR["password"]),
     )
     db.add(user)
     await db.flush()  # чтобы получить user.id до коммита
