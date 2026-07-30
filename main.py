@@ -321,8 +321,13 @@ def profile(request: Request):
 
 
 @app.get("/login", include_in_schema=False, name="login")
-def login(request: Request):
+async def login_page(request: Request):
     return templates.TemplateResponse(request, "login.html", {"title": "Login"})
+
+
+@app.get("/register", include_in_schema=False, name="register")
+async def register_page(request: Request):
+    return templates.TemplateResponse(request, "register.html", {"title": "Register"})
 
 
 @app.post("/posts/{post_id}/delete", include_in_schema=False, name="delete_post")

@@ -4,36 +4,48 @@
         <header class="masthead">
             <span class="eyebrow mono-label">Account</span>
             <h1 class="masthead-title auth-title">Sign in</h1>
-            <p class="masthead-tagline">
-                One-author blog — this form is here for when real auth ships.
-            </p>
+            <p class="masthead-tagline">For writing and editing. Reading needs no account.</p>
         </header>
 
-        <form class="auth-form content-section">
-            <div class="mb-3">
-                <label class="form-label mono-label" for="username">Username</label>
-                <input class="form-control"
-                       type="text"
-                       id="username"
-                       name="username"
-                       autocomplete="username">
+        <noscript>
+            <div class="form-summary" role="alert">
+                <span class="mono-label">Needs JavaScript</span>
+                <p>This form signs in through the API from the browser.</p>
             </div>
-            <div class="mb-4">
+        </noscript>
+
+        {# Поле — адрес, а не имя. OAuth2PasswordRequestForm требует поле
+           с именем username, но маршрут /api/users/token ищет по email;
+           подпись говорит правду о том, что вводят, а имя поля в запросе
+           подставляет скрипт ниже. #}
+        <form class="auth-form content-section" id="loginForm">
+            <div class="field">
+                <label class="form-label mono-label" for="email">Email</label>
+                <input class="form-control"
+                       type="email"
+                       id="email"
+                       name="email"
+                       autocomplete="username"
+                       aria-describedby="email-error"
+                       autofocus>
+                <p class="field-error mono-label" id="email-error" hidden></p>
+            </div>
+
+            <div class="field">
                 <label class="form-label mono-label" for="password">Password</label>
                 <input class="form-control"
                        type="password"
                        id="password"
                        name="password"
-                       autocomplete="current-password">
+                       autocomplete="current-password"
+                       aria-describedby="password-error">
+                <p class="field-error mono-label" id="password-error" hidden></p>
             </div>
-            {# Не подключено: JWT-авторизация ещё впереди по курсу.
-               Кнопка выключена явно, а не спрятана — чтобы форма
-               не выглядела сломанной, а честно говорила "рано". #}
-            <button class="btn btn-light w-100"
-                    type="submit"
-                    disabled
-                    title="Not wired up yet — arrives with JWT auth">Sign in</button>
-            <p class="auth-note mono-label">Not wired up yet — arrives with JWT auth.</p>
+
+            <button class="btn btn-light write-btn w-100" type="submit">Sign in</button>
+            <p class="auth-note mono-label">
+                No account yet? <a href="{{ url_for('register') }}">Create one</a>
+            </p>
         </form>
 
         <p class="mt-4">
@@ -43,3 +55,36 @@
         </p>
     </div>
 {% endblock content %}
+
+{% block scripts %}
+    <!-- Sign-in Form Handler -->
+    <script type="module">
+        import { saveToken } from "/static/js/auth.js";
+        import { wireForm } from "/static/js/utils.js";
+
+        const form = document.getElementById("loginForm");
+
+        wireForm(form, {
+            request: (fields) => ({
+                url: "/api/users/token",
+                method: "POST",
+                // The token endpoint reads a form body, not JSON, and its
+                // field is called username however much it holds an address.
+                encoding: "form",
+                payload: {
+                    username: fields.get("email").trim(),
+                    password: fields.get("password"),
+                },
+            }),
+            // No success window: the page you land on is the confirmation,
+            // and a dialog between the password and it is pure friction.
+            result: () => null,
+            after: (token) => {
+                saveToken(token.access_token);
+                window.location.assign("/");
+            },
+            failure: { title: "Not signed in", action: "Back to the form" },
+            busy: "Signing in",
+        });
+    </script>
+{% endblock scripts %}

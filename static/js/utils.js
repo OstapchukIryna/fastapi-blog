@@ -159,12 +159,29 @@ export function showError(
   showResult("error", { title, message, action, then });
 }
 
-// Send JSON to the API.
-export async function sendJSON(url, method, payload) {
+/**
+ * Send a body to the API and hand back both outcomes the same way.
+ *
+ * `encoding` is "json" everywhere except the token endpoint:
+ * OAuth2PasswordRequestForm reads the credentials from a form body, not
+ * from JSON, so signing in has to be sent the other way. It is the one
+ * exception, which is why it is a parameter rather than a second helper.
+ */
+export async function sendJSON(url, method, payload, encoding = "json") {
+  const form = encoding === "form";
   const response = await fetch(url, {
     method,
-    headers: { "Content-Type": "application/json" },
-    body: payload === undefined ? null : JSON.stringify(payload),
+    headers: {
+      "Content-Type": form
+        ? "application/x-www-form-urlencoded"
+        : "application/json",
+    },
+    body:
+      payload === undefined
+        ? null
+        : form
+          ? new URLSearchParams(payload).toString()
+          : JSON.stringify(payload),
   });
 
   const data =
@@ -203,13 +220,16 @@ const inFlight = new WeakSet();
  *
  * @param {HTMLFormElement} form
  * @param {object} options
- * @param {(fields: FormData) => {url: string, method: string, payload?: object}} options.request
+ * @param {(fields: FormData) => {url: string, method: string, payload?: object, encoding?: "json"|"form"}} options.request
  *   what to send.
- * @param {(data: object|null) => {title: string, message: string, action: string}} options.result
+ * @param {(data: object|null) => {title: string, message: string, action: string}|null} options.result
  *   the whole success window: its heading, its line, and what its button
- *   will do when pressed.
+ *   will do when pressed. Return null to open no window at all, for a
+ *   success the destination already announces — signing in is the case:
+ *   a dialog between the password and the page is pure friction.
  * @param {(data: object|null) => void} [options.after]
- *   what to do once that window is closed — usually a redirect.
+ *   what to do once that window is closed, or straight away when there
+ *   is no window — usually a redirect.
  * @param {{title?: string, action?: string}} [options.failure]
  *   overrides for the error window. Its message comes from the API.
  * @param {string} [options.busy]
@@ -254,19 +274,24 @@ export function wireForm(
     };
 
     try {
-      const { url, method, payload } = request(new FormData(form));
-      const { ok, data } = await sendJSON(url, method, payload);
+      const { url, method, payload, encoding } = request(new FormData(form));
+      const { ok, data } = await sendJSON(url, method, payload, encoding);
 
       if (ok) {
         markFields(form);
         const outcome = result(data);
-        replaceModal(closes, () =>
-          showSuccess(outcome.message, {
-            title: outcome.title,
-            action: outcome.action,
-            then: after ? () => after(data) : undefined,
-          }),
-        );
+        if (outcome) {
+          replaceModal(closes, () =>
+            showSuccess(outcome.message, {
+              title: outcome.title,
+              action: outcome.action,
+              then: after ? () => after(data) : undefined,
+            }),
+          );
+        } else {
+          // No window asked for: whatever `after` does is the report.
+          after?.(data);
+        }
       } else {
         const fields = getFieldErrors(data);
         markFields(form, fields);
