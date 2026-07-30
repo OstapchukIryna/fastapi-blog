@@ -1,0 +1,20 @@
+$kind: http-request
+description: The uniqueness check runs against the other rows, so claiming a name that belongs to somebody else is a 400 and not an IntegrityError.
+url: "{{baseUrl}}/api/users/{{userId}}"
+method: PATCH
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "username": "{{seededUsername}}"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("400 Bad Request", () => pm.response.to.have.status(400));
+      pm.test("names the conflict", () =>
+          pm.expect(pm.response.json().detail).to.eql("Username or email already registered"));
+    language: text/javascript
+order: 8000

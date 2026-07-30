@@ -1,0 +1,9 @@
+$kind: http-request
+description: DELETE is idempotent in its effect - the post is gone either way - but the second call honestly reports that there was nothing at that id.
+url: "{{baseUrl}}/api/posts/{{postId}}"
+method: DELETE
+scripts:
+  - type: afterResponse
+    code: pm.test("404 Not Found", () => pm.response.to.have.status(404));
+    language: text/javascript
+order: 12000

@@ -67,8 +67,20 @@ if [[ -z "$BASE_URL" ]]; then
     fi
 fi
 
+# Postman keeps the collection as a tree of YAML — one file per request,
+# which is what makes a changed test readable in review. Newman reads only
+# the single-file v2.1 JSON, so it is built here rather than committed: a
+# second copy in the repository would be a second thing to keep in step.
+if [[ -z "$WORK_DIR" ]]; then
+    WORK_DIR="$(mktemp -d)"   # --url was passed, so nothing made one yet
+fi
+COLLECTION="${WORK_DIR}/collection.json"
+
+echo "==> building the collection from postman/collections"
+uv run python scripts/build_postman_collection.py "$COLLECTION"
+
 echo "==> running the collection against ${BASE_URL}"
-npx --yes newman@6 run postman/collections/fastapi-blog.postman_collection.json \
+npx --yes newman@6 run "$COLLECTION" \
     --env-var "baseUrl=${BASE_URL}" \
     --reporters cli \
     --color auto \

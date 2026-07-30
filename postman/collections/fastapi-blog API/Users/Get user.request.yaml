@@ -1,0 +1,22 @@
+$kind: http-request
+url: "{{baseUrl}}/api/users/{{userId}}"
+method: GET
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("200 OK", () => pm.response.to.have.status(200));
+
+      const user = pm.response.json();
+
+      pm.test("is the user that was just created", () => {
+          pm.expect(user.id).to.eql(Number(pm.collectionVariables.get("userId")));
+          pm.expect(user.username).to.eql(pm.collectionVariables.get("newUsername"));
+      });
+
+      pm.test("shape is exactly UserPublic - a public read carries no email", () => {
+          pm.expect(Object.keys(user).sort()).to.eql(
+              ["id", "image_file", "image_path", "username"]);
+          pm.expect(user).to.not.have.property("email");
+      });
+    language: text/javascript
+order: 5000

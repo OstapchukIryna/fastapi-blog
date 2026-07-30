@@ -79,7 +79,7 @@ UserDep = Annotated[models.User, Depends(load_user)]
 async def create_user(user: UserCreate, db: DbSession):
     result = await db.execute(
         select(models.User).where(
-            func.lowe((models.User.username) == user.username.lower())
+            (func.lower(models.User.username) == user.username.lower())
             | (func.lower(models.User.email) == user.email.lower())
         )
     )
@@ -243,7 +243,11 @@ async def update_user_fields(
         user.password_hash = hash_password(changes.pop("password"))
 
     for name, value in changes.items():
-        setattr(user, name, value.lower())
+        # Только адрес приводится к нижнему регистру — так же, как при
+        # регистрации. Раньше .lower() применялся ко всем полям подряд:
+        # имя теряло выбранный регистр, а image_file вида «Avatar.JPG»
+        # превращался в путь к несуществующему файлу.
+        setattr(user, name, value.lower() if name == "email" else value)
 
     try:
         await db.commit()

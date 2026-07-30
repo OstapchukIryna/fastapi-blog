@@ -1,0 +1,36 @@
+$kind: http-request
+description: "PostResponse, not PostDetail: the list deliberately carries no body text."
+url: "{{baseUrl}}/api/posts"
+method: GET
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("200 OK", () => pm.response.to.have.status(200));
+
+      const posts = pm.response.json();
+
+      pm.test("returns a list", () => pm.expect(posts).to.be.an("array"));
+
+      if (posts.length) {
+          pm.test("shape is exactly PostResponse", () =>
+              pm.expect(Object.keys(posts[0]).sort()).to.eql(
+                  ["author", "date_posted", "id", "is_pinned", "summary", "tags", "title"]));
+
+          pm.test("the list carries no content - that is PostDetail's job", () =>
+              pm.expect(posts[0]).to.not.have.property("content"));
+
+          pm.test("tags are flat strings, not objects", () => {
+              pm.expect(posts[0].tags).to.be.an("array");
+              posts[0].tags.forEach((t) => pm.expect(t).to.be.a("string"));
+          });
+
+          pm.test("author is embedded, not just an id", () =>
+              pm.expect(posts[0].author).to.have.property("username"));
+
+          pm.test("newest first", () => {
+              const dates = posts.map((p) => Date.parse(p.date_posted));
+              pm.expect(dates).to.eql([...dates].sort((a, b) => b - a));
+          });
+      }
+    language: text/javascript
+order: 1000

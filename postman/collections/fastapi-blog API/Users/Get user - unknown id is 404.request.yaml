@@ -1,0 +1,11 @@
+$kind: http-request
+url: "{{baseUrl}}/api/users/99999999"
+method: GET
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("404 Not Found", () => pm.response.to.have.status(404));
+      pm.test("says what was not found", () =>
+          pm.expect(pm.response.json().detail).to.eql("User not found"));
+    language: text/javascript
+order: 6000
