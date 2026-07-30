@@ -6,11 +6,10 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from pwdlib import PasswordHash
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 import models
 from config import settings
-from database import get_db
+from database import DbSession
 
 password_hash = PasswordHash.recommended()
 
@@ -20,8 +19,6 @@ password_hash = PasswordHash.recommended()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/users/token")
 
 # --- Dependencies ------------------------------------------------------
-
-DbSession = Annotated[AsyncSession, Depends(get_db)]
 TokenDep = Annotated[str, Depends(oauth2_scheme)]
 
 

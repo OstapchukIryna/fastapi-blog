@@ -15,7 +15,7 @@ from sqlalchemy.orm import joinedload, selectinload
 
 import models
 from auth import CurrentUser
-from database import get_db
+from database import DbSession
 from models import get_or_create_tags
 from schemas import (
     PostCreate,
@@ -45,7 +45,38 @@ async def load_post(post_id: int, db: DbSession) -> models.Post:
 router = APIRouter()
 
 PostDep = Annotated[models.Post, Depends(load_post)]
-DbSession = Annotated[AsyncSession, Depends(get_db)]
+
+
+def owned_post(post: PostDep, current_user: CurrentUser) -> models.Post:
+    """
+    The post at this id, once it is established that it is the caller's.
+
+    A precondition rather than a step, so it is a dependency: the routes
+    that change a post have nothing to say about somebody else's, and
+    `post: OwnedPost` in the signature says both things at once — that
+    the post exists, and that it is yours to change.
+
+    Args:
+        post (PostDep): the post, already loaded or already a 404.
+        current_user (CurrentUser): whoever the token belongs to.
+
+    Raises:
+        HTTPException: 403 when the post belongs to somebody else. Not
+            401 — the caller is known, they are simply not the author.
+
+    Returns:
+        models.Post: the same post, now known to be theirs.
+
+    """
+    if post.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorize to change this post",
+        )
+    return post
+
+
+OwnedPost = Annotated[models.Post, Depends(owned_post)]
 
 # --- Helpers ---------------------------------------------------------
 
@@ -70,14 +101,6 @@ def posts_query():
         )
         .order_by(models.Post.date_posted.desc())
     )
-
-
-def check_current_user(post: PostDep, current_user: CurrentUser):
-    if post.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorize to change this post",
-        )
 
 
 async def find_related(
@@ -255,7 +278,7 @@ async def create_post(post: PostCreate, current_user: CurrentUser, db: DbSession
 
 @router.put("/{post_id}", response_model=PostDetail)
 async def update_all_post_fields(
-    post: PostDep, current_user: CurrentUser, data: PostCreate, db: DbSession
+    post: OwnedPost, data: PostCreate, db: DbSession
 ) -> models.Post:
     """
     Replace every editable field of a post.
@@ -272,7 +295,6 @@ async def update_all_post_fields(
     been found.
 
     Args:
-        current_user (CurrentUser): verified user dependency
         post (PostDep): the post being replaced; the dependency raises
             404 when the id does not exist.
         data (PostCreate): the complete replacement, already validated.
@@ -286,7 +308,6 @@ async def update_all_post_fields(
         models.Post: the post as stored after the replacement.
 
     """
-    check_current_user(post, current_user)
     replacement = data.model_dump()
     post.tags = await get_or_create_tags(db, replacement.pop("tags"))
     for name, value in replacement.items():
@@ -299,7 +320,7 @@ async def update_all_post_fields(
 
 @router.patch("/{post_id}", response_model=PostDetail)
 async def update_post_fields(
-    post: PostDep, current_user: CurrentUser, data: PostUpdate, db: DbSession
+    post: OwnedPost, data: PostUpdate, db: DbSession
 ) -> models.Post:
     """
     Change some fields of a post, leaving the rest alone.
@@ -319,7 +340,6 @@ async def update_post_fields(
     Args:
         post (PostDep): the post being changed, resolved by the
             dependency, which raises 404 when it does not exist.
-        current_user (CurrentUser): authorized user dependency.
         data (PostUpdate): the fields to change, already validated.
         db (DbSession): current database session.
 
@@ -327,7 +347,6 @@ async def update_post_fields(
         models.Post: the post as stored after the change.
 
     """
-    check_current_user(post, current_user)
     changes = data.model_dump(exclude_unset=True, exclude_none=True)
 
     if "tags" in changes:
@@ -340,9 +359,7 @@ async def update_post_fields(
 
 
 @router.delete("/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_post_api(
-    post: PostDep, current_user: CurrentUser, db: DbSession
-) -> Response:
+async def delete_post_api(post: OwnedPost, db: DbSession) -> Response:
     """
     Delete a post.
 
@@ -357,15 +374,12 @@ async def delete_post_api(
     Args:
         post (PostDep): the post to delete; the dependency raises 404
             when the id does not exist.
-        current_user (CurrentUser): authorized user dependency.
         db (DbSession): current database session.
 
     Returns:
         Response: 204 with no body.
 
     """
-    await load_post(post.id, db)
-    check_current_user(post, current_user)
     await db.delete(post)
     await db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

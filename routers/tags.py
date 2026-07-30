@@ -11,7 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import models
-from database import get_db
+from database import DbSession
 from routers.posts import posts_query
 from schemas import (
     PostResponse,
@@ -19,7 +19,6 @@ from schemas import (
 )
 
 router = APIRouter()
-DbSession = Annotated[AsyncSession, Depends(get_db)]
 
 
 # --- Helpers ---------------------------------------------------------
