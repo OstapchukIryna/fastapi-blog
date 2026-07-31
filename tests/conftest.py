@@ -6,7 +6,6 @@ database, because Playwright drives a real browser and a browser needs
 an address. Nothing here touches blog.db.
 """
 
-import json
 import os
 import socket
 import subprocess
@@ -128,19 +127,24 @@ def make_account(api, request):
 
 
 @pytest.fixture
-def sign_in(page):
+def sign_in(page, live_server: str):
     """
-    Put a token where the pages look for it.
+    Put a token where the pages look for it, once.
 
-    add_init_script rather than an evaluate after loading: the layout
-    reads the token in <head> to decide which menu entry to show, so a
-    token set after the page loads would be seen by the profile and
-    missed by the navigation.
+    Loads the origin first so that localStorage exists, then writes the
+    token. The obvious alternative — add_init_script — plants it again on
+    every navigation, which quietly undoes any clearToken() the page
+    performs and makes a test of expiry unable to fail.
+
+    Whatever is loaded next reads the token in <head> the way a returning
+    visitor's browser would.
     """
 
     def apply(token: str) -> None:
-        page.add_init_script(
-            f"localStorage.setItem('accessToken', {json.dumps(token)});"
+        page.goto(f"{live_server}/")
+        page.evaluate(
+            "token => localStorage.setItem('accessToken', token)",
+            token,
         )
 
     return apply

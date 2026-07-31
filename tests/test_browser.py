@@ -79,25 +79,28 @@ def test_expired_token_is_noticed_on_the_profile(
     the ordinary end of every session rather than an edge case.
 
     The page has to notice by itself: nothing tells the browser that the
-    token died, and the menu will go on claiming the person is signed in
-    until something asks the API and is refused.
+    token died. The profile is the page that finds out, because it is the
+    one that asks the API before it can draw anything.
     """
     account = make_account("owner")
     sign_in(expired_token(account["id"]))
 
     page.goto(f"{live_server}/profile")
 
-    # Said plainly, and not as a broken form.
-    expect(page.locator("#profileAnon")).to_be_visible()
-    expect(page.locator("#anonReason")).to_have_text("Your session has expired")
-    expect(page.locator("#profileBody")).to_be_hidden()
+    # Taken to sign in rather than shown an empty profile, and told why.
+    expect(page).to_have_url(re.compile(r"/login\?next=%2Fprofile&reason=expired$"))
+    expect(page.locator("#loginReasonTitle")).to_have_text("Session expired")
 
     # The dead token is thrown away rather than left to fail again.
     assert page.evaluate("localStorage.getItem('accessToken')") is None
 
-    # And the menu stops claiming otherwise, without a reload.
+    # And the menu stops claiming otherwise.
     expect(page.locator(".nav-anon")).to_be_visible()
     expect(page.locator("#signOut")).to_be_hidden()
+
+    # replace, not assign: going back must not bounce off the profile again.
+    page.go_back()
+    expect(page).not_to_have_url(re.compile(r"/profile$"))
 
 
 def test_edit_is_offered_to_the_author_only(
