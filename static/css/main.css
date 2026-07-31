@@ -1316,6 +1316,62 @@ h4 {
     border-bottom: 1px solid var(--bs-border-color);
 }
 
+/* Каждая секция сохраняется своей кнопкой, поэтому её и надо видеть как
+   отдельную вещь. Разделены линейкой, а не карточками: списком правит
+   правило, а не коробка */
+.profile-section {
+    padding-bottom: 2.5rem;
+    margin-bottom: 2.5rem;
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.profile-section:last-child {
+    margin-bottom: 0;
+    border-bottom: 0;
+}
+
+.profile-section-title {
+    margin: 0 0 0.3rem;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: var(--text-lg);
+    letter-spacing: -0.02em;
+    color: var(--bs-emphasis-color);
+}
+
+.profile-section-note {
+    margin: 0 0 1.75rem;
+    color: var(--bs-secondary-color);
+}
+
+/* Отступ полей задан у каждой формы отдельно, потому что плотность
+   у них разная; профиль идёт шагом редактора записи */
+.profile-section .field {
+    margin-bottom: 1.75rem;
+}
+
+.profile-photo {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+/* Строка действия внутри секции своей линейки не рисует: секции уже
+   разделены, и вторая линия в сантиметре от первой читается как полоса,
+   а не как граница */
+.profile-section .record-action {
+    padding-top: 0;
+    border-top: 0;
+}
+
+/* Опасная зона объявлена словом в Signal Rose, а не цветной рамкой:
+   по системе состояние называют, а фон и линейка остаются обычными.
+   Рамка вокруг блока — самый узнаваемый признак сгенерированного
+   интерфейса, и подпись говорит то же самое точнее */
+.profile-section.is-danger .profile-section-title {
+    color: var(--danger);
+}
+
 /* --- Действия над записью ---------------------------------------
    Не поля формы, а операции над самой записью: у каждой свой адрес
    и своё последствие, поэтому они вне формы и разделены линейками. */

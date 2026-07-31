@@ -15,19 +15,12 @@
         </div>
     </noscript>
 
-    {# Три состояния, потому что до ответа /me страница ничего не знает:
-       токен лежит в localStorage, сервер его не видит и подставить данные
-       в шаблон не может. Пока ответа нет — не показываем ни форму, ни
-       «вы не вошли»: и то и другое было бы догадкой. #}
+    {# Не вошедшего уводим на /login, поэтому «вы не вошли» здесь больше
+       нет — есть только ожидание ответа /me. Токен лежит в localStorage,
+       сервер его не видит, так что решение принимается уже после загрузки
+       страницы, и до ответа показывать форму было бы догадкой. #}
     <div id="profileLoading" class="empty-state is-leading">
         <p class="mono-label mb-0">Loading your account…</p>
-    </div>
-
-    <div id="profileAnon" class="empty-state is-leading" hidden>
-        <p class="mono-label mb-2" id="anonReason">Not signed in</p>
-        <p class="mb-0">
-            <a href="{{ url_for('login') }}">Sign in</a> to change your name, address or password.
-        </p>
     </div>
 
     <div id="profileBody" hidden>
@@ -49,65 +42,169 @@
             </div>
         </div>
 
-        <form class="post-form" id="profileForm" data-user-id="">
-            <div class="field">
-                <label class="form-label mono-label" for="username">Username</label>
-                <input class="form-control"
-                       type="text"
-                       id="username"
-                       name="username"
-                       minlength="3"
-                       maxlength="50"
-                       autocomplete="username"
-                       aria-describedby="username-error">
-                <p class="field-error mono-label" id="username-error" hidden></p>
-            </div>
+        <section class="profile-section">
+            <h2 class="profile-section-title">Name and address</h2>
+            <p class="profile-section-note">The name on your posts, and the address you sign in with.</p>
 
-            <div class="field">
-                <label class="form-label mono-label" for="email">Email</label>
-                <input class="form-control"
-                       type="email"
-                       id="email"
-                       name="email"
-                       maxlength="120"
-                       autocomplete="email"
-                       aria-describedby="email-error">
-                <p class="field-error mono-label" id="email-error" hidden></p>
-                <p class="field-hint mono-label">You sign in with this</p>
-            </div>
+            <form id="identityForm" data-user-id="">
+                <div class="field">
+                    <label class="form-label mono-label" for="username">Username</label>
+                    <input class="form-control"
+                           type="text"
+                           id="username"
+                           name="username"
+                           minlength="3"
+                           maxlength="50"
+                           autocomplete="username"
+                           aria-describedby="username-error">
+                    <p class="field-error mono-label" id="username-error" hidden></p>
+                </div>
 
-            <div class="field">
-                <label class="form-label mono-label" for="image_file">Avatar</label>
-                <input class="form-control"
-                       type="text"
-                       id="image_file"
-                       name="image_file"
-                       maxlength="200"
-                       aria-describedby="image_file-error"
-                       placeholder="avatar-256.jpg">
-                <p class="field-error mono-label" id="image_file-error" hidden></p>
-                <p class="field-hint mono-label">File name in /media/profile_pics</p>
-            </div>
+                <div class="field">
+                    <label class="form-label mono-label" for="email">Email</label>
+                    <input class="form-control"
+                           type="email"
+                           id="email"
+                           name="email"
+                           maxlength="120"
+                           autocomplete="email"
+                           aria-describedby="email-error">
+                    <p class="field-error mono-label" id="email-error" hidden></p>
+                </div>
 
-            <div class="field">
-                <label class="form-label mono-label" for="password">New password</label>
-                <input class="form-control"
-                       type="password"
-                       id="password"
-                       name="password"
-                       minlength="8"
-                       maxlength="128"
-                       autocomplete="new-password"
-                       aria-describedby="password-error">
-                <p class="field-error mono-label" id="password-error" hidden></p>
-                <p class="field-hint mono-label">Empty keeps the current</p>
-            </div>
+                <button class="btn btn-light write-btn" type="submit">Save name and address</button>
+            </form>
+        </section>
 
-            <div class="form-actions">
-                <button class="btn btn-light write-btn" type="submit">Save changes</button>
-                <a class="back-link mono-label" href="/">Cancel</a>
+        <section class="profile-section">
+            <h2 class="profile-section-title">Photo</h2>
+            <p class="profile-section-note">Shown beside your name on every post you write.</p>
+
+            <div class="profile-photo">
+                <img class="avatar"
+                     id="photoPreview"
+                     src="/static/profile_pics/avatar-256.jpg"
+                     alt=""
+                     width="72"
+                     height="72">
+                {# Выключена явно, а не спрятана: форма не должна выглядеть
+                   сломанной, она должна честно говорить «ещё рано». Тот же
+                   приём, что стоял на входе до появления JWT. #}
+                <div>
+                    <button class="btn record-btn"
+                            type="button"
+                            disabled
+                            title="Not wired up yet — arrives with file uploads">Upload a photo</button>
+                    <p class="field-hint mono-label">Uploading arrives with the file tutorial</p>
+                </div>
             </div>
-        </form>
+        </section>
+
+        <section class="profile-section">
+            <h2 class="profile-section-title">Password</h2>
+            <p class="profile-section-note">Changing it does not sign you out anywhere else.</p>
+
+            <form id="passwordForm" data-user-id="">
+                <div class="field">
+                    <label class="form-label mono-label" for="currentPassword">Current password</label>
+                    <input class="form-control"
+                           type="password"
+                           id="currentPassword"
+                           name="currentPassword"
+                           autocomplete="current-password"
+                           aria-describedby="currentPassword-error">
+                    <p class="field-error mono-label" id="currentPassword-error" hidden></p>
+                </div>
+
+                <div class="field">
+                    <label class="form-label mono-label" for="newPassword">New password</label>
+                    <input class="form-control"
+                           type="password"
+                           id="newPassword"
+                           name="newPassword"
+                           minlength="8"
+                           maxlength="128"
+                           autocomplete="new-password"
+                           aria-describedby="newPassword-error">
+                    <p class="field-error mono-label" id="newPassword-error" hidden></p>
+                    <p class="field-hint mono-label">At least 8 characters</p>
+                </div>
+
+                <div class="field">
+                    <label class="form-label mono-label" for="confirmPassword">Repeat new password</label>
+                    <input class="form-control"
+                           type="password"
+                           id="confirmPassword"
+                           name="confirmPassword"
+                           autocomplete="new-password"
+                           aria-describedby="confirmPassword-error">
+                    <p class="field-error mono-label" id="confirmPassword-error" hidden></p>
+                </div>
+
+                <button class="btn btn-light write-btn" type="submit">Change password</button>
+            </form>
+        </section>
+
+        <section class="profile-section">
+            <div class="record-action">
+                <div>
+                    <p class="record-action-name">Sign out</p>
+                    <p class="record-action-note">On this browser. The account is untouched.</p>
+                </div>
+                <button class="btn record-btn" type="button" id="signOutHere">Sign out</button>
+            </div>
+        </section>
+
+        {# «Опасная зона» названа словом в Signal Rose, а не обведена рамкой:
+           по системе состояние объявляют цветом подписи, а линейка и фон
+           остаются обычными. Ровно так же оформлено удаление записи. #}
+        <section class="profile-section is-danger">
+            <h2 class="profile-section-title">Danger zone</h2>
+
+            <div class="record-action">
+                <div>
+                    <p class="record-action-name">Delete this account</p>
+                    <p class="record-action-note">
+                        Every post you have written goes with it. This cannot be undone.
+                    </p>
+                </div>
+                <button class="btn record-btn is-danger"
+                        type="button"
+                        data-bs-toggle="modal"
+                        data-bs-target="#deleteAccountModal">Delete account</button>
+            </div>
+        </section>
+    </div>
+
+    <div class="modal fade"
+         id="deleteAccountModal"
+         tabindex="-1"
+         data-bs-theme="dark"
+         aria-labelledby="deleteAccountLabel"
+         aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title is-danger" id="deleteAccountLabel">Delete this account?</h2>
+                    <button type="button"
+                            class="btn-close"
+                            data-bs-dismiss="modal"
+                            aria-label="Close"></button>
+                </div>
+                <form id="deleteAccountForm" data-user-id="">
+                    <div class="modal-body">
+                        <p class="modal-message mb-0">
+                            <strong id="deleteAccountName"></strong> and every post
+                            written under it will be removed permanently.
+                        </p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn record-btn" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger write-btn">Delete account</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 {% endblock content %}
 
@@ -115,39 +212,44 @@
     <!-- Profile Handler -->
     <script type="module">
         import { authHeaders, clearToken, isSignedIn } from "/static/js/auth.js";
-        import { sendJSON, wireForm } from "/static/js/utils.js";
+        import { markFields, sendJSON, wireForm } from "/static/js/utils.js";
 
         const loading = document.getElementById("profileLoading");
-        const anon = document.getElementById("profileAnon");
         const body = document.getElementById("profileBody");
-        const form = document.getElementById("profileForm");
+        const identityForm = document.getElementById("identityForm");
+        const passwordForm = document.getElementById("passwordForm");
+        const deleteForm = document.getElementById("deleteAccountForm");
 
-        const show = (which) => {
-            loading.hidden = which !== "loading";
-            anon.hidden = which !== "anon";
-            body.hidden = which !== "body";
-        };
-
-        const showAnon = (reason) => {
-            document.getElementById("anonReason").textContent = reason;
-            show("anon");
+        // Уводим на вход, а не показываем пустую страницу. replace, а не
+        // assign: «назад» из логина должно вести туда, откуда человек
+        // пришёл, а не обратно на профиль, который его снова отфутболит.
+        const toLogin = (reason) => {
+            const next = encodeURIComponent(window.location.pathname);
+            const why = reason ? `&reason=${reason}` : "";
+            window.location.replace(`{{ url_for('login') }}?next=${next}${why}`);
         };
 
         function fill(user) {
             document.getElementById("identityName").textContent = user.username;
             document.getElementById("identityEmail").textContent = user.email;
+            document.getElementById("deleteAccountName").textContent = user.username;
 
-            const avatar = document.getElementById("identityAvatar");
-            avatar.src = user.image_path;
-            avatar.alt = user.username;
+            for (const id of ["identityAvatar", "photoPreview"]) {
+                const image = document.getElementById(id);
+                image.src = user.image_path;
+                image.alt = user.username;
+            }
 
-            form.dataset.userId = user.id;
-            form.username.value = user.username;
-            form.email.value = user.email;
-            form.image_file.value = user.image_file ?? "";
-            form.password.value = "";
+            for (const form of [identityForm, passwordForm, deleteForm]) {
+                form.dataset.userId = user.id;
+            }
 
-            show("body");
+            identityForm.username.value = user.username;
+            identityForm.email.value = user.email;
+            passwordForm.reset();
+
+            loading.hidden = true;
+            body.hidden = false;
         }
 
         // A real count or nothing: an invented number on a page that is
@@ -164,7 +266,7 @@
 
         async function load() {
             if (!isSignedIn()) {
-                showAnon("Not signed in");
+                toLogin();
                 return;
             }
 
@@ -178,51 +280,135 @@
                 return;
             }
 
-            // A token is worth nothing 30 minutes after it was issued.
-            // Dropping it here is what stops the menu claiming otherwise.
+            // Токен ничего не стоит через полчаса после выдачи. Выбросить
+            // его здесь — то, что мешает меню и дальше утверждать обратное.
             if (status === 401) {
                 clearToken();
-                showAnon("Your session has expired");
+                toLogin("expired");
                 return;
             }
 
-            showAnon("Could not load your account");
+            loading.querySelector("p").textContent = "Could not load your account.";
         }
 
-        wireForm(form, {
-            request: (fields) => {
+        wireForm(identityForm, {
+            request: (fields) => ({
+                url: `/api/users/${identityForm.dataset.userId}`,
+                method: "PATCH",
                 // PATCH means "change these": an empty field is not a
                 // request to blank the column, it is a field left alone.
-                const changes = {};
-                const keep = (name, value) => {
-                    if (value) changes[name] = value;
-                };
-
-                keep("username", fields.get("username").trim());
-                keep("email", fields.get("email").trim());
-                keep("image_file", fields.get("image_file").trim());
-                // Not trimmed: spaces can be part of a password
-                keep("password", fields.get("password"));
-
-                return {
-                    url: `/api/users/${form.dataset.userId}`,
-                    method: "PATCH",
-                    payload: changes,
-                    // The endpoint does not check the token yet. Sent anyway,
-                    // so the page is already right when it starts to.
-                    headers: authHeaders(),
-                };
-            },
+                payload: Object.fromEntries(
+                    ["username", "email"]
+                        .map((name) => [name, fields.get(name).trim()])
+                        .filter(([, value]) => value),
+                ),
+                headers: authHeaders(),
+            }),
             result: (user) => ({
                 title: "Saved",
-                message: `Profile of ${user.username} updated.`,
+                message: `You are now ${user.username}.`,
                 action: "Close",
             }),
-            // Re-read rather than reload: the form is filled from /me, so a
-            // full page start-over would buy nothing.
+            // Перечитываем, а не перезагружаем: форма и так заполняется
+            // из /me, полный рестарт страницы ничего не добавит.
             after: () => load(),
             failure: { action: "Back to the form" },
             busy: "Saving",
+        });
+
+        const newPassword = document.getElementById("newPassword");
+        const confirmation = document.getElementById("confirmPassword");
+        const mismatch = document.getElementById("confirmPassword-error");
+
+        const matches = () => newPassword.value === confirmation.value;
+
+        const showMismatch = (show) => {
+            mismatch.textContent = show ? "Does not match the new password above." : "";
+            mismatch.hidden = !show;
+            confirmation.classList.toggle("is-invalid", show);
+            confirmation.toggleAttribute("aria-invalid", show);
+        };
+
+        // Пока печатают — только смягчаем: жаловаться на несовпадение до
+        // того, как пароль дописали, это придирка.
+        confirmation.addEventListener("input", () => {
+            if (matches()) showMismatch(false);
+        });
+        confirmation.addEventListener("blur", () => {
+            if (confirmation.value) showMismatch(!matches());
+        });
+
+        passwordForm.addEventListener("submit", (event) => {
+            if (matches()) return;
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            showMismatch(true);
+            confirmation.focus();
+        });
+
+        wireForm(passwordForm, {
+            // Сервер текущий пароль не проверяет — в UserUpdate такого поля
+            // нет. Поэтому доказательство здесь: вход этим паролем. Это
+            // защита от чужих рук за открытым ноутбуком, но не гарантия:
+            // у кого есть токен, тот сменит пароль и мимо страницы.
+            guard: async (fields) => {
+                const { ok } = await sendJSON("/api/users/token", {
+                    method: "POST",
+                    encoding: "form",
+                    payload: {
+                        username: identityForm.email.value.trim(),
+                        password: fields.get("currentPassword"),
+                    },
+                });
+                if (ok) return null;
+
+                markFields(passwordForm, {
+                    currentPassword: "That is not your current password.",
+                });
+                document.getElementById("currentPassword").focus();
+                return "The current password is wrong, so nothing was changed.";
+            },
+            request: (fields) => ({
+                url: `/api/users/${passwordForm.dataset.userId}`,
+                method: "PATCH",
+                payload: { password: fields.get("newPassword") },
+                headers: authHeaders(),
+            }),
+            result: () => ({
+                title: "Password changed",
+                message: "Your next sign-in will use the new one.",
+                action: "Close",
+            }),
+            after: () => passwordForm.reset(),
+            failure: { title: "Not changed", action: "Back to the form" },
+            busy: "Changing",
+        });
+
+        document.getElementById("signOutHere").addEventListener("click", () => {
+            clearToken();
+            window.location.assign("/");
+        });
+
+        wireForm(deleteForm, {
+            request: () => ({
+                url: `/api/users/${deleteForm.dataset.userId}`,
+                method: "DELETE",
+                headers: authHeaders(),
+            }),
+            result: () => ({
+                title: "Deleted",
+                message: "The account and its posts are gone.",
+                action: "Back to the blog",
+            }),
+            // Токен переживает аккаунт, которого больше нет: убираем сами,
+            // иначе меню продолжит предлагать «выйти» из пустоты.
+            after: () => {
+                clearToken();
+                window.location.assign("/");
+            },
+            failure: { title: "Not deleted", action: "Close" },
+            busy: "Deleting",
+            closes: "deleteAccountModal",
         });
 
         load();

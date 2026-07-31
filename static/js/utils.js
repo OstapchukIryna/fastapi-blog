@@ -244,13 +244,18 @@ const inFlight = new WeakSet();
  *   what the submit button says while the request is out. A disabled
  *   button with an unchanged label is the whole of the feedback
  *   otherwise, and a long post can take a noticeable moment to save.
+ * @param {(fields: FormData) => Promise<string|null>} [options.guard]
+ *   a check that has to ask the API before the request is worth making.
+ *   Return a message to refuse, null to go ahead. Changing a password is
+ *   the case: proving the current one is known takes a round trip, and
+ *   `request` is synchronous.
  * @param {string} [options.closes]
  *   id of a modal the form lives in. It is closed first, and the result
  *   window opens only once it is gone.
  */
 export function wireForm(
   form,
-  { request, result, after, failure = {}, busy, closes },
+  { request, result, after, failure = {}, busy, guard, closes },
 ) {
   // Watch the containing dialog from page load, so its state is already
   // known by the time a submit needs it
@@ -282,6 +287,14 @@ export function wireForm(
     };
 
     try {
+      const refusal = guard ? await guard(new FormData(form)) : null;
+      if (refusal) {
+        replaceModal(closes, () =>
+          showError(refusal, { ...failure, then: recoverFocus }),
+        );
+        return;
+      }
+
       const { url, ...options } = request(new FormData(form));
       const { ok, data } = await sendJSON(url, options);
 
