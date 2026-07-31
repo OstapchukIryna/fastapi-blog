@@ -102,6 +102,10 @@ changes rather than when the API merely moves:
   That is a contract between the API and the browser, and nothing else
   tests it.
 
+The order those refusals happen in — which one wins when more than one
+applies — is drawn out in [`docs/auth.md`](../docs/auth.md). Every row
+of its precedence table is a request in this collection.
+
 The first request in the run compares the paths in `/openapi.json`
 against the paths this collection covers, and fails when they diverge.
 Adding an endpoint without adding requests for it breaks the build,
