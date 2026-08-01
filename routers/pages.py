@@ -34,6 +34,7 @@ router = APIRouter(include_in_schema=False)
 
 # --- Page state -----------------------------------------------------
 
+
 def arrange(items: Sequence[models.Post]) -> dict:
     """
     Separate posts onto one pinned and others
@@ -380,12 +381,12 @@ def profile(request: Request):
 
 
 @router.get("/login", name="login")
-async def login_page(request: Request):
+def login_page(request: Request):
     return templates.TemplateResponse(request, "login.html", {"title": "Login"})
 
 
 @router.get("/register", name="register")
-async def register_page(request: Request):
+def register_page(request: Request):
     return templates.TemplateResponse(request, "register.html", {"title": "Register"})
 
 

@@ -44,11 +44,6 @@ async def all_topics(db: AsyncSession) -> list[tuple[str, int]]:
 
 
 # --- Dependencies ------------------------------------------------------
-# Create dependencies for tagged posts from the database.
-# These dependencies will be used in the route handlers to fetch the required data based on the provided parameters.
-# Prevent code duplication and ensure consistent error handling for missing resources.
-
-
 async def load_tagged_posts(tag: str, db: DbSession) -> Sequence[models.Post]:
     """Returns posts by tag, otherwise 404. If tags are not found or no posts with this tag, return 404."""
     result = await db.execute(
