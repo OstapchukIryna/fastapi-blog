@@ -36,7 +36,7 @@ scripts:
 
       pm.test("falls back to the shared default avatar", () => {
           pm.expect(user.image_file).to.be.null;
-          pm.expect(user.image_path).to.eql("/media/profile_pics/image.png");
+          pm.expect(user.image_path).to.eql("/static/profile_pics/default.jpg");
       });
 
       // The response model is UserResponse, which has no password field at all.

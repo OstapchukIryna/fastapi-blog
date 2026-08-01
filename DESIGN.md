@@ -262,8 +262,6 @@ nothing outside them. The single exception is documented under Code below.
 **The One Ramp Rule.** A literal `font-size` in a component is a defect. If a
 step is missing, add it to the ramp and to this table; do not solve it locally.
 
-### Named Rules
-
 **The Voice-Is-Serif Rule.** Wherever the page speaks in the first person at
 large size, it speaks in Newsreader, not Archivo. The grotesque names
 things; the serif says them. This is why the front page's thesis reads as a
@@ -440,6 +438,53 @@ down here.
   per open dialog, and overlapping them leaves the page scroll-locked with no
   way out but a reload.
 
+### Account pages
+- **Shape:** a single 26rem column, centred, with the form on `Raised Ink`
+  inside it. Narrower than the 760px measure on purpose — sign-in and
+  registration are four fields and a decision, and a full-width form would
+  make them look like work.
+- **Density:** fields sit 1.25rem apart rather than the editor's 1.75rem.
+  Four of them in a 26rem card at the editor's spacing did not fit a phone
+  screen in one look.
+- **Primary action:** full width, because on a phone it is the only thing on
+  the page worth touching.
+- **The reason line:** somebody sent here from a page they could not open is
+  told so above the form, in the `.form-summary` block. Being bounced without
+  explanation reads as having clicked the wrong thing.
+
+### Sectioned settings
+The profile is five sections divided by hairlines, each saving itself. One
+button at the foot saving everything at once would mean a person changing a
+password also re-submits their name, and an error in either would be reported
+about both.
+
+- **Heading:** display face at `--text-lg`, with an optional line of
+  explanation under it in `Muted Sand`.
+- **Own control:** each section ends in its own button, labelled with what that
+  section does — `Save`, `Change password` — never a generic `Save changes`.
+- **Danger zone:** named in `Signal Rose` and otherwise identical to every
+  other section. See the Named Rule below.
+- **The photo control:** the native file input cannot be styled, so it is
+  visually hidden and its `<label>` is the button; the focus ring moves onto
+  the label so keyboard reach stays visible. Choosing a file *is* the upload —
+  a second confirming click would decide nothing. The button says `Choose a
+  photo` or `Replace` depending on what is there, and `Remove` appears only
+  when there is something to remove.
+
+Uploads are fitted to 300×300 and stored as JPEG, so every avatar in the
+system is the same shape and weight. The stand-in for an account with no
+photo of its own is `static/profile_pics/default.jpg`, cut to the same size by
+the same pipeline — uploads live under `media/` and are not part of the
+source, the default is an asset of the interface and is.
+
+### Named Rules
+
+**The Named-Danger Rule.** A destructive area is announced by its heading in
+`Signal Rose`, and by nothing else: same ground, same hairline, same spacing
+as its neighbours. A tinted panel behind a red border is the most recognisable
+tell of a generated interface, and it says less than the word does — the row
+already carries a sentence explaining what will be lost.
+
 ### The Now Panel (signature)
 A status card carrying what the author is building, what is next, and a link to
 the source, with the primary contact action attached to its foot. `Raised Ink`
@@ -497,4 +542,10 @@ a true `scrollY` ratio, with no starting offset. It exists only on the post page
 - **Don't** drift toward a generic SaaS landing page — gradient hero, pastel
   illustrations, large rounded cards floating on shadows.
 - **Don't** leave anything looking like untouched Bootstrap: default blue
-  buttons, default shadows, default radii.
+  buttons, default shadows, default radii. Dialog footers and file controls
+  are the two places this keeps coming back.
+- **Don't** wrap a danger zone in a red panel. Name it in `Signal Rose` and
+  leave the ground alone.
+- **Don't** put two hairlines within a couple of centimetres of each other. A
+  section already separated by a rule does not need a second one inside it;
+  read together they look like a stripe rather than a boundary.

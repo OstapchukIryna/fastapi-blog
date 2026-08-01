@@ -11,6 +11,7 @@ import socket
 import subprocess
 import sys
 import time
+from collections.abc import Iterator
 from pathlib import Path
 
 import httpx
@@ -40,7 +41,7 @@ def free_port() -> int:
 
 
 @pytest.fixture(scope="session")
-def live_server(tmp_path_factory) -> str:
+def live_server(tmp_path_factory) -> Iterator[str]:
     """Seed a temporary database, serve it, and hand back the address."""
     work = tmp_path_factory.mktemp("browser")
     env = {
