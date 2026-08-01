@@ -72,13 +72,12 @@
                     <p class="field-error mono-label" id="email-error" hidden></p>
                 </div>
 
-                <button class="btn btn-light write-btn" type="submit">Save name and address</button>
+                <button class="btn btn-light write-btn" type="submit">Save</button>
             </form>
         </section>
 
         <section class="profile-section">
             <h2 class="profile-section-title">Photo</h2>
-            <p class="profile-section-note">Shown beside your name on every post you write.</p>
 
             <div class="profile-photo">
                 <img class="avatar"
@@ -87,22 +86,19 @@
                      alt=""
                      width="72"
                      height="72">
-                {# Выключена явно, а не спрятана: форма не должна выглядеть
-                   сломанной, она должна честно говорить «ещё рано». Тот же
-                   приём, что стоял на входе до появления JWT. #}
+
                 <div>
                     <button class="btn record-btn"
                             type="button"
                             disabled
                             title="Not wired up yet — arrives with file uploads">Upload a photo</button>
-                    <p class="field-hint mono-label">Uploading arrives with the file tutorial</p>
+                    <p class="field-hint mono-label">CHANGE ME PLEASE</p>
                 </div>
             </div>
         </section>
 
         <section class="profile-section">
             <h2 class="profile-section-title">Password</h2>
-            <p class="profile-section-note">Changing it does not sign you out anywhere else.</p>
 
             <form id="passwordForm" data-user-id="">
                 <div class="field">
@@ -147,27 +143,14 @@
 
         <section class="profile-section">
             <div class="record-action">
-                <div>
-                    <p class="record-action-name">Sign out</p>
-                    <p class="record-action-note">On this browser. The account is untouched.</p>
-                </div>
                 <button class="btn record-btn" type="button" id="signOutHere">Sign out</button>
             </div>
         </section>
 
-        {# «Опасная зона» названа словом в Signal Rose, а не обведена рамкой:
-           по системе состояние объявляют цветом подписи, а линейка и фон
-           остаются обычными. Ровно так же оформлено удаление записи. #}
         <section class="profile-section is-danger">
             <h2 class="profile-section-title">Danger zone</h2>
 
             <div class="record-action">
-                <div>
-                    <p class="record-action-name">Delete this account</p>
-                    <p class="record-action-note">
-                        Every post you have written goes with it. This cannot be undone.
-                    </p>
-                </div>
                 <button class="btn record-btn is-danger"
                         type="button"
                         data-bs-toggle="modal"

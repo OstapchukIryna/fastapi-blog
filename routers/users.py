@@ -1,16 +1,12 @@
 from datetime import timedelta
 from typing import Annotated
 
-from fastapi import (
-    APIRouter,
-    Depends,
-    HTTPException,
-    Response,
-    status,
-)
+from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile, status
 from fastapi.security import OAuth2PasswordRequestForm
+from PIL import UnidentifiedImageError
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
+from starlette.concurrency import run_in_threadpool
 
 import models
 from auth import (
@@ -21,6 +17,7 @@ from auth import (
 )
 from config import settings
 from database import DbSession
+from image_utils import delete_profile_image, process_profile_image
 from routers.posts import posts_query
 from schemas import PostResponse, Token, UserCreate, UserPrivate, UserPublic, UserUpdate
 
@@ -48,18 +45,12 @@ def own_account(user: UserDep, current_user: CurrentUser) -> models.User:
     """
     The user at this id, once it is established that it is the caller.
 
-    The same precondition posts have, and a dependency for the same
-    reason: changing an account is only ever your own, so `user:
-    OwnAccount` says the account exists and belongs to whoever asked.
-
     Args:
         user (UserDep): the account, already loaded or already a 404.
         current_user (CurrentUser): whoever the token belongs to.
 
     Raises:
-        HTTPException: 403 when it is somebody else's account. The
-            wording differs from the posts one because the thing being
-            refused differs; both are pinned by the collection.
+        HTTPException: 403 when it is somebody else's account.
 
     Returns:
         models.User: the same account, now known to be theirs.
@@ -177,11 +168,7 @@ async def update_user_fields(
     field already holds is not a clash with yourself and passes through
     as a no-op.
 
-    The password never reaches the model as-is. The column is
-    password_hash, so assigning `password` would set an attribute
-    SQLAlchemy does not map — the request would report success and
-    change nothing.
-
+    The password never reaches the model as-is.
     Args:
         user (UserDep): the user being changed, resolved by the
             dependency, which raises 404 when it does not exist.
@@ -237,8 +224,55 @@ async def update_user_fields(
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user(user: OwnAccount, db: DbSession) -> Response:
-    """Cascading deletion of a user. All posts will be delete as well. Returns an empty 204."""
+async def delete_user(user: OwnAccount, db: DbSession):
+    """Cascading deletion of a user. All posts will be delete as well as profile picture file"""
+    old_filename = user.image_file
     await db.delete(user)
     await db.commit()
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    if old_filename:
+        delete_profile_image(old_filename)
+
+
+@router.patch("/{user_id}/picture", response_model=UserPrivate)
+async def upload_profile_picture(file: UploadFile, user: OwnAccount, db: DbSession):
+    content = await file.read()
+    if len(content) > settings.max_upload_size_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File is too large. Maximum size is {settings.max_upload_size_bytes // (1024 * 1024)} MB",
+        )
+    try:
+        new_filename = await run_in_threadpool(process_profile_image, content)
+    except UnidentifiedImageError as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid image file. Please upload a valid file format (JPEG, PNG, GIF, WebP).",
+        ) from err
+    old_filename = user.image_file
+
+    user.image_file = new_filename
+    await db.commit()
+    await db.refresh(user)
+
+    if old_filename:
+        delete_profile_image(old_filename)
+
+    return user
+
+
+@router.delete("/{user_id}/picture")
+async def delete_profile_picture(user: OwnAccount, db: DbSession):
+    old_filename = user.image_file
+    if old_filename is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No picture to delete.",
+        )
+    user.image_file = None
+    await db.commit()
+    await db.refresh(user)
+
+    delete_profile_image(old_filename)
+
+    return user

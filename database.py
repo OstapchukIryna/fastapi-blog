@@ -5,10 +5,7 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
-# Адрес базы берётся из окружения, потому что blog.db лежит в репозитории:
-# любой автоматический прогон по API писал бы в отслеживаемый файл и оставлял
-# после себя diff. Значение по умолчанию — прежнее, так что обычный запуск
-# ничего не замечает.
+# Get db attribute from environment
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./blog.db")
 
 engine = create_async_engine(
@@ -29,8 +26,5 @@ async def get_db():
         yield session
 
 
-# Один псевдоним на весь проект. Раньше эта строка стояла пятью
-# одинаковыми копиями — в каждом роутере, в auth и в main; сессия у
-# приложения одна, и объявлять её заново на каждый модуль значило дать
-# пяти копиям возможность разойтись.
+# One global dependency over full project
 DbSession = Annotated[AsyncSession, Depends(get_db)]
