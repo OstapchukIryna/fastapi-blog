@@ -1,5 +1,3 @@
-from collections.abc import Sequence
-from dataclasses import dataclass, field
 from typing import Annotated
 
 from fastapi import (
@@ -20,7 +18,6 @@ from models import get_or_create_tags
 from schemas import (
     PostCreate,
     PostDetail,
-    PostFormInput,
     PostResponse,
     PostUpdate,
 )
@@ -167,80 +164,6 @@ async def set_pinned(db: AsyncSession, post: models.Post, *, pinned: bool) -> No
             .values(is_pinned=False)
         )
     post.is_pinned = pinned
-
-
-def arrange(items: Sequence[models.Post]) -> dict:
-    """
-    Separate posts onto one pinned and others
-
-    Args:
-        items (Sequence[models.Post]): sequence of posts
-
-    Returns:
-        dict: Dictionary containing pinned post, lead post, and the rest of the posts
-
-    """
-    pinned = next((p for p in items if p.is_pinned), None)
-    rest = [
-        p for p in items if p is not pinned
-    ]  # we need pop method and cannot use generator
-    lead = pinned or (rest.pop(0) if rest else None)
-    return {"pinned": pinned, "lead": lead, "rest": rest}
-
-
-@dataclass(slots=True)
-class PostFormView:
-    """
-    State of the post form, from which the page is drawn.
-
-    Prevents passing too much arguments in functions and routs
-
-    Three fields instead of the previous six arguments. Two of the old
-    ones are derived rather than passed: editing means "there is a post",
-    and 422 means "there are errors". Before, `mode="edit"` with
-    `post=None`, or errors alongside a 200, were both constructible and
-    nothing prevented it.
-
-    Attributes:
-        values (PostFormInput): what the person typed. Returned to the
-            fields even when the post was not saved, so typed text is
-            never lost.
-        post (models.Post | None): the post being edited, or None when
-            creating a new one.
-        errors (dict[str, str]): field name to message, one per field.
-
-    """
-
-    values: PostFormInput
-    post: models.Post | None = None
-    errors: dict[str, str] = field(default_factory=dict)
-
-    @property
-    def editing(self) -> bool:
-        # Whether an existing post is being edited. Distinguishes editing from creating.
-        return self.post is not None
-
-    @property
-    def title(self) -> str:
-        # Title for the page and the browser tab.
-        return "Edit post" if self.editing else "New post"
-
-    @property
-    def status_code(self) -> int:
-        # HTTP status the form should be returned with.
-        return (
-            status.HTTP_422_UNPROCESSABLE_CONTENT if self.errors else status.HTTP_200_OK
-        )
-
-
-def post_to_input(post: models.Post) -> PostFormInput:
-    # Convert an existing post that is being edited into the values its form fields show.
-    return PostFormInput(
-        title=post.title,
-        summary=post.summary,
-        content=post.content,
-        tags=", ".join(tag.name for tag in post.tags),
-    )
 
 
 # --- Routes ---------------------------------------------------------

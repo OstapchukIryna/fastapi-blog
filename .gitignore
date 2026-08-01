@@ -23,6 +23,12 @@ wheels/
 .postman/
 postman/collection.json
 
+# Загруженные аватары — пользовательские данные, а не исходник:
+# заглушка по умолчанию лежит в static/. .gitkeep оставлен, потому что
+# StaticFiles монтирует каталог при старте и падает, если его нет.
+media/profile_pics/*
+!media/profile_pics/.gitkeep
+
 # Database files. blog.db is still tracked from before this rule; see
 # `git ls-files blog.db`. Ignoring a tracked file does not untrack it.
 *.sqlite3
