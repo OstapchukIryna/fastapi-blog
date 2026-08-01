@@ -32,11 +32,7 @@ from templating import templates
 router = APIRouter(include_in_schema=False)
 
 
-# --- Страничное состояние ---------------------------------------
-# Переехало из routers/posts.py: там это лежало рядом с JSON-API,
-# который ими не пользуется ни разу — форма, её состояние и раскладка
-# главной существуют только ради шаблонов.
-
+# --- Page state -----------------------------------------------------
 
 def arrange(items: Sequence[models.Post]) -> dict:
     """
@@ -169,8 +165,8 @@ def render_post_form(request: Request, view: PostFormView) -> Response:
 # --- Routes ---------------------------------------------------------
 
 
-@router.get("/", include_in_schema=False, name="home")
-@router.get("/posts", include_in_schema=False, name="posts")
+@router.get("/", name="home")
+@router.get("/posts", name="posts")
 async def home(request: Request, db: DbSession):
     result = await db.execute(posts_query())
     posts = result.scalars().unique().all()
@@ -183,7 +179,7 @@ async def home(request: Request, db: DbSession):
 
 # Must be declared before /posts/{post_id} because FastAPI parses routes in the order of registration,
 # and "new" would otherwise match post_id: int and give 422
-@router.get("/posts/new", include_in_schema=False, name="new_post")
+@router.get("/posts/new", name="new_post")
 def new_post_form(request: Request) -> Response:
     """
     Show an empty form for a new post.
@@ -198,7 +194,7 @@ def new_post_form(request: Request) -> Response:
     return render_post_form(request, PostFormView(values=PostFormInput()))
 
 
-@router.post("/posts/new", include_in_schema=False, name="create_post_page")
+@router.post("/posts/new", name="create_post_page")
 async def create_post_page(
     request: Request,
     current_user: CurrentUser,
@@ -255,7 +251,7 @@ async def create_post_page(
     )
 
 
-@router.get("/posts/{post_id}/edit", include_in_schema=False, name="edit_post")
+@router.get("/posts/{post_id}/edit", name="edit_post")
 def edit_post_form(request: Request, post: PostDep) -> Response:
     """
     Show the edit form filled with an existing post.
@@ -274,7 +270,7 @@ def edit_post_form(request: Request, post: PostDep) -> Response:
     )
 
 
-@router.post("/posts/{post_id}/edit", include_in_schema=False, name="update_post")
+@router.post("/posts/{post_id}/edit", name="update_post")
 async def update_post(
     request: Request,
     post: PostDep,
@@ -317,7 +313,7 @@ async def update_post(
 
 
 # One separate action, not a form field
-@router.post("/posts/{post_id}/pin", include_in_schema=False, name="toggle_pin")
+@router.post("/posts/{post_id}/pin", name="toggle_pin")
 async def toggle_pin(request: Request, post: PostDep, db: DbSession):
     await set_pinned(db, post, pinned=not post.is_pinned)
     await db.commit()
@@ -327,7 +323,7 @@ async def toggle_pin(request: Request, post: PostDep, db: DbSession):
     )
 
 
-@router.get("/posts/{post_id}", include_in_schema=False, name="post_page")
+@router.get("/posts/{post_id}", name="post_page")
 async def post_page(request: Request, post: PostDep, db: DbSession):
     related, related_label = await find_related(db, post)
     return templates.TemplateResponse(
@@ -342,14 +338,14 @@ async def post_page(request: Request, post: PostDep, db: DbSession):
     )
 
 
-@router.get("/tags", include_in_schema=False, name="tags_index")
+@router.get("/tags", name="tags_index")
 async def tags_index(request: Request, db: DbSession):
     return templates.TemplateResponse(
         request, "tags.html", {"topics": await all_topics(db), "title": "Topics"}
     )
 
 
-@router.get("/tags/{tag}", include_in_schema=False, name="get_tag")
+@router.get("/tags/{tag}", name="get_tag")
 def get_tag(request: Request, tag: str, tagged: TaggedPostsDep):
     return templates.TemplateResponse(
         request,
@@ -362,7 +358,7 @@ def get_tag(request: Request, tag: str, tagged: TaggedPostsDep):
     )
 
 
-@router.get("/users/{user_id}/posts", include_in_schema=False, name="user_posts")
+@router.get("/users/{user_id}/posts", name="user_posts")
 async def user_posts_page(request: Request, user: UserDep, db: DbSession):
     result = await db.execute(posts_query().where(models.Post.user_id == user.id))
     posts = result.scalars().unique().all()
@@ -373,27 +369,27 @@ async def user_posts_page(request: Request, user: UserDep, db: DbSession):
     )
 
 
-@router.get("/about", include_in_schema=False, name="about")
+@router.get("/about", name="about")
 def about(request: Request):
     return templates.TemplateResponse(request, "about.html", {"title": "About"})
 
 
-@router.get("/profile", include_in_schema=False, name="profile")
+@router.get("/profile", name="profile")
 def profile(request: Request):
     return templates.TemplateResponse(request, "profile.html", {"title": "Profile"})
 
 
-@router.get("/login", include_in_schema=False, name="login")
+@router.get("/login", name="login")
 async def login_page(request: Request):
     return templates.TemplateResponse(request, "login.html", {"title": "Login"})
 
 
-@router.get("/register", include_in_schema=False, name="register")
+@router.get("/register", name="register")
 async def register_page(request: Request):
     return templates.TemplateResponse(request, "register.html", {"title": "Register"})
 
 
-@router.post("/posts/{post_id}/delete", include_in_schema=False, name="delete_post")
+@router.post("/posts/{post_id}/delete", name="delete_post")
 async def delete_post(post: PostDep, db: DbSession):
     await db.delete(post)
     await db.commit()
