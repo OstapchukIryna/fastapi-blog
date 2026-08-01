@@ -1,0 +1,31 @@
+$kind: http-request
+description: "A name ending in .jpg proves nothing about the bytes. The server opens the file rather than trusting the extension, and answers 400 when it cannot."
+url: "{{baseUrl}}/api/users/{{userId}}/picture"
+method: PATCH
+headers:
+  Authorization: Bearer {{accessToken}}
+body:
+  type: formdata
+  content:
+    - key: file
+      type: file
+      src: "{{notAnImageFile}}"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("400 Bad Request", () => pm.response.to.have.status(400));
+
+      pm.test("says what would be accepted", () =>
+          pm.expect(pm.response.json().detail).to.include("Invalid image file"));
+
+      pm.test("the picture already there was left alone", () => {
+          pm.sendRequest({
+              url: `${pm.variables.get("baseUrl")}/api/users/me`,
+              method: "GET",
+              header: { Authorization: `Bearer ${pm.collectionVariables.get("accessToken")}` },
+          }, (_e, res) =>
+              pm.expect(res.json().image_file)
+                  .to.eql(pm.collectionVariables.get("firstPicture")));
+      });
+    language: text/javascript
+order: 2000

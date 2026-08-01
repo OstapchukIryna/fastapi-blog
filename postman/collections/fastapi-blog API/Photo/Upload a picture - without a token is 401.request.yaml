@@ -1,0 +1,16 @@
+$kind: http-request
+description: Writing a file to the server is the last place to leave open.
+url: "{{baseUrl}}/api/users/{{userId}}/picture"
+method: PATCH
+body:
+  type: formdata
+  content:
+    - key: file
+      type: file
+      src: "{{pictureFile}}"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("401 Unauthorized", () => pm.response.to.have.status(401));
+    language: text/javascript
+order: 3000

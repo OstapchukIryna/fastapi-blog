@@ -34,8 +34,10 @@ scripts:
 
       pm.test("id is a number", () => pm.expect(user.id).to.be.a("number"));
 
-      pm.test("falls back to the default avatar", () =>
-          pm.expect(user.image_path).to.eql("/static/profile_pics/avatar-256.jpg"));
+      pm.test("falls back to the shared default avatar", () => {
+          pm.expect(user.image_file).to.be.null;
+          pm.expect(user.image_path).to.eql("/media/profile_pics/image.png");
+      });
 
       // The response model is UserResponse, which has no password field at all.
       // Asserted anyway: this is the one leak that would matter, and a response

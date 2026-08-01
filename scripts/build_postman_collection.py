@@ -88,11 +88,17 @@ def build_request(path: Path) -> dict[str, Any]:
 
     body = spec.get("body")
     if body and body.get("content") is not None:
-        request["body"] = {
-            "mode": "raw",
-            "raw": body["content"],
-            "options": {"raw": {"language": body.get("type", "json")}},
-        }
+        if body.get("type") == "formdata":
+            # The upload endpoint is the only one sending a file, and a
+            # file cannot live in the collection: `src` is a path that
+            # scripts/api-tests.sh writes and passes in.
+            request["body"] = {"mode": "formdata", "formdata": body["content"]}
+        else:
+            request["body"] = {
+                "mode": "raw",
+                "raw": body["content"],
+                "options": {"raw": {"language": body.get("type", "json")}},
+            }
 
     item: dict[str, Any] = {
         "name": path.name.removesuffix(".request.yaml"),

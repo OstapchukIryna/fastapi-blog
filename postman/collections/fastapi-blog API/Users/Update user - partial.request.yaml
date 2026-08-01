@@ -1,5 +1,5 @@
 $kind: http-request
-description: PATCH applies only the fields that arrived. An omitted field is left alone rather than nulled. The response is UserPublic, so the change has to be asserted on a field a public read actually shows.
+description: "PATCH applies only the fields that arrived; an omitted one is left alone rather than nulled. The picture is no longer among them — a filename is not something a client gets to choose, so it moved to its own endpoint that takes the file itself."
 url: "{{baseUrl}}/api/users/{{userId}}"
 method: PATCH
 headers:
@@ -9,25 +9,37 @@ body:
   type: json
   content: |-
     {
-      "image_file": "Avatar-256.JPG"
+      "username": "{{renamedUsername}}"
     }
 scripts:
+  - type: beforeRequest
+    code: |-
+      pm.collectionVariables.set(
+          "renamedUsername",
+          `${pm.collectionVariables.get("newUsername")}_renamed`.slice(-50));
+    language: text/javascript
   - type: afterResponse
     code: |-
       pm.test("200 OK", () => pm.response.to.have.status(200));
 
       const user = pm.response.json();
+      const renamed = pm.collectionVariables.get("renamedUsername");
 
       pm.test("changes the field that was sent", () =>
-          pm.expect(user.image_file).to.eql("Avatar-256.JPG"));
+          pm.expect(user.username).to.eql(renamed));
 
-      // Only the email is lower-cased on the way in, the way registration
-      // does it. Everything else is stored as typed: lower-casing a file
-      // name would point image_path at a file that is not there.
-      pm.test("does not mangle the case of a file name", () =>
-          pm.expect(user.image_path).to.eql("/media/profile_pics/Avatar-256.JPG"));
+      pm.test("leaves the address alone", () => {
+          pm.sendRequest({
+              url: `${pm.variables.get("baseUrl")}/api/users/me`,
+              method: "GET",
+              header: { Authorization: `Bearer ${pm.collectionVariables.get("accessToken")}` },
+          }, (_e, res) =>
+              pm.expect(res.json().email)
+                  .to.eql(pm.collectionVariables.get("newEmail").toLowerCase()));
+      });
 
-      pm.test("leaves the field that was not sent alone", () =>
-          pm.expect(user.username).to.eql(pm.collectionVariables.get("newUsername")));
+      // Дальше по прогону имя сверяют с этой переменной.
+      pm.collectionVariables.set("newUsername", renamed);
+      pm.collectionVariables.unset("renamedUsername");
     language: text/javascript
 order: 7000
