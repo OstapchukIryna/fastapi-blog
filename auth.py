@@ -13,9 +13,6 @@ from database import DbSession
 
 password_hash = PasswordHash.recommended()
 
-# Путь абсолютный, с ведущей косой чертой: без неё адрес в схеме
-# относительный, и кнопка Authorize в /docs разрешает его от адреса
-# страницы документации, а не от корня.
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/users/token")
 
 # --- Dependencies ------------------------------------------------------
