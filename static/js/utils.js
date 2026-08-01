@@ -96,16 +96,7 @@ function replaceModal(closingId, open) {
     return;
   }
 
-  let opened = false;
-  closing.addEventListener(
-    "hidden.bs.modal",
-    () => {
-      if (opened) return;
-      opened = true;
-      open();
-    },
-    { once: true },
-  );
+  closing.addEventListener("hidden.bs.modal", open, { once: true });
 
   instance.hide();
   closing.addEventListener("shown.bs.modal", () => instance.hide(), {
@@ -115,12 +106,11 @@ function replaceModal(closingId, open) {
 
 // Fill one of the shared windows and show it.
 function showResult(kind, { title, message, action, then }) {
-  const name = kind === "success" ? "success" : "error";
-  const modal = document.getElementById(`${name}Modal`);
+  const modal = document.getElementById(`${kind}Modal`);
 
-  document.getElementById(`${name}ModalLabel`).textContent = title;
-  document.getElementById(`${name}Message`).textContent = message;
-  document.getElementById(`${name}Action`).textContent = action;
+  document.getElementById(`${kind}ModalLabel`).textContent = title;
+  document.getElementById(`${kind}Message`).textContent = message;
+  document.getElementById(`${kind}Action`).textContent = action;
 
   if (then) {
     modal.addEventListener("hidden.bs.modal", then, { once: true });
@@ -140,7 +130,7 @@ function showResult(kind, { title, message, action, then }) {
     );
   }
 
-  showModal(`${name}Modal`);
+  showModal(`${kind}Modal`);
 }
 
 // Report success. `action` names what closing the window will do.
@@ -190,7 +180,7 @@ const BODY = {
   },
 };
 
-export async function sendJSON(
+export async function sendRequest(
   url,
   { method = "GET", payload, encoding = "json", headers = {} } = {},
 ) {
@@ -238,7 +228,7 @@ const inFlight = new WeakSet();
  * @param {HTMLFormElement} form
  * @param {object} options
  * @param {(fields: FormData) => {url: string, method: string, payload?: object, encoding?: "json"|"form", headers?: object}} options.request
- *   what to send. Everything but `url` is handed to sendJSON as is.
+ *   what to send. Everything but `url` is handed to sendRequest as is.
  * @param {(data: object|null) => {title: string, message: string, action: string}|null} options.result
  *   the whole success window: its heading, its line, and what its button
  *   will do when pressed. Return null to open no window at all, for a
@@ -305,7 +295,7 @@ export function wireForm(
       }
 
       const { url, ...options } = request(new FormData(form));
-      const { ok, data } = await sendJSON(url, options);
+      const { ok, data } = await sendRequest(url, options);
 
       if (ok) {
         markFields(form);

@@ -206,7 +206,7 @@
         import {
             getErrorMessage,
             markFields,
-            sendJSON,
+            sendRequest,
             showError,
             wireForm,
         } from "/static/js/utils.js";
@@ -280,7 +280,7 @@
             link.href = `/users/${userId}/posts`;
             link.textContent = "Your posts";
 
-            const { ok, data } = await sendJSON(`/api/users/${userId}/posts`);
+            const { ok, data } = await sendRequest(`/api/users/${userId}/posts`);
             if (!ok || !Array.isArray(data)) return;
             link.textContent = data.length === 1 ? "1 post" : `${data.length} posts`;
         }
@@ -291,7 +291,7 @@
                 return;
             }
 
-            const { ok, status, data } = await sendJSON("/api/users/me", {
+            const { ok, status, data } = await sendRequest("/api/users/me", {
                 headers: authHeaders(),
             });
 
@@ -320,7 +320,7 @@
             photoRemove.disabled = true;
 
             try {
-                const { ok, status, data } = await sendJSON(
+                const { ok, status, data } = await sendRequest(
                     `/api/users/${userId}/picture`,
                     { headers: authHeaders(), ...options },
                 );
@@ -431,7 +431,7 @@
             // защита от чужих рук за открытым ноутбуком, но не гарантия:
             // у кого есть токен, тот сменит пароль и мимо страницы.
             guard: async (fields) => {
-                const { ok } = await sendJSON("/api/users/token", {
+                const { ok } = await sendRequest("/api/users/token", {
                     method: "POST",
                     encoding: "form",
                     payload: {
