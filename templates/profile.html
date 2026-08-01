@@ -27,7 +27,7 @@
         <div class="profile-identity">
             <img class="avatar"
                  id="identityAvatar"
-                 src="/static/profile_pics/avatar-256.jpg"
+                 src="/media/profile_pics/image.png"
                  alt=""
                  width="88"
                  height="88">
@@ -79,20 +79,28 @@
         <section class="profile-section">
             <h2 class="profile-section-title">Photo</h2>
 
+            {# Выбор файла и есть отправка: второй клик по «сохранить»
+               ничего бы не решал, а картинку видно сразу. Нативный
+               input невозможно оформить, поэтому он спрятан, а нажимают
+               на label — он и так его цель, и остаётся доступен с
+               клавиатуры. #}
             <div class="profile-photo">
                 <img class="avatar"
                      id="photoPreview"
-                     src="/static/profile_pics/avatar-256.jpg"
+                     src="/media/profile_pics/image.png"
                      alt=""
                      width="72"
                      height="72">
 
-                <div>
-                    <button class="btn record-btn"
-                            type="button"
-                            disabled
-                            title="Not wired up yet — arrives with file uploads">Upload a photo</button>
-                    <p class="field-hint mono-label">CHANGE ME PLEASE</p>
+                <div class="profile-photo-actions">
+                    <input class="visually-hidden"
+                           type="file"
+                           id="photoFile"
+                           name="file"
+                           accept="image/jpeg,image/png,image/gif,image/webp">
+                    <label class="btn record-btn" id="photoChoose" for="photoFile">Choose a photo</label>
+                    <button class="btn record-btn is-danger" type="button" id="photoRemove" hidden>Remove</button>
+                    <p class="field-hint mono-label" id="photoHint">JPEG, PNG, GIF or WebP · up to 5 MB</p>
                 </div>
             </div>
         </section>
@@ -195,13 +203,47 @@
     <!-- Profile Handler -->
     <script type="module">
         import { authHeaders, clearToken, isSignedIn } from "/static/js/auth.js";
-        import { markFields, sendJSON, wireForm } from "/static/js/utils.js";
+        import {
+            getErrorMessage,
+            markFields,
+            sendJSON,
+            showError,
+            wireForm,
+        } from "/static/js/utils.js";
 
         const loading = document.getElementById("profileLoading");
         const body = document.getElementById("profileBody");
         const identityForm = document.getElementById("identityForm");
         const passwordForm = document.getElementById("passwordForm");
         const deleteForm = document.getElementById("deleteAccountForm");
+
+        const photoFile = document.getElementById("photoFile");
+        const photoChoose = document.getElementById("photoChoose");
+        const photoRemove = document.getElementById("photoRemove");
+        let userId = null;
+        let hasPhoto = false;
+
+        // Подпись выводится из состояния, а не восстанавливается из
+        // снимка: восстановление затирало «Replace», которое только что
+        // поставил успешный ответ.
+        function showPhotoActions() {
+            photoRemove.hidden = !hasPhoto;
+            photoChoose.textContent = hasPhoto ? "Replace" : "Choose a photo";
+        }
+
+        // Обе картинки — одна и та же: та, что в шапке профиля, и та, что
+        // рядом с кнопкой. Разъехаться им нельзя.
+        function showPhoto(user) {
+            userId = user.id;
+            hasPhoto = Boolean(user.image_file);
+
+            for (const id of ["identityAvatar", "photoPreview"]) {
+                const image = document.getElementById(id);
+                image.src = user.image_path;
+                image.alt = user.username;
+            }
+            showPhotoActions();
+        }
 
         // Уводим на вход, а не показываем пустую страницу. replace, а не
         // assign: «назад» из логина должно вести туда, откуда человек
@@ -217,11 +259,7 @@
             document.getElementById("identityEmail").textContent = user.email;
             document.getElementById("deleteAccountName").textContent = user.username;
 
-            for (const id of ["identityAvatar", "photoPreview"]) {
-                const image = document.getElementById(id);
-                image.src = user.image_path;
-                image.alt = user.username;
-            }
+            showPhoto(user);
 
             for (const form of [identityForm, passwordForm, deleteForm]) {
                 form.dataset.userId = user.id;
@@ -273,6 +311,64 @@
 
             loading.querySelector("p").textContent = "Could not load your account.";
         }
+
+        // Не через wireForm: здесь нет ни полей, ни кнопки отправки —
+        // есть выбор файла, который сам себе submit.
+        async function changePhoto(busyLabel, options) {
+            photoChoose.textContent = busyLabel;
+            photoChoose.classList.add("is-busy");
+            photoRemove.disabled = true;
+
+            try {
+                const { ok, status, data } = await sendJSON(
+                    `/api/users/${userId}/picture`,
+                    { headers: authHeaders(), ...options },
+                );
+
+                if (ok) {
+                    showPhoto(data);
+                    return;
+                }
+                if (status === 401) {
+                    clearToken();
+                    toLogin("expired");
+                    return;
+                }
+                // Отказы здесь осмысленные — «слишком большой», «не
+                // картинка», — и говорит их сервер, а не догадка страницы.
+                showError(getErrorMessage(data ?? {}), { title: "Not changed" });
+            } catch {
+                showError(
+                    "Network error. Please check your connection and try again.",
+                    { title: "Not changed" },
+                );
+            } finally {
+                photoChoose.classList.remove("is-busy");
+                photoRemove.disabled = false;
+                showPhotoActions();
+                // Тот же файл, выбранный второй раз, должен снова считаться
+                // выбором: без сброса change не сработает.
+                photoFile.value = "";
+            }
+        }
+
+        photoFile.addEventListener("change", () => {
+            const [file] = photoFile.files;
+            if (!file) return;
+
+            const body = new FormData();
+            body.append("file", file);
+            // Окна об успехе нет: сменившаяся картинка и есть ответ.
+            changePhoto("Uploading…", {
+                method: "PATCH",
+                encoding: "multipart",
+                payload: body,
+            });
+        });
+
+        photoRemove.addEventListener("click", () =>
+            changePhoto("Removing…", { method: "DELETE" }),
+        );
 
         wireForm(identityForm, {
             request: (fields) => ({

@@ -1331,12 +1331,19 @@ h4 {
 }
 
 .profile-section-title {
-    margin: 0 0 0.3rem;
+    margin: 0 0 1.5rem;
     font-family: var(--font-display);
     font-weight: 700;
     font-size: var(--text-lg);
     letter-spacing: -0.02em;
     color: var(--bs-emphasis-color);
+}
+
+/* Заголовок жмётся к пояснению, только когда оно есть; без него между
+   ним и первым полем нужен полный отступ, иначе подпись поля читается
+   как часть заголовка */
+.profile-section-title:has(+ .profile-section-note) {
+    margin-bottom: 0.3rem;
 }
 
 .profile-section-note {
@@ -1354,6 +1361,34 @@ h4 {
     display: flex;
     align-items: center;
     gap: 1.5rem;
+}
+
+.profile-photo-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem 0.9rem;
+}
+
+/* Подпись к форматам занимает всю строку под кнопками, а не тянется
+   третьей кнопкой в один ряд с ними */
+.profile-photo-actions .field-hint {
+    flex-basis: 100%;
+    margin: 0;
+}
+
+/* Сам input спрятан, нажимают на label — значит и рамка фокуса должна
+   появляться на нём, иначе с клавиатуры не видно, где ты находишься */
+#photoFile:focus-visible + label {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+}
+
+/* Пока файл уходит на сервер, label перестаёт быть целью: повторный
+   выбор в этот момент отменил бы первый */
+.record-btn.is-busy {
+    pointer-events: none;
+    opacity: 0.55;
 }
 
 /* Строка действия внутри секции своей линейки не рисует: секции уже

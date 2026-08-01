@@ -1,0 +1,35 @@
+$kind: http-request
+description: "The one endpoint that takes a file. Postman sends the multipart body; the src attribute below is a 1x1 PNG written by the setup script, because a collection cannot carry a binary."
+url: "{{baseUrl}}/api/users/{{userId}}/picture"
+method: PATCH
+headers:
+  Authorization: Bearer {{accessToken}}
+body:
+  type: formdata
+  content:
+    - key: file
+      type: file
+      src: "{{pictureFile}}"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("200 OK", () => pm.response.to.have.status(200));
+
+      const user = pm.response.json();
+
+      pm.test("the account now has a picture", () =>
+          pm.expect(user.image_file).to.be.a("string").and.not.empty);
+
+      // Имя генерируется на сервере, не приходит от клиента: иначе
+      // загрузивший выбирал бы, куда писать файл.
+      pm.test("named by the server, not by the file that was sent", () => {
+          pm.expect(user.image_file).to.match(/^[0-9a-f]{32}\.jpg$/);
+          pm.expect(user.image_file).to.not.include("probe");
+      });
+
+      pm.test("image_path points at the stored file", () =>
+          pm.expect(user.image_path).to.eql(`/media/profile_pics/${user.image_file}`));
+
+      pm.collectionVariables.set("firstPicture", user.image_file);
+    language: text/javascript
+order: 1000

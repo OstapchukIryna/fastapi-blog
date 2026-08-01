@@ -1,7 +1,7 @@
 from datetime import timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from fastapi.security import OAuth2PasswordRequestForm
 from PIL import UnidentifiedImageError
 from sqlalchemy import func, or_, select
@@ -261,7 +261,7 @@ async def upload_profile_picture(file: UploadFile, user: OwnAccount, db: DbSessi
     return user
 
 
-@router.delete("/{user_id}/picture")
+@router.delete("/{user_id}/picture", response_model=UserPrivate)
 async def delete_profile_picture(user: OwnAccount, db: DbSession):
     old_filename = user.image_file
     if old_filename is None:

@@ -27,8 +27,11 @@ scripts:
           pm.expect(pm.response.code, `server error: ${pm.response.text().slice(0, 200)}`)
               .to.be.below(500));
 
+      // 204 и 304 по определению не несут тела, даже когда заголовок
+      // обещает JSON: FastAPI ставит его и на пустой ответ.
       const type = pm.response.headers.get("Content-Type") || "";
-      if (type.includes("application/json")) {
+      const canCarryBody = ![204, 304].includes(pm.response.code);
+      if (canCarryBody && type.includes("application/json")) {
           pm.test("body is valid JSON", () => pm.response.to.be.json);
       }
     language: text/javascript

@@ -1,0 +1,38 @@
+$kind: http-request
+description: "Replacing does not accumulate: the previous file is deleted from disk, or every change would leave one behind for ever. Checked by asking for the old path afterwards."
+url: "{{baseUrl}}/api/users/{{userId}}/picture"
+method: PATCH
+headers:
+  Authorization: Bearer {{accessToken}}
+body:
+  type: formdata
+  content:
+    - key: file
+      type: file
+      src: "{{pictureFile}}"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("200 OK", () => pm.response.to.have.status(200));
+
+      const replaced = pm.response.json().image_file;
+      const previous = pm.collectionVariables.get("firstPicture");
+
+      pm.test("a different file than before", () =>
+          pm.expect(replaced).to.not.eql(previous));
+
+      pm.test("the previous one is gone from disk", () => {
+          pm.sendRequest(
+              `${pm.variables.get("baseUrl")}/media/profile_pics/${previous}`,
+              (_e, res) => pm.expect(res.code).to.eql(404));
+      });
+
+      pm.test("and the new one is served", () => {
+          pm.sendRequest(
+              `${pm.variables.get("baseUrl")}/media/profile_pics/${replaced}`,
+              (_e, res) => pm.expect(res.code).to.eql(200));
+      });
+
+      pm.collectionVariables.set("firstPicture", replaced);
+    language: text/javascript
+order: 4000

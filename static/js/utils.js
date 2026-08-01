@@ -166,30 +166,39 @@ export function showError(
  * another failure: it means the token is gone or stale, and the caller
  * has to stop trusting it rather than only show a message.
  *
- * `encoding` is "json" everywhere except the token endpoint:
- * OAuth2PasswordRequestForm reads the credentials from a form body, not
- * from JSON, so signing in has to be sent the other way. It is the one
- * exception, which is why it is an option rather than a second helper.
+ * `encoding` is "json" almost everywhere. The two exceptions each have a
+ * reason on the server: the token endpoint reads credentials from a form
+ * body, and uploading a picture sends the file itself.
+ *
+ * The multipart case must not set Content-Type. The boundary is part of
+ * that header, only the browser knows it, and writing the header by hand
+ * loses it — the request then arrives as a body the server cannot split
+ * and reads as a missing field.
  */
+const BODY = {
+  json: {
+    type: "application/json",
+    encode: (payload) => JSON.stringify(payload),
+  },
+  form: {
+    type: "application/x-www-form-urlencoded",
+    encode: (payload) => new URLSearchParams(payload).toString(),
+  },
+  multipart: {
+    type: null,
+    encode: (payload) => payload,
+  },
+};
+
 export async function sendJSON(
   url,
   { method = "GET", payload, encoding = "json", headers = {} } = {},
 ) {
-  const form = encoding === "form";
+  const body = BODY[encoding];
   const response = await fetch(url, {
     method,
-    headers: {
-      "Content-Type": form
-        ? "application/x-www-form-urlencoded"
-        : "application/json",
-      ...headers,
-    },
-    body:
-      payload === undefined
-        ? null
-        : form
-          ? new URLSearchParams(payload).toString()
-          : JSON.stringify(payload),
+    headers: body.type ? { "Content-Type": body.type, ...headers } : headers,
+    body: payload === undefined ? null : body.encode(payload),
   });
 
   const data =

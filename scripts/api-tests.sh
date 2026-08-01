@@ -83,13 +83,29 @@ if [[ -z "$WORK_DIR" ]]; then
 fi
 COLLECTION="${WORK_DIR}/collection.json"
 
+# One endpoint takes a file, and a file cannot live inside the
+# collection. They are written next to the built JSON because Newman only
+# reads files from its working directory, which is set to the same place.
+echo "==> writing the upload fixtures"
+uv run python -c "
+import sys
+from pathlib import Path
+from PIL import Image
+work = Path(sys.argv[1])
+Image.new('RGB', (640, 480), (30, 120, 200)).save(work / 'picture.png')
+(work / 'not-an-image.jpg').write_bytes(b'a name ending in .jpg proves nothing')
+" "$WORK_DIR"
+
 echo "==> building the collection from postman/collections"
 uv run python scripts/build_postman_collection.py "$COLLECTION"
 
 echo "==> running the collection against ${BASE_URL}"
 npx --yes newman@6 run "$COLLECTION" \
+    --working-dir "$WORK_DIR" \
     --env-var "baseUrl=${BASE_URL}" \
     --env-var "jwtSecret=${SECRET_KEY}" \
+    --env-var "pictureFile=picture.png" \
+    --env-var "notAnImageFile=not-an-image.jpg" \
     --reporters cli \
     --color auto \
     "$@"
