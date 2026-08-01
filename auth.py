@@ -5,7 +5,6 @@ import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from pwdlib import PasswordHash
-from sqlalchemy import select
 
 import models
 from config import settings
@@ -14,6 +13,22 @@ from database import DbSession
 password_hash = PasswordHash.recommended()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/users/token")
+
+
+def unauthorized(detail: str) -> HTTPException:
+    """
+    A 401 carrying the challenge header.
+
+    Returned rather than raised, so the `raise` stays at the place that
+    decided to refuse. WWW-Authenticate is what makes it a challenge and
+    not just a status: without it the OAuth flow has nothing to answer.
+    """
+    return HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail=detail,
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
 
 # --- Dependencies ------------------------------------------------------
 TokenDep = Annotated[str, Depends(oauth2_scheme)]
@@ -61,30 +76,16 @@ def verify_access_token(token: str) -> str | None:
 
 async def get_current_user(token: TokenDep, db: DbSession) -> models.User:
     """Get the currently authenticated user"""
-    user_id = verify_access_token(token)
-    if user_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    # Validate user id is valid integer (defense against malformed JWT)
+    # int() covers both refusals at once: a rejected token gives None,
+    # and a sub that is not a number gives whatever was in the claim.
     try:
-        user_id_int = int(user_id)
+        user_id = int(verify_access_token(token))
     except TypeError, ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    result = await db.execute(select(models.User).where(models.User.id == user_id_int))
-    user = result.scalars().first()
+        raise unauthorized("Invalid or expired token") from None
+
+    user = await db.get(models.User, user_id)
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise unauthorized("User not found")
     return user
 
 

@@ -22,12 +22,8 @@ from schemas import (
     PostUpdate,
 )
 
+
 # --- Dependencies ------------------------------------------------------
-# Create dependencies for loading posts from the database.
-# These dependencies will be used in the route handlers to fetch the required data based on the provided parameters.
-# Prevent code duplication and ensure consistent error handling for missing resources.
-
-
 async def load_post(post_id: int, db: DbSession) -> models.Post:
     """Returns post by id, otherwise 404."""
     result = await db.execute(posts_query().where(models.Post.id == post_id))
@@ -176,10 +172,10 @@ async def list_posts(db: DbSession):
     return result.scalars().unique().all()
 
 
-@router.get("/{post_id}", response_model=PostDetail)
 # Show one post
-async def get_post(post_id: int, db: DbSession):
-    return await load_post(post_id, db)
+@router.get("/{post_id}", response_model=PostDetail)
+def get_post(post: PostDep):
+    return post
 
 
 @router.post("", response_model=PostDetail, status_code=status.HTTP_201_CREATED)

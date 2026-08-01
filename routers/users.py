@@ -13,6 +13,7 @@ from auth import (
     CurrentUser,
     create_access_token,
     hash_password,
+    unauthorized,
     verify_password,
 )
 from config import settings
@@ -25,9 +26,23 @@ router = APIRouter()
 
 
 # --- Dependencies ------------------------------------------------------
-# Create dependencies for loading users from the database.
-# These dependencies will be used in the route handlers to fetch the required data based on the provided parameters.
-# Prevent code duplication and ensure consistent error handling for missing resources.
+
+
+def already_registered() -> HTTPException:
+    """
+    The 400 for a username or email somebody already holds.
+
+    Raised from three places — the check before the insert, and the
+    unique index catching the two requests that both passed it — and the
+    caller cannot be told which of the two fields clashed, because that
+    would answer "is this person registered here" to anyone who asks.
+    """
+    return HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Username or email already registered",
+    )
+
+
 async def load_user(user_id: int, db: DbSession) -> models.User:
     """Returns user by id, otherwise 404."""
     user = await db.get(models.User, user_id)
@@ -80,10 +95,7 @@ async def create_user(user: UserCreate, db: DbSession):
     clash = result.scalars().first()
 
     if clash is not None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username or email already registered",
-        )
+        raise already_registered()
 
     new_user = models.User(
         username=user.username,
@@ -96,10 +108,7 @@ async def create_user(user: UserCreate, db: DbSession):
     except IntegrityError:
         # Race prevention
         await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username or email already registered",
-        ) from None
+        raise already_registered() from None
     return new_user
 
 
@@ -119,11 +128,7 @@ async def login_for_access_token(
     # Verify user exists and password is correct
     # Don't reveal which one is failed if one was (security best practice)
     if not user or not verify_password(form_data.password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect password or email",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise unauthorized("Incorrect password or email")
 
     # Create access token with user id as subject
     access_token_expires = timedelta(minutes=settings.accesse_token_expire_minutes)
@@ -188,7 +193,7 @@ async def update_user_fields(
     wanted = {
         name: value
         for name, value in changes.items()
-        if name.lower() in {"username", "email"} and value != getattr(user, name)
+        if name in {"username", "email"} and value != getattr(user, name)
     }
     if wanted:
         result = await db.execute(
@@ -198,10 +203,7 @@ async def update_user_fields(
             )
         )
         if result.scalars().first() is not None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Username or email already registered",
-            )
+            raise already_registered()
 
     if "password" in changes:
         user.password_hash = hash_password(changes.pop("password"))
@@ -215,10 +217,7 @@ async def update_user_fields(
         # The same race create_user guards: two requests can both pass
         # the check above and collide at the unique index.
         await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username or email already registered",
-        ) from None
+        raise already_registered() from None
 
     return user
 
