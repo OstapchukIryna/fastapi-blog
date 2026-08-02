@@ -8,7 +8,7 @@
         </p>
     </header>
 
-    {% for name, count in topics %}
+    {% for name, count in tags %}
         <a class="topic-row" href="{{ url_for('get_tag', tag=name) }}">
             <span class="name">{{ name }}</span>
             <span class="count mono-label">

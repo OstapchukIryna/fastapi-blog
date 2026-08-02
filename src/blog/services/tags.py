@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from blog.infrastructure import models
 
 
-async def all_topics(db: AsyncSession) -> list[tuple[str, int]]:
+async def with_counts(db: AsyncSession) -> list[tuple[str, int]]:
     """
     Sort tags by counting posts with them. Return list of tuples with tag name and count of posts.
 
@@ -32,7 +32,7 @@ async def all_topics(db: AsyncSession) -> list[tuple[str, int]]:
     return [(name, count) for name, count in rows]
 
 
-async def get_or_create_tags(db: AsyncSession, names: list[str]) -> list[models.Tag]:
+async def get_or_create(db: AsyncSession, names: list[str]) -> list[models.Tag]:
     """Check of existing tags or create new ones."""
     if not names:
         return []

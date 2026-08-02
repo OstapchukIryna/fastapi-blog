@@ -88,8 +88,8 @@ graph TD
 it is easy to break is `presentation`. `web/` does not import `api/` — both ask
 `services/` instead, which is why «пост не найден» is one place in the code
 rather than two that drifted apart. Before the split it was not like that:
-`pages` imported the JSON routers for `posts_query` and the dependencies, and
-every page inherited whatever the API happened to need.
+`pages` imported the JSON routers for their base query and their dependencies,
+and every page inherited whatever the API happened to need.
 
 A module below importing a router is the mistake that already happened once —
 `schemas.py` imported the tags router for a tag-cleaning helper, and since that

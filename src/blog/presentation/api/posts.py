@@ -12,7 +12,7 @@ router = APIRouter()
 @router.get("", response_model=list[PostResponse])
 async def list_posts(db: DbSession):
     # List all posts
-    return await posts.all_posts(db)
+    return await posts.list_all(db)
 
 
 # Show one post
@@ -22,19 +22,19 @@ def get_post(post: PostDep):
 
 
 @router.post("", response_model=PostDetail, status_code=status.HTTP_201_CREATED)
-async def create_post(data: PostCreate, current_user: CurrentUser, db: DbSession):
+async def create_post(form: PostCreate, current_user: CurrentUser, db: DbSession):
     # Protected by CurrentUser: the author is whoever the token belongs to
-    return await posts.create(db, data, current_user)
+    return await posts.create(db, form, current_user)
 
 
 @router.put("/{post_id}", response_model=PostDetail)
-async def update_all_post_fields(post: OwnedPost, data: PostCreate, db: DbSession):
-    return await posts.replace(db, post, data)
+async def update_all_post_fields(post: OwnedPost, form: PostCreate, db: DbSession):
+    return await posts.replace(db, post, form)
 
 
 @router.patch("/{post_id}", response_model=PostDetail)
-async def update_post_fields(post: OwnedPost, data: PostUpdate, db: DbSession):
-    return await posts.apply_changes(db, post, data)
+async def update_post_fields(post: OwnedPost, changes: PostUpdate, db: DbSession):
+    return await posts.update(db, post, changes)
 
 
 @router.delete("/{post_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from blog.core.security import hash_password
 from blog.infrastructure import models
 from blog.infrastructure.database import AsyncSessionLocal, Base, engine
-from blog.services.tags import get_or_create_tags
+from blog.services import tags as tag_service
 
 CONTENT_DIR = Path(__file__).parent / "content"
 
@@ -152,7 +152,7 @@ async def seed() -> None:
                     date_posted=item["date"],
                     is_pinned=item.get("pinned", False),
                     author=author,
-                    tags=await get_or_create_tags(db, item["tags"]),
+                    tags=await tag_service.get_or_create(db, item["tags"]),
                 )
             )
             created += 1

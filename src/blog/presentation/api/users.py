@@ -20,8 +20,8 @@ router = APIRouter()
 
 
 @router.post("", response_model=UserPrivate, status_code=status.HTTP_201_CREATED)
-async def create_user(data: UserCreate, db: DbSession):
-    return await users.register(db, data)
+async def create_user(registration: UserCreate, db: DbSession):
+    return await users.register(db, registration)
 
 
 @router.post("/token", response_model=Token)
@@ -47,12 +47,12 @@ def get_user(user: UserDep):
 
 @router.get("/{user_id}/posts", response_model=list[PostResponse])
 async def get_user_posts(user: UserDep, db: DbSession):
-    return await posts.by_author(db, user.id)
+    return await posts.for_author(db, user.id)
 
 
 @router.patch("/{user_id}", response_model=UserPublic)
-async def update_user_fields(user: OwnAccount, data: UserUpdate, db: DbSession):
-    return await users.apply_changes(db, user, data)
+async def update_user_fields(user: OwnAccount, changes: UserUpdate, db: DbSession):
+    return await users.update(db, user, changes)
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -67,4 +67,4 @@ async def upload_profile_picture(file: UploadFile, user: OwnAccount, db: DbSessi
 
 @router.delete("/{user_id}/picture", response_model=UserPrivate)
 async def delete_profile_picture(user: OwnAccount, db: DbSession):
-    return await users.clear_picture(db, user)
+    return await users.remove_picture(db, user)

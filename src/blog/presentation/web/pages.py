@@ -64,7 +64,7 @@ async def home(request: Request, db: DbSession):
     return templates.TemplateResponse(
         request,
         "home.html",
-        {**arrange(await posts.all_posts(db)), "title": "Home"},
+        {**arrange(await posts.list_all(db)), "title": "Home"},
     )
 
 
@@ -90,7 +90,7 @@ async def create_post_page(
     request: Request,
     current_user: CurrentUser,
     db: DbSession,
-    form: Annotated[PostFormInput, Form()],
+    submitted: Annotated[PostFormInput, Form()],
 ) -> Response:
     """
     Create a post from the submitted form.
@@ -110,7 +110,7 @@ async def create_post_page(
         request (Request): needed by the template and by url_for.
         current_user (CurrentUser): authorized current user.
         db (DbSession): current database session.
-        form (PostFormInput): the submitted fields, unvalidated.
+        submitted (PostFormInput): the fields as typed, unvalidated.
 
     Returns:
         Response: a 303 redirect to the new post, or the form again with
@@ -118,13 +118,13 @@ async def create_post_page(
 
     """
     try:
-        data = form.validated()
+        form = submitted.validated()
     except ValidationError as exception:
         return render_post_form(
-            request, PostFormView(values=form, errors=form_errors(exception))
+            request, PostFormView(values=submitted, errors=form_errors(exception))
         )
 
-    post = await posts.create(db, data, current_user)
+    post = await posts.create(db, form, current_user)
     return RedirectResponse(
         request.url_for("post_page", post_id=post.id),
         status_code=status.HTTP_303_SEE_OTHER,
@@ -155,7 +155,7 @@ async def update_post(
     request: Request,
     post: PostDep,
     db: DbSession,
-    form: Annotated[PostFormInput, Form()],
+    submitted: Annotated[PostFormInput, Form()],
 ) -> Response:
     """
     Save an edit to a post.
@@ -164,7 +164,7 @@ async def update_post(
         request (Request): needed by the template and by url_for.
         post (PostDep): the post being edited.
         db (DbSession): current database session.
-        form (PostFormInput): the submitted fields, unvalidated.
+        submitted (PostFormInput): the fields as typed, unvalidated.
 
     Returns:
         Response: a 303 redirect to the post, or the form again with
@@ -174,14 +174,14 @@ async def update_post(
 
     """
     try:
-        data = form.validated()
+        form = submitted.validated()
     except ValidationError as exception:
         return render_post_form(
             request,
-            PostFormView(values=form, post=post, errors=form_errors(exception)),
+            PostFormView(values=submitted, post=post, errors=form_errors(exception)),
         )
 
-    await posts.replace(db, post, data)
+    await posts.replace(db, post, form)
     return RedirectResponse(
         request.url_for("post_page", post_id=post.id),
         status_code=status.HTTP_303_SEE_OTHER,
@@ -216,7 +216,7 @@ async def post_page(request: Request, post: PostDep, db: DbSession):
 @router.get("/tags", name="tags_index")
 async def tags_index(request: Request, db: DbSession):
     return templates.TemplateResponse(
-        request, "tags.html", {"topics": await tags.all_topics(db), "title": "Topics"}
+        request, "tags.html", {"tags": await tags.with_counts(db), "title": "Topics"}
     )
 
 
@@ -239,7 +239,7 @@ async def user_posts_page(request: Request, user: UserDep, db: DbSession):
         request,
         "user_posts.html",
         {
-            "posts": await posts.by_author(db, user.id),
+            "posts": await posts.for_author(db, user.id),
             "user": user,
             "title": f"{user.username}'s posts",
         },

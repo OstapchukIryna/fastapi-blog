@@ -10,7 +10,9 @@ router = APIRouter()
 
 @router.get("", response_model=list[TagCount])
 async def list_tags(db: DbSession):
-    return [{"name": name, "count": count} for name, count in await tags.all_topics(db)]
+    return [
+        {"name": name, "count": count} for name, count in await tags.with_counts(db)
+    ]
 
 
 @router.get("/{tag}/posts", response_model=list[PostResponse])

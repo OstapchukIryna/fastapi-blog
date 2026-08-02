@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
 from blog.core.config import settings
-from blog.core.security import hash_password, unauthorized, verify_password
+from blog.core.security import Unauthorized, hash_password, verify_password
 from blog.infrastructure import models
 from blog.infrastructure.database import DbSession
 from blog.infrastructure.images import delete_profile_image, process_profile_image
@@ -23,19 +23,21 @@ from blog.schemas import UserCreate, UserUpdate
 from blog.services.auth import CurrentUser
 
 
-def already_registered() -> HTTPException:
+class AlreadyRegistered(HTTPException):
     """
     The 400 for a username or email somebody already holds.
 
-    Raised from three places — the check before the insert, and the
+    Raised from four places — the check before the insert, and the
     unique index catching the two requests that both passed it — and the
     caller cannot be told which of the two fields clashed, because that
     would answer "is this person registered here" to anyone who asks.
     """
-    return HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail="Username or email already registered",
-    )
+
+    def __init__(self) -> None:
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username or email already registered",
+        )
 
 
 # --- Dependencies ------------------------------------------------------
@@ -83,7 +85,7 @@ OwnAccount = Annotated[models.User, Depends(own_account)]
 # --- Changes ---------------------------------------------------------
 
 
-async def register(db: AsyncSession, data: UserCreate) -> models.User:
+async def register(db: AsyncSession, registration: UserCreate) -> models.User:
     """
     Create an account, or refuse because the name or the email is taken.
 
@@ -93,17 +95,17 @@ async def register(db: AsyncSession, data: UserCreate) -> models.User:
     """
     result = await db.execute(
         select(models.User).where(
-            (func.lower(models.User.username) == data.username.lower())
-            | (func.lower(models.User.email) == data.email.lower())
+            (func.lower(models.User.username) == registration.username.lower())
+            | (func.lower(models.User.email) == registration.email.lower())
         )
     )
     if result.scalars().first() is not None:
-        raise already_registered()
+        raise AlreadyRegistered()
 
     user = models.User(
-        username=data.username,
-        email=data.email.lower(),
-        password_hash=hash_password(data.password),
+        username=registration.username,
+        email=registration.email.lower(),
+        password_hash=hash_password(registration.password),
     )
     db.add(user)
     try:
@@ -111,7 +113,7 @@ async def register(db: AsyncSession, data: UserCreate) -> models.User:
     except IntegrityError:
         # Race prevention
         await db.rollback()
-        raise already_registered() from None
+        raise AlreadyRegistered() from None
     return user
 
 
@@ -129,12 +131,12 @@ async def authenticate(db: AsyncSession, email: str, password: str) -> models.Us
     user = result.scalars().first()
 
     if not user or not verify_password(password, user.password_hash):
-        raise unauthorized("Incorrect password or email")
+        raise Unauthorized("Incorrect password or email")
     return user
 
 
-async def apply_changes(
-    db: AsyncSession, user: models.User, data: UserUpdate
+async def update(
+    db: AsyncSession, user: models.User, changes: UserUpdate
 ) -> models.User:
     """
     Change some fields of a user, leaving the rest alone.
@@ -154,7 +156,7 @@ async def apply_changes(
     Args:
         db (AsyncSession): current database session.
         user (models.User): the user being changed.
-        data (UserUpdate): the fields to change, already validated.
+        changes (UserUpdate): the fields to change, already validated.
 
     Raises:
         HTTPException: 400 when the requested username or email already
@@ -164,27 +166,27 @@ async def apply_changes(
         models.User: the user as stored after the change.
 
     """
-    changes = data.model_dump(exclude_unset=True, exclude_none=True)
+    wanted = changes.model_dump(exclude_unset=True, exclude_none=True)
 
-    wanted = {
+    unique_fields = {
         name: value
-        for name, value in changes.items()
+        for name, value in wanted.items()
         if name in {"username", "email"} and value != getattr(user, name)
     }
-    if wanted:
+    if unique_fields:
         result = await db.execute(
             select(models.User).where(
                 models.User.id != user.id,
-                or_(*[getattr(models.User, n) == v for n, v in wanted.items()]),
+                or_(*[getattr(models.User, n) == v for n, v in unique_fields.items()]),
             )
         )
         if result.scalars().first() is not None:
-            raise already_registered()
+            raise AlreadyRegistered()
 
-    if "password" in changes:
-        user.password_hash = hash_password(changes.pop("password"))
+    if "password" in wanted:
+        user.password_hash = hash_password(wanted.pop("password"))
 
-    for name, value in changes.items():
+    for name, value in wanted.items():
         setattr(user, name, value.lower() if name == "email" else value)
 
     try:
@@ -193,7 +195,7 @@ async def apply_changes(
         # The same race register guards: two requests can both pass the
         # check above and collide at the unique index.
         await db.rollback()
-        raise already_registered() from None
+        raise AlreadyRegistered() from None
 
     return user
 
@@ -244,7 +246,7 @@ async def set_picture(
     return user
 
 
-async def clear_picture(db: AsyncSession, user: models.User) -> models.User:
+async def remove_picture(db: AsyncSession, user: models.User) -> models.User:
     """Back to the shared default, and the uploaded file goes."""
     old_filename = user.image_file
     if old_filename is None:
