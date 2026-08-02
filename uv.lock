@@ -397,6 +397,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "djlint" },
+    { name = "httpx" },
     { name = "pyrefly" },
     { name = "pytest-playwright" },
     { name = "pyyaml" },
@@ -420,6 +421,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "djlint", specifier = ">=1.42.3" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "pyrefly", specifier = ">=1.1.0" },
     { name = "pytest-playwright", specifier = ">=0.8.0" },
     { name = "pyyaml", specifier = ">=6.0.3" },
