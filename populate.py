@@ -44,14 +44,14 @@ from blog.infrastructure.images import PROFILE_PICS_DIR
 from blog.main import app
 
 
-class UserSeed(TypedDict):
+class DemoUser(TypedDict):
     username: str
     email: str
     password: str
     colour: NotRequired[tuple[int, int, int]]
 
 
-class PostSeed(TypedDict):
+class DemoPost(TypedDict):
     title: str
     summary: str
     content: str
@@ -62,7 +62,7 @@ class PostSeed(TypedDict):
 
 # Пароли годятся ровно для локальной базы. Почта на example.com —
 # домен зарезервирован RFC 2606 и ни к кому не приедет.
-USERS: list[UserSeed] = [
+USERS: list[DemoUser] = [
     {
         "username": "called_mad",
         "email": "called_mad@example.com",
@@ -105,7 +105,7 @@ USERS: list[UserSeed] = [
 # Сверху новые, снизу старые — даты проставляются по индексу.
 # Тексты короткие: это данные для листания, а не для чтения. Настоящие
 # посты лежат в content/*.md и приезжают через seed.py.
-POSTS: list[PostSeed] = [
+POSTS: list[DemoPost] = [
     {
         "title": "The N+1 you can't see in the logs",
         "summary": (
@@ -854,7 +854,7 @@ POSTS: list[PostSeed] = [
 ]
 
 
-def avatar(letter: str, colour: tuple[int, int, int]) -> bytes:
+def draw_avatar(letter: str, colour: tuple[int, int, int]) -> bytes:
     """Нарисовать аватар вместо того, чтобы класть картинки в репозиторий."""
     image = Image.new("RGB", (400, 400), colour)
     draw = ImageDraw.Draw(image)
@@ -870,7 +870,7 @@ def avatar(letter: str, colour: tuple[int, int, int]) -> bytes:
     return buffer.getvalue()
 
 
-async def wipe() -> None:
+async def clear_everything() -> None:
     """
     Снести всё, что скрипт потом создаст заново.
 
@@ -895,13 +895,13 @@ async def create_users(client: httpx.AsyncClient) -> list[str]:
     """Зарегистрировать авторов, войти каждым и загрузить аватар. Вернуть токены."""
     tokens: list[str] = []
 
-    for person in USERS:
+    for demo_user in USERS:
         created = await client.post(
             "/api/users",
             json={
-                "username": person["username"],
-                "email": person["email"],
-                "password": person["password"],
+                "username": demo_user["username"],
+                "email": demo_user["email"],
+                "password": demo_user["password"],
             },
         )
         created.raise_for_status()
@@ -909,19 +909,22 @@ async def create_users(client: httpx.AsyncClient) -> list[str]:
 
         issued = await client.post(
             "/api/users/token",
-            data={"username": person["email"], "password": person["password"]},
+            data={
+                "username": demo_user["email"],
+                "password": demo_user["password"],
+            },
         )
         issued.raise_for_status()
         token = issued.json()["access_token"]
         tokens.append(token)
 
-        if colour := person.get("colour"):
+        if colour := demo_user.get("colour"):
             uploaded = await client.patch(
                 f"/api/users/{user_id}/picture",
                 files={
                     "file": (
                         "avatar.png",
-                        avatar(person["username"][0], colour),
+                        draw_avatar(demo_user["username"][0], colour),
                         "image/png",
                     )
                 },
@@ -929,36 +932,36 @@ async def create_users(client: httpx.AsyncClient) -> list[str]:
             )
             uploaded.raise_for_status()
 
-        mark = "" if person.get("colour") else "  (default picture)"
-        print(f"  {person['username']}{mark}")
+        mark = "" if demo_user.get("colour") else "  (default picture)"
+        print(f"  {demo_user['username']}{mark}")
 
     return tokens
 
 
 async def create_posts(client: httpx.AsyncClient, tokens: list[str]) -> None:
     """Создать посты в порядке списка — от новых к старым."""
-    for item in POSTS:
-        token = tokens[item.get("author", 0)]
+    for demo_post in POSTS:
+        token = tokens[demo_post.get("author", 0)]
         response = await client.post(
             "/api/posts",
             json={
-                "title": item["title"],
-                "summary": item["summary"],
-                "content": item["content"],
-                "tags": item["tags"],
+                "title": demo_post["title"],
+                "summary": demo_post["summary"],
+                "content": demo_post["content"],
+                "tags": demo_post["tags"],
             },
             headers={"Authorization": f"Bearer {token}"},
         )
         response.raise_for_status()
 
 
-async def arrange_dates_and_pin() -> None:
+async def backdate_posts() -> None:
     """
-    Расставить даты и закрепить один пост.
+    Развести посты по времени: список сверху вниз — от новых к старым.
 
-    Дат нет в API — публиковать задним числом посторонний не может, и это
-    правильно. Поэтому единственная часть скрипта, которая идёт мимо
-    роутов, — вот эта, и идёт она через ORM намеренно.
+    Дат нет в API, и правильно: публиковать задним числом посторонний не
+    должен. Поэтому две функции ниже — единственное, что идёт мимо
+    роутов, и идут они через ORM намеренно.
     """
     now = datetime.now(UTC)
 
@@ -966,7 +969,7 @@ async def arrange_dates_and_pin() -> None:
         result = await db.execute(select(models.Post).order_by(models.Post.id))
         posts = result.scalars().all()
 
-        for index, (post, item) in enumerate(zip(posts, POSTS, strict=True)):
+        for index, post in enumerate(posts):
             # Полтора дня между постами и смещение по часам, чтобы
             # временные метки не совпадали: сортировка по дате должна
             # быть однозначной, иначе страницы начнут перекрываться.
@@ -975,11 +978,23 @@ async def arrange_dates_and_pin() -> None:
                 .where(models.Post.id == post.id)
                 .values(
                     date_posted=now
-                    - timedelta(days=index * 1.5, hours=(index * 7) % 24),
-                    is_pinned=item.get("pinned", False),
+                    - timedelta(days=index * 1.5, hours=(index * 7) % 24)
                 )
             )
 
+        await db.commit()
+
+
+async def pin_featured() -> None:
+    """Закрепить тот пост, который помечен pinned в списке."""
+    titles = [item["title"] for item in POSTS if item.get("pinned")]
+
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            update(models.Post)
+            .where(models.Post.title.in_(titles))
+            .values(is_pinned=True)
+        )
         await db.commit()
 
 
@@ -993,7 +1008,7 @@ async def main() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    await wipe()
+    await clear_everything()
     print("cleared")
 
     transport = httpx.ASGITransport(app=app)
@@ -1006,7 +1021,8 @@ async def main() -> None:
         print(f"\n{len(POSTS)} posts...")
         await create_posts(client, tokens)
 
-    await arrange_dates_and_pin()
+    await backdate_posts()
+    await pin_featured()
     await engine.dispose()
 
     print(f"\ndone: {len(USERS)} users, {len(POSTS)} posts, 1 pinned")
