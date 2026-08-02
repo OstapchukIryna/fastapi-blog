@@ -4,7 +4,9 @@ from pathlib import Path
 
 from PIL import Image, ImageOps
 
-PROFILE_PICS_DIR = Path("media/profile_pics")
+from blog.core.config import MEDIA_DIR
+
+PROFILE_PICS_DIR: Path = MEDIA_DIR / "profile_pics"
 
 
 def process_profile_image(content: bytes) -> str:

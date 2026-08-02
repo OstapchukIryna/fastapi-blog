@@ -120,7 +120,7 @@ sequenceDiagram
 Each row is asserted in `postman/`, because this table is the kind of
 thing that changes by accident when a signature is reordered.
 
-`routers/users.py` has the same shape with `OwnAccount`, and its refusal
+`services/users.py` has the same shape with `OwnAccount`, and its refusal
 reads `"Not authorize to change profile"` — different wording for a
 different resource, and both are pinned by tests so they cannot drift
 into each other.
@@ -167,5 +167,5 @@ unavoidable consequence of the token being the only thing the browser
 holds, but it is the sort of thing that reads as one in a report.
 
 Moving the token into an httpOnly cookie removes this state entirely —
-the server would decide, and `is_author` in `templating.py` could stop
+the server would decide, and `is_author` in `presentation/web/templating.py` could stop
 being hardcoded. That is the intended direction, not yet taken.

@@ -17,9 +17,27 @@ dependencies = [
     "sqlalchemy[asyncio]>=2.0.51",
 ]
 
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# src-layout: пакет лежит в src/blog и ставится в venv редактируемым,
+# поэтому `import blog` работает одинаково из приложения, из seed.py и из
+# тестов — и не зависит от того, из какого каталога запущен процесс.
+[tool.hatch.build.targets.wheel]
+packages = ["src/blog"]
+
 [tool.pyrefly]
 project-includes = ["**/*.py"]
 project-excludes = [".venv/**", "**/__pycache__/**"]
+# src/ — ради `import blog`, корень — ради seed.py, tests/ и scripts/,
+# которые пакетом не являются и живут рядом. Без корня `from .conftest
+# import ...` в тестах перестаёт разрешаться.
+search-path = ["src", "."]
+
+[tool.ruff]
+# Чтобы isort считал blog своим, а не сторонним пакетом.
+src = ["src"]
 
 [dependency-groups]
 dev = [

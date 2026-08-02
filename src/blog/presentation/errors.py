@@ -6,7 +6,7 @@ from fastapi.exception_handlers import (
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from templating import templates
+from blog.presentation.web.templating import templates
 
 
 def error_page(request: Request, status_code: int, message: str):
