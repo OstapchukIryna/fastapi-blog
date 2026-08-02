@@ -19,7 +19,7 @@ BASE_URL=""
 SERVER_PID=""
 WORK_DIR=""
 
-# config.py requires a secret and reads it from .env, which is not in the
+# core/config.py requires a secret and reads it from .env, which is not in the
 # repository — so a fresh clone, and CI, have none and the app refuses to
 # start. The run supplies its own: it signs tokens that live exactly as
 # long as the server started below, and is overridden by a real SECRET_KEY
@@ -54,7 +54,7 @@ if [[ -z "$BASE_URL" ]]; then
     uv run python seed.py >/dev/null
 
     echo "==> starting the app on ${BASE_URL}"
-    uv run uvicorn main:app --port "$PORT" --log-level warning >"${WORK_DIR}/server.log" 2>&1 &
+    uv run uvicorn blog.main:app --port "$PORT" --log-level warning >"${WORK_DIR}/server.log" 2>&1 &
     SERVER_PID=$!
 
     for _ in $(seq 1 60); do

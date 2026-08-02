@@ -1,41 +1,9 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-
-class UserBase(BaseModel):
-    username: str = Field(min_length=3, max_length=50)
-    email: EmailStr = Field(min_length=3, max_length=120)
-
-
-class UserCreate(UserBase):
-    password: str = Field(min_length=8, max_length=128)
-
-
-class UserUpdate(BaseModel):
-    username: str | None = Field(default=None, min_length=3, max_length=50)
-    email: EmailStr | None = Field(default=None, min_length=3, max_length=120)
-    password: str | None = Field(default=None, min_length=8, max_length=128)
-
-
-class UserPublic(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    username: str
-    image_file: str | None
-    image_path: str
-
-
-class UserPrivate(UserPublic):
-    model_config = ConfigDict(from_attributes=True)
-
-    email: EmailStr
-
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str
+from blog.schemas.tag import normalise_tags
+from blog.schemas.user import UserPublic
 
 
 class PostForm(BaseModel):
@@ -163,33 +131,3 @@ class PostResponse(BaseModel):
 
 class PostDetail(PostResponse):
     content: str
-
-
-class TagCount(BaseModel):
-    name: str
-    count: int
-
-
-def normalise_tags(value: list[str]) -> list[str]:
-    """
-    Strip, lowercase and de-duplicate a list of tag names.
-
-    Shared by every schema that accepts tags, so the rules cannot drift
-    apart between creating and updating a post.
-
-    Lives here rather than in routers/tags.py because it is pure data
-    cleaning: no session, no request, nothing a router owns. Keeping it
-    in the router meant schemas had to import a router, and that router
-    imports schemas back by way of routers/posts.py — so importing the
-    application at all failed on a partially initialised module.
-
-    Args:
-        value (list[str]): tag names as received.
-
-    Returns:
-        list[str]: cleaned names, blanks dropped, order preserved.
-
-    """
-    cleaned = [tag.strip().lower() for tag in value if tag.strip()]
-    # dict keeps order
-    return list(dict.fromkeys(cleaned))

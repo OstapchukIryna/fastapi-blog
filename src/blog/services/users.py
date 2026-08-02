@@ -1,31 +1,26 @@
-from datetime import timedelta
+"""
+Учётные записи: регистрация, вход, профиль и картинка.
+
+Файл на диске меняется здесь же, а не в роуте, и всегда после коммита:
+если транзакция не прошла, старая картинка должна остаться на месте.
+"""
+
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import Depends, HTTPException, UploadFile, status
 from PIL import UnidentifiedImageError
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
-import models
-from auth import (
-    CurrentUser,
-    create_access_token,
-    hash_password,
-    unauthorized,
-    verify_password,
-)
-from config import settings
-from database import DbSession
-from image_utils import delete_profile_image, process_profile_image
-from routers.posts import posts_query
-from schemas import PostResponse, Token, UserCreate, UserPrivate, UserPublic, UserUpdate
-
-router = APIRouter()
-
-
-# --- Dependencies ------------------------------------------------------
+from blog.core.config import settings
+from blog.core.security import hash_password, unauthorized, verify_password
+from blog.infrastructure import models
+from blog.infrastructure.database import DbSession
+from blog.infrastructure.images import delete_profile_image, process_profile_image
+from blog.schemas import UserCreate, UserUpdate
+from blog.services.auth import CurrentUser
 
 
 def already_registered() -> HTTPException:
@@ -41,6 +36,9 @@ def already_registered() -> HTTPException:
         status_code=status.HTTP_400_BAD_REQUEST,
         detail="Username or email already registered",
     )
+
+
+# --- Dependencies ------------------------------------------------------
 
 
 async def load_user(user_id: int, db: DbSession) -> models.User:
@@ -81,84 +79,62 @@ def own_account(user: UserDep, current_user: CurrentUser) -> models.User:
 
 OwnAccount = Annotated[models.User, Depends(own_account)]
 
-# --- Routes ---------------------------------------------------------
+
+# --- Changes ---------------------------------------------------------
 
 
-@router.post("", response_model=UserPrivate, status_code=status.HTTP_201_CREATED)
-async def create_user(user: UserCreate, db: DbSession):
+async def register(db: AsyncSession, data: UserCreate) -> models.User:
+    """
+    Create an account, or refuse because the name or the email is taken.
+
+    Checked before the insert and again by the unique index: two requests
+    can both pass the check and collide, and that race gives a 400 like
+    any other clash rather than the 500 an IntegrityError would produce.
+    """
     result = await db.execute(
         select(models.User).where(
-            (func.lower(models.User.username) == user.username.lower())
-            | (func.lower(models.User.email) == user.email.lower())
+            (func.lower(models.User.username) == data.username.lower())
+            | (func.lower(models.User.email) == data.email.lower())
         )
     )
-    clash = result.scalars().first()
-
-    if clash is not None:
+    if result.scalars().first() is not None:
         raise already_registered()
 
-    new_user = models.User(
-        username=user.username,
-        email=user.email.lower(),
-        password_hash=hash_password(user.password),
+    user = models.User(
+        username=data.username,
+        email=data.email.lower(),
+        password_hash=hash_password(data.password),
     )
-    db.add(new_user)
+    db.add(user)
     try:
         await db.commit()
     except IntegrityError:
         # Race prevention
         await db.rollback()
         raise already_registered() from None
-    return new_user
-
-
-@router.post("/token", response_model=Token)
-async def login_for_access_token(
-    form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: DbSession
-):
-    # Look up user by case-**insensitive** email
-    # NOTE: OAuth2PasswordRequestForm requires username field, but we treat it as email
-    result = await db.execute(
-        select(models.User).where(
-            func.lower(models.User.email) == form_data.username.lower()
-        )
-    )
-    user = result.scalars().first()
-
-    # Verify user exists and password is correct
-    # Don't reveal which one is failed if one was (security best practice)
-    if not user or not verify_password(form_data.password, user.password_hash):
-        raise unauthorized("Incorrect password or email")
-
-    # Create access token with user id as subject
-    access_token_expires = timedelta(minutes=settings.accesse_token_expire_minutes)
-    access_token = create_access_token(
-        data={"sub": str(user.id)}, expires_delta=access_token_expires
-    )
-    return Token(access_token=access_token, token_type="bearer")
-
-
-# Frontend get current user endpoint
-@router.get("/me", response_model=UserPrivate)
-async def get_current_user(current_user: CurrentUser):
-    """Get the currently authenticated user"""
-    return current_user
-
-
-@router.get("/{user_id}", response_model=UserPublic)
-def get_user(user: UserDep):
     return user
 
 
-@router.get("/{user_id}/posts", response_model=list[PostResponse])
-async def get_user_posts(user: UserDep, db: DbSession):
-    result = await db.execute(posts_query().where(models.Post.user_id == user.id))
-    return result.scalars().unique().all()
+async def authenticate(db: AsyncSession, email: str, password: str) -> models.User:
+    """
+    The user these credentials belong to, or a 401.
+
+    Which of the two was wrong is not said — an account that exists is
+    itself something worth not telling an unauthenticated caller.
+    """
+    # Look up user by case-**insensitive** email
+    result = await db.execute(
+        select(models.User).where(func.lower(models.User.email) == email.lower())
+    )
+    user = result.scalars().first()
+
+    if not user or not verify_password(password, user.password_hash):
+        raise unauthorized("Incorrect password or email")
+    return user
 
 
-@router.patch("/{user_id}", response_model=UserPublic)
-async def update_user_fields(
-    user: OwnAccount, data: UserUpdate, db: DbSession
+async def apply_changes(
+    db: AsyncSession, user: models.User, data: UserUpdate
 ) -> models.User:
     """
     Change some fields of a user, leaving the rest alone.
@@ -174,11 +150,11 @@ async def update_user_fields(
     as a no-op.
 
     The password never reaches the model as-is.
+
     Args:
-        user (UserDep): the user being changed, resolved by the
-            dependency, which raises 404 when it does not exist.
+        db (AsyncSession): current database session.
+        user (models.User): the user being changed.
         data (UserUpdate): the fields to change, already validated.
-        db (DbSession): current database session.
 
     Raises:
         HTTPException: 400 when the requested username or email already
@@ -214,27 +190,37 @@ async def update_user_fields(
     try:
         await db.commit()
     except IntegrityError:
-        # The same race create_user guards: two requests can both pass
-        # the check above and collide at the unique index.
+        # The same race register guards: two requests can both pass the
+        # check above and collide at the unique index.
         await db.rollback()
         raise already_registered() from None
 
     return user
 
 
-@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user(user: OwnAccount, db: DbSession):
+async def delete(db: AsyncSession, user: models.User) -> None:
     """Cascading deletion of a user. All posts will be delete as well as profile picture file"""
     old_filename = user.image_file
     await db.delete(user)
     await db.commit()
 
-    if old_filename:
-        delete_profile_image(old_filename)
+    delete_profile_image(old_filename)
 
 
-@router.patch("/{user_id}/picture", response_model=UserPrivate)
-async def upload_profile_picture(file: UploadFile, user: OwnAccount, db: DbSession):
+async def set_picture(
+    db: AsyncSession, user: models.User, file: UploadFile
+) -> models.User:
+    """
+    Replace this user's profile picture, and drop the file it replaces.
+
+    Pillow is synchronous and the resize is not free, so it runs in a
+    worker thread rather than blocking the loop.
+
+    Raises:
+        HTTPException: 400 when the upload is over the size limit, or is
+            not something Pillow recognises as an image.
+
+    """
     content = await file.read()
     if len(content) > settings.max_upload_size_bytes:
         raise HTTPException(
@@ -248,20 +234,18 @@ async def upload_profile_picture(file: UploadFile, user: OwnAccount, db: DbSessi
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid image file. Please upload a valid file format (JPEG, PNG, GIF, WebP).",
         ) from err
-    old_filename = user.image_file
 
+    old_filename = user.image_file
     user.image_file = new_filename
     await db.commit()
     await db.refresh(user)
 
-    if old_filename:
-        delete_profile_image(old_filename)
-
+    delete_profile_image(old_filename)
     return user
 
 
-@router.delete("/{user_id}/picture", response_model=UserPrivate)
-async def delete_profile_picture(user: OwnAccount, db: DbSession):
+async def clear_picture(db: AsyncSession, user: models.User) -> models.User:
+    """Back to the shared default, and the uploaded file goes."""
     old_filename = user.image_file
     if old_filename is None:
         raise HTTPException(
@@ -273,5 +257,4 @@ async def delete_profile_picture(user: OwnAccount, db: DbSession):
     await db.refresh(user)
 
     delete_profile_image(old_filename)
-
     return user

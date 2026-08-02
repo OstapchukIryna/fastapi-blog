@@ -6,8 +6,8 @@ the data actually is, and what runs in the browser.
 
 All of them were generated from the code rather than from memory — the import
 graph by walking every module's AST, the API paths out of `/openapi.json`, the
-page paths out of the decorators in `routers/pages.py`. If a diagram here is
-wrong, the code moved.
+page paths out of the decorators in `presentation/web/pages.py`. If a diagram
+here is wrong, the code moved.
 
 For how a request is *authenticated*, see [auth.md](auth.md). For why the
 pages have their own router, [adr-001-pages-and-api.md](adr-001-pages-and-api.md).
@@ -16,66 +16,97 @@ pages have their own router, [adr-001-pages-and-api.md](adr-001-pages-and-api.md
 
 ## What may import what
 
-Four layers. Every arrow points down, and the diagram shows the edges that
-carry information — not the ones every module has. Every interface module also imports
-`models` and `database` — for the ORM classes and the `DbSession` alias —
-and drawing that eight more times would have said only that the layers exist.
+Five layers, each a package under `src/blog/`, one module per thing inside it.
+Every arrow points down, and the diagram shows the edges that carry
+information — not the ones every module has. Nearly everything above
+`infrastructure` also imports `models` and `database` for the ORM classes and
+the `DbSession` alias, and drawing that a dozen more times would have said only
+that the layers exist.
 
 ```mermaid
 graph TD
-    main["main.py · 38 lines<br/><i>lifespan, mounts, routers</i>"]
+    main["main.py · 44 lines<br/><i>lifespan, mounts, routers</i>"]
 
-    subgraph L3["interfaces · one module per surface"]
-        pages["routers/pages.py<br/><b>HTML</b> · 16 routes"]
-        api["routers/posts.py<br/>routers/users.py<br/>routers/tags.py<br/><b>JSON</b> · 10 paths"]
+    subgraph L4["presentation · what HTTP and Jinja look like"]
+        pages["web/pages.py · 16 routes<br/>web/forms.py · состояние формы<br/>web/templating.py<br/><b>HTML</b>"]
+        api["api/posts.py · api/users.py<br/>api/tags.py<br/><b>JSON</b> · 10 paths"]
+        errors["errors.py"]
     end
 
-    subgraph L2["domain · nothing here knows about HTTP shape"]
-        auth["auth.py<br/><i>tokens, hashing</i>"]
-        models["models.py"]
-        schemas["schemas.py"]
-        image["image_utils.py"]
+    subgraph L3["services · что приложение умеет и на каких условиях"]
+        s_posts["posts.py<br/><i>запросы, PostDep, OwnedPost</i>"]
+        s_users["users.py<br/><i>UserDep, OwnAccount</i>"]
+        s_tags["tags.py"]
+        s_auth["auth.py<br/><i>CurrentUser</i>"]
     end
 
-    subgraph L1["foundations · import nothing of ours"]
-        config["config.py"]
-        database["database.py"]
-        templating["templating.py"]
+    subgraph L2["schemas · формы данных на границе"]
+        schemas["post.py · user.py · tag.py"]
+    end
+
+    subgraph L1["infrastructure · где данные лежат"]
+        models["models/post.py<br/>models/user.py · models/tag.py"]
+        database["database.py<br/><i>engine, DbSession</i>"]
+        images["images.py"]
+    end
+
+    subgraph L0["core · не импортирует ничего нашего"]
+        config["config.py<br/><i>settings, BASE_DIR</i>"]
+        security["security.py<br/><i>tokens, hashing</i>"]
     end
 
     main --> pages
     main --> api
-    main --> errors["error_handlers.py"]
+    main --> errors
 
-    pages -->|"reuses the API's<br/>queries and deps"| api
-    pages --> templating
-    errors --> templating
+    errors --> pages
+    api --> s_posts
+    api --> s_users
+    api --> s_tags
+    api --> s_auth
+    pages --> s_posts
+    pages --> s_users
+    pages --> s_tags
+    pages --> s_auth
 
-    api --> auth
-    pages --> auth
-    api --> image
-    api --> schemas
-    pages --> schemas
+    s_posts --> s_tags
+    s_posts --> s_auth
+    s_users --> s_auth
 
-    auth --> config
-    auth --> models
+    s_posts --> schemas
+    s_users --> schemas
+    s_users --> images
+    s_auth --> security
+
+    schemas --> models
     models --> database
+    security --> config
+    database --> config
 ```
 
-**The rule this records:** arrows only ever point downwards. A module in
-`domain` importing a router is the mistake that already happened once —
-`schemas.py` imported `routers/tags.py` for a tag-cleaning helper, and since
-that router imports `schemas` back through `routers/posts.py`, the application
-stopped importing at all. The helper was pure data cleaning and belonged in
-`schemas` from the start.
+**The rule this records:** arrows only ever point downwards, and the one place
+it is easy to break is `presentation`. `web/` does not import `api/` — both ask
+`services/` instead, which is why «пост не найден» is one place in the code
+rather than two that drifted apart. Before the split it was not like that:
+`pages` imported the JSON routers for `posts_query` and the dependencies, and
+every page inherited whatever the API happened to need.
 
-**Two arrows worth explaining.** `routers/tags.py` and `routers/users.py` both
-import `routers/posts.py`, which looks like a layering violation and is not:
-they want `posts_query`, and asking for posts is what that module is for.
-`pages` importing all three is the same thing — a page shows whatever it shows.
+A module below importing a router is the mistake that already happened once —
+`schemas.py` imported the tags router for a tag-cleaning helper, and since that
+router imported `schemas` back by way of the posts one, the application stopped
+importing at all. The helper was pure data cleaning and belongs where it now
+sits, in `schemas/tag.py`.
 
-`seed.py` is off the diagram. It imports `auth`, `database` and `models` and
-is imported by nothing; it is a script, not part of the running application.
+**Two arrows inside `services` worth explaining.** `posts.py` imports `tags.py`
+because storing a post means creating the tags it names; `users.py` and
+`posts.py` both import `auth.py` because ownership is a question about the
+current user. Nothing points back: `tags.py` returns tags, never posts, and
+what returns posts *by* tag lives in `posts.py`. Otherwise the two would
+import each other.
+
+`seed.py` is off the diagram. It imports `core.security`, `infrastructure` and
+`services.tags` and is imported by nothing; it is a script, not part of the
+running application.
 
 ---
 
@@ -86,14 +117,14 @@ graph LR
     person([a person]) --> pages_r
     script([a script,<br/>Postman, fetch]) --> api_r
 
-    subgraph pages_r["routers/pages.py — 16 routes, include_in_schema=False"]
+    subgraph pages_r["presentation/web/pages.py — 16 routes, include_in_schema=False"]
         direction TB
         p1["/ · /posts · /posts/{id}<br/>/tags · /tags/{tag}<br/>/users/{id}/posts · /about"]
         p2["/posts/new · /posts/{id}/edit<br/>/posts/{id}/pin · /posts/{id}/delete"]
         p3["/login · /register · /profile"]
     end
 
-    subgraph api_r["routers/*.py — 10 paths, the documented surface"]
+    subgraph api_r["presentation/api/*.py — 10 paths, the documented surface"]
         a1["/api/posts · /api/posts/{id}"]
         a2["/api/users · /api/users/{id}<br/>/api/users/{id}/picture<br/>/api/users/{id}/posts"]
         a3["/api/users/token · /api/users/me"]
@@ -153,8 +184,9 @@ Three things the columns do not say:
   `User.image_path` turns it into `/static/profile_pics/default.jpg`. Deleting
   a picture sets it back to null and removes the file.
 - **`is_pinned` is a single-winner flag** with no constraint behind it.
-  `set_pinned` clears the others in the same transaction; nothing in the
-  schema would stop two rows being true if something else wrote them.
+  `set_pinned` in `services/posts.py` clears the others in the same
+  transaction; nothing in the schema would stop two rows being true if
+  something else wrote them.
 - **Deleting a user cascades to their posts** and to their uploaded file.
   Tags are left behind even when nothing references them any more — they
   become invisible in `/api/tags`, which counts through posts, but they do

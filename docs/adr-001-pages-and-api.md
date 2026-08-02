@@ -109,3 +109,20 @@ visible by then.
 - Route names unchanged, which is what kept every `url_for` in the templates
   working. Verified by opening all twelve pages and by 325 API assertions and
   3 browser tests.
+
+## Later
+
+The module paths above are the ones that existed when this was decided; the
+decision itself still holds, and the record is left as written. A later change
+moved the whole application into `src/blog/` and split it by layer, so:
+
+- `routers/pages.py` → `presentation/web/pages.py`, and the form state it
+  carried (`PostFormView`, `post_to_input`, `render_post_form`, `form_errors`)
+  → `presentation/web/forms.py`. `arrange` stayed with the pages.
+- `routers/posts.py` → split in two: the queries and the rules into
+  `services/posts.py`, the six JSON routes into `presentation/api/posts.py`.
+- The seam this ADR argued for got sharper, not softer: `web/` no longer
+  imports `api/` at all. Both ask `services/`, so the post form and
+  `POST /api/posts` now go through the same function.
+
+See [architecture.md](architecture.md) for the layout as it stands.

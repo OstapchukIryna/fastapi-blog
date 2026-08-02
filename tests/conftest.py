@@ -57,7 +57,7 @@ def live_server(tmp_path_factory) -> Iterator[str]:
     port = free_port()
     base_url = f"http://127.0.0.1:{port}"
     server = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "main:app", "--port", str(port)],
+        [sys.executable, "-m", "uvicorn", "blog.main:app", "--port", str(port)],
         cwd=ROOT,
         env=env,
         stdout=subprocess.PIPE,
