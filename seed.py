@@ -16,10 +16,10 @@ from typing import NotRequired, TypedDict
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-import models
-from auth import hash_password
-from database import AsyncSessionLocal, Base, engine
-from models import get_or_create_tags
+from blog.core.security import hash_password
+from blog.infrastructure import models
+from blog.infrastructure.database import AsyncSessionLocal, Base, engine
+from blog.services.tags import get_or_create_tags
 
 CONTENT_DIR = Path(__file__).parent / "content"
 

@@ -1,12 +1,11 @@
 from collections.abc import MutableMapping
-from pathlib import Path
 from typing import Any
 
 import markdown
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
 
-TEMPLATES_DIR = Path(__file__).parent / "templates"
+from blog.core.config import TEMPLATES_DIR
 
 SITE = {
     "handle": "called_mad",

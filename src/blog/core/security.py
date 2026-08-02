@@ -1,18 +1,20 @@
+"""
+Пароли и протокол токена — и больше ничего.
+
+Здесь нет ни сессии, ни запроса: функции превращают пароль в хеш, а id
+пользователя в токен и обратно. Кому этот id принадлежит и существует ли
+такой пользователь — вопрос services/auth.py, и он задаётся слоем выше.
+"""
+
 from datetime import UTC, datetime, timedelta
-from typing import Annotated
 
 import jwt
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import HTTPException, status
 from pwdlib import PasswordHash
 
-import models
-from config import settings
-from database import DbSession
+from blog.core.config import settings
 
 password_hash = PasswordHash.recommended()
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/users/token")
 
 
 def unauthorized(detail: str) -> HTTPException:
@@ -28,10 +30,6 @@ def unauthorized(detail: str) -> HTTPException:
         detail=detail,
         headers={"WWW-Authenticate": "Bearer"},
     )
-
-
-# --- Dependencies ------------------------------------------------------
-TokenDep = Annotated[str, Depends(oauth2_scheme)]
 
 
 def hash_password(password: str) -> str:
@@ -72,21 +70,3 @@ def verify_access_token(token: str) -> str | None:
         return None
     else:
         return payload.get("sub")
-
-
-async def get_current_user(token: TokenDep, db: DbSession) -> models.User:
-    """Get the currently authenticated user"""
-    # int() covers both refusals at once: a rejected token gives None,
-    # and a sub that is not a number gives whatever was in the claim.
-    try:
-        user_id = int(verify_access_token(token))
-    except TypeError, ValueError:
-        raise unauthorized("Invalid or expired token") from None
-
-    user = await db.get(models.User, user_id)
-    if not user:
-        raise unauthorized("User not found")
-    return user
-
-
-CurrentUser = Annotated[models.User, Depends(get_current_user)]
