@@ -1,31 +1,30 @@
-"""Наполнение базы демонстрационными данными: шесть авторов, 45 постов.
+"""Fill the database with demonstration data: six authors, 45 posts.
 
-    uv run python populate.py
+    uv run python populate.py --yes
 
-ОСТОРОЖНО: скрипт разрушающий. Он сносит всех пользователей, все посты,
-все теги и все загруженные аватары — и только потом наполняет заново.
-Иначе смысла нет: пагинацию видно только на точном количестве записей, а
-идемпотентный догон дал бы каждый раз разное число страниц.
+DESTRUCTIVE. It removes every user, post, tag and uploaded avatar before
+filling anything in. That is the point: pagination is only visible at an
+exact number of records, and an idempotent top-up would give a different
+number of pages every time.
 
-Постов 45, а не круглые 40: при десяти на страницу последняя выходит
-неполной, и это единственный случай, который ловит ошибку на единицу
-в ссылке «последняя».
+45 rather than a round 40, so the last page comes out short — the only
+case that catches an off-by-one in a "last page" link.
 
-Чем отличается от seed.py, и почему это два скрипта, а не один:
+How it differs from seed.py, and why these are two scripts:
 
-    seed.py       пять настоящих постов, тексты из content/*.md,
-                  идемпотентен, пишет напрямую через ORM.
-                  Его гоняют tests/conftest.py и scripts/api-tests.sh,
-                  поэтому он обязан быть быстрым и предсказуемым.
+    seed.py       five real posts, prose from content/*.md, idempotent,
+                  writing straight through the ORM. It is run by
+                  tests/conftest.py and scripts/api-tests.sh, so it has
+                  to stay fast and predictable.
 
-    populate.py   объём. Ходит через настоящий API поверх ASGITransport —
-                  те же роуты, что и у браузера, включая регистрацию,
-                  выдачу токена и загрузку картинки. Медленнее (шесть
-                  хешей argon2 и пять раз Pillow), зато заодно проверяет,
-                  что публичный контракт цел.
+    populate.py   volume. Goes through the real API over ASGITransport —
+                  the same routes a browser uses, including registration,
+                  token issue and picture upload. Slower (six Argon2
+                  hashes and five trips through Pillow), and in exchange
+                  it checks that the public contract still works.
 
-Тексты постов свои. Аватары рисуются на месте, а не лежат в репозитории:
-это демонстрационные данные, а не исходник.
+The prose is this project's own. Avatars are drawn at run time rather
+than committed: this is demonstration data, not source.
 """
 
 import asyncio
@@ -45,6 +44,17 @@ from blog.main import app
 
 
 class DemoUser(TypedDict):
+    """One demonstration account.
+
+    Attributes:
+        username (str): the handle.
+        email (str): on example.com, so it can reach nobody.
+        password (str): local-only.
+        colour (NotRequired[tuple[int, int, int]]): avatar background.
+            Absent for exactly one account, which is how the shared
+            default avatar becomes visible on a real page.
+    """
+
     username: str
     email: str
     password: str
@@ -52,16 +62,28 @@ class DemoUser(TypedDict):
 
 
 class DemoPost(TypedDict):
+    """One demonstration article.
+
+    Attributes:
+        title (str): headline; also what pin_featured matches on.
+        summary (str): the listing blurb.
+        content (str): the body, as Markdown.
+        tags (list[str]): labels.
+        author (NotRequired[int]): index into USERS; defaults to the first.
+        pinned (NotRequired[bool]): whether this leads the front page.
+    """
+
     title: str
     summary: str
     content: str
     tags: list[str]
-    author: NotRequired[int]  # индекс в USERS; по умолчанию 0
+    author: NotRequired[int]  # index into USERS; defaults to the first
     pinned: NotRequired[bool]
 
 
-# Пароли годятся ровно для локальной базы. Почта на example.com —
-# домен зарезервирован RFC 2606 и ни к кому не приедет.
+# ! These passwords are good for a local database and nothing else.
+# * Addresses use example.com, reserved by RFC 2606, so no message
+# * anybody generates from this data can reach a real person.
 USERS: list[DemoUser] = [
     {
         "username": "called_mad",
@@ -94,17 +116,17 @@ USERS: list[DemoUser] = [
         "colour": (174, 129, 255),
     },
     {
-        # Без картинки намеренно: единственный способ увидеть на живой
-        # странице, что image_path отдаёт общий default.jpg.
+        # * Deliberately without a picture: the only way to see on a
+        # * live page that image_path falls back to the shared default.
         "username": "plain_defaults",
         "email": "plain_defaults@example.com",
         "password": "TestPassword123",
     },
 ]
 
-# Сверху новые, снизу старые — даты проставляются по индексу.
-# Тексты короткие: это данные для листания, а не для чтения. Настоящие
-# посты лежат в content/*.md и приезжают через seed.py.
+# Newest at the top, oldest at the bottom; dates are assigned by index.
+# The prose is short because this is data to page through rather than to
+# read. The real articles live in content/*.md and arrive via seed.py.
 POSTS: list[DemoPost] = [
     {
         "title": "The N+1 you can't see in the logs",
@@ -855,7 +877,15 @@ POSTS: list[DemoPost] = [
 
 
 def draw_avatar(letter: str, colour: tuple[int, int, int]) -> bytes:
-    """Нарисовать аватар вместо того, чтобы класть картинки в репозиторий."""
+    """Draw an avatar instead of committing image files to the repository.
+
+    Args:
+        letter (str): the initial to show; upper-cased here.
+        colour (tuple[int, int, int]): background, one per demo account.
+
+    Returns:
+        bytes: a PNG, ready to be uploaded through the real endpoint.
+    """
     image = Image.new("RGB", (400, 400), colour)
     draw = ImageDraw.Draw(image)
     draw.text(
@@ -871,14 +901,12 @@ def draw_avatar(letter: str, colour: tuple[int, int, int]) -> bytes:
 
 
 async def clear_everything() -> None:
-    """
-    Снести всё, что скрипт потом создаст заново.
-
-    Связи из post_tags удаляются явно: у них есть ON DELETE CASCADE, но
-    SQLite соблюдает внешние ключи только при PRAGMA foreign_keys = ON, а
-    SQLAlchemy её не ставит. Массовый delete(Post) оставил бы висящие
-    строки, и следующий join вернул бы посты, которых нет.
-    """
+    """Remove everything this script is about to create again."""
+    # ! post_tags is emptied explicitly. The cascade is in the schema,
+    # ! but SQLite only enforces foreign keys with PRAGMA foreign_keys =
+    # ! ON, which SQLAlchemy does not set. A bulk delete of posts would
+    # ! leave the link rows behind, and the next join would return posts
+    # ! that no longer exist.
     for file in PROFILE_PICS_DIR.glob("*"):
         if file.is_file() and file.name != ".gitkeep":
             file.unlink()
@@ -892,7 +920,15 @@ async def clear_everything() -> None:
 
 
 async def create_users(client: httpx.AsyncClient) -> list[str]:
-    """Зарегистрировать авторов, войти каждым и загрузить аватар. Вернуть токены."""
+    """Register the demo authors, sign each in, and upload their avatars.
+
+    Args:
+        client (httpx.AsyncClient): a client wired to the app in-process.
+
+    Returns:
+        list[str]: one bearer token per entry in USERS, in the same order,
+            so a post can pick its author by index.
+    """
     tokens: list[str] = []
 
     for demo_user in USERS:
@@ -939,7 +975,12 @@ async def create_users(client: httpx.AsyncClient) -> list[str]:
 
 
 async def create_posts(client: httpx.AsyncClient, tokens: list[str]) -> None:
-    """Создать посты в порядке списка — от новых к старым."""
+    """Create the posts in list order, newest first.
+
+    Args:
+        client (httpx.AsyncClient): a client wired to the app in-process.
+        tokens (list[str]): the authors' tokens, by index.
+    """
     for demo_post in POSTS:
         token = tokens[demo_post.get("author", 0)]
         response = await client.post(
@@ -956,12 +997,12 @@ async def create_posts(client: httpx.AsyncClient, tokens: list[str]) -> None:
 
 
 async def backdate_posts() -> None:
-    """
-    Развести посты по времени: список сверху вниз — от новых к старым.
+    """Spread the posts over time, newest at the top of the list.
 
-    Дат нет в API, и правильно: публиковать задним числом посторонний не
-    должен. Поэтому две функции ниже — единственное, что идёт мимо
-    роутов, и идут они через ORM намеренно.
+    Publication dates are not in the API, and should not be: nobody
+    outside should be able to backdate a post. This function and
+    pin_featured are therefore the only two that go around the routes,
+    and they do so deliberately.
     """
     now = datetime.now(UTC)
 
@@ -970,9 +1011,9 @@ async def backdate_posts() -> None:
         posts = result.scalars().all()
 
         for index, post in enumerate(posts):
-            # Полтора дня между постами и смещение по часам, чтобы
-            # временные метки не совпадали: сортировка по дате должна
-            # быть однозначной, иначе страницы начнут перекрываться.
+            # * A day and a half apart, offset by hours so that no two
+            # * timestamps collide. The date ordering has to be
+            # * unambiguous or consecutive pages start to overlap.
             await db.execute(
                 update(models.Post)
                 .where(models.Post.id == post.id)
@@ -986,7 +1027,7 @@ async def backdate_posts() -> None:
 
 
 async def pin_featured() -> None:
-    """Закрепить тот пост, который помечен pinned в списке."""
+    """Pin whichever post is marked pinned in the list above."""
     titles = [item["title"] for item in POSTS if item.get("pinned")]
 
     async with AsyncSessionLocal() as db:
@@ -999,10 +1040,16 @@ async def pin_featured() -> None:
 
 
 async def main() -> None:
+    """Wipe, refill, and report — refusing to start without --yes.
+
+    The address of the database is printed before anything is touched,
+    because the one mistake this script can make is emptying the wrong
+    one.
+    """
     print(f"database: {engine.url}")
     if "--yes" not in sys.argv:
-        print("сотрёт всех пользователей, посты, теги и аватары.")
-        print("подтвердить: uv run python populate.py --yes")
+        print("this removes every user, post, tag and uploaded avatar.")
+        print("to confirm: uv run python populate.py --yes")
         return
 
     async with engine.begin() as conn:

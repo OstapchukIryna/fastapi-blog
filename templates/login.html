@@ -6,26 +6,24 @@
             <h1 class="masthead-title auth-title">Sign in</h1>
             <p class="masthead-tagline">For writing and editing. Reading needs no account.</p>
         </header>
-
         <noscript>
             <div class="form-summary" role="alert">
                 <span class="mono-label">Needs JavaScript</span>
                 <p>This form signs in through the API from the browser.</p>
             </div>
         </noscript>
-
-        {# Причину показываем, когда сюда привели, а не пришли: человек,
-           которого сняли со страницы на полуслове, должен узнать почему,
-           а не решить, что нажал не туда. #}
+        {# The reason is shown when somebody was sent here rather than came
+           here: a person pulled off a page mid-task should learn why, not
+           conclude that they clicked the wrong thing. #}
         <div class="form-summary" id="loginReason" role="status" hidden>
             <span class="mono-label" id="loginReasonTitle"></span>
             <p id="loginReasonNote"></p>
         </div>
-
-        {# Поле — адрес, а не имя. OAuth2PasswordRequestForm требует поле
-           с именем username, но маршрут /api/users/token ищет по email;
-           подпись говорит правду о том, что вводят, а имя поля в запросе
-           подставляет скрипт ниже. #}
+        {# The field is an address, not a handle. OAuth2PasswordRequestForm
+           requires a field named `username`, but /api/users/token looks the
+           account up by email. The label tells the truth about what is
+           typed; the script below supplies the field name the request
+           needs. #}
         <form class="auth-form content-section" id="loginForm">
             <div class="field">
                 <label class="form-label mono-label" for="email">Email</label>
@@ -38,7 +36,6 @@
                        autofocus>
                 <p class="field-error mono-label" id="email-error" hidden></p>
             </div>
-
             <div class="field">
                 <label class="form-label mono-label" for="password">Password</label>
                 <input class="form-control"
@@ -49,13 +46,11 @@
                        aria-describedby="password-error">
                 <p class="field-error mono-label" id="password-error" hidden></p>
             </div>
-
             <button class="btn btn-light write-btn w-100" type="submit">Sign in</button>
             <p class="auth-note mono-label">
-                No account yet? <a href="{{ url_for('register') }}">Create one</a>
+                No account yet? <a href="{{ url_for("register") }}">Create one</a>
             </p>
         </form>
-
         <p class="mt-4">
             <a class="back-link mono-label" href="/">
                 <span class="arrow">&larr;</span> All posts
@@ -63,7 +58,6 @@
         </p>
     </div>
 {% endblock content %}
-
 {% block scripts %}
     <!-- Sign-in Form Handler -->
     <script type="module">
@@ -73,10 +67,10 @@
         const form = document.getElementById("loginForm");
         const params = new URLSearchParams(window.location.search);
 
-        // Только собственные пути: `next` приходит из адресной строки, а
-        // значит его мог написать кто угодно. Открытый редирект — это
-        // ссылка «войти на called_mad», которая после входа уводит на
-        // чужой сайт, уже с доверием человека.
+        // ! Own paths only. `next` comes from the address bar, so anybody
+        // ! could have written it. An open redirect is a "sign in to
+        // ! called_mad" link that sends the person to somebody else's site
+        // ! after they sign in — carrying their trust with them.
         const nextPath = params.get("next") ?? "";
         const destination = /^\/(?!\/)/.test(nextPath) ? nextPath : "/";
 
