@@ -52,4 +52,10 @@ testpaths = ["tests"]
 addopts = "--browser chromium"
 
 [tool.fastapi]
-entrypoint = "src.blog.main:app"
+# ! `blog.main`, not `src.blog.main`. Both import — `src` works as a
+# ! namespace package from the repository root — but they are two
+# ! different module objects, so the second one builds a second FastAPI
+# ! application. The models stay shared, because every import inside the
+# ! package is absolute (`blog.…`), which is what makes the duplication
+# ! quiet rather than loud. `blog` is the installed name; use it.
+entrypoint = "blog.main:app"

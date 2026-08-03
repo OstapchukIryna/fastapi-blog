@@ -2,9 +2,7 @@
 {% block content %}
     <section class="error-page">
         <span class="error-code eyebrow mono-label">Error {{ status_code }}</span>
-
         <h1 class="error-title">{{ message or "Something went wrong" }}</h1>
-
         <p class="error-detail">
             {% if status_code == 404 %}
                 The address is either mistyped or points to something that no longer exists.
@@ -18,7 +16,6 @@
                 The request couldn't be completed.
             {% endif %}
         </p>
-
         <div class="error-actions mono-label">
             <a class="back-link" href="/">
                 <span class="arrow">&larr;</span> All posts
