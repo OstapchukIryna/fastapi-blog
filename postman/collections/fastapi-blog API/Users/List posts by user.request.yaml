@@ -5,6 +5,20 @@ scripts:
   - type: afterResponse
     code: |-
       pm.test("200 OK", () => pm.response.to.have.status(200));
-      pm.test("returns a list", () => pm.expect(pm.response.json()).to.be.an("array"));
+
+      const page = pm.response.json();
+
+      pm.test("returns a page", () =>
+          pm.expect(Object.keys(page).sort()).to.eql(
+              ["has_more", "items", "limit", "skip", "total"]));
+
+      pm.test("all of them are this user's", () =>
+          page.items.forEach((p) =>
+              pm.expect(String(p.author.id)).to.eql(String(pm.collectionVariables.get("userId")))));
+
+      // Счёт по своему запросу, а не по всей таблице: иначе «ещё»
+      // остаётся видимой после последнего поста автора.
+      pm.test("total counts this author's posts, not everyone's", () =>
+          pm.expect(page.total).to.eql(page.items.length + page.skip));
     language: text/javascript
 order: 9000

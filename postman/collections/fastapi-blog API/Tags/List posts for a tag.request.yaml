@@ -6,12 +6,24 @@ scripts:
     code: |-
       pm.test("200 OK", () => pm.response.to.have.status(200));
 
-      const posts = pm.response.json();
+      const page = pm.response.json();
+      const posts = page.items;
       const tag = pm.collectionVariables.get("knownTag");
 
-      pm.test("returns a list", () => pm.expect(posts).to.be.an("array"));
+      pm.test("returns a page", () =>
+          pm.expect(Object.keys(page).sort()).to.eql(
+              ["has_more", "items", "limit", "skip", "total"]));
 
       pm.test("every post really carries the tag", () =>
           posts.forEach((p) => pm.expect(p.tags).to.include(tag)));
+
+      // Пустой срез у существующего тега — это 200. 404 говорит только
+      // о том, что тега нет вообще, и проверяется соседним запросом.
+      pm.sendRequest(
+          `${pm.variables.get("baseUrl")}/api/tags/${tag}/posts?skip=10000`,
+          (err, res) => pm.test("past the end of a real tag is an empty page", () => {
+              pm.expect(res.code).to.eql(200);
+              pm.expect(res.json().items).to.eql([]);
+          }));
     language: text/javascript
 order: 2000

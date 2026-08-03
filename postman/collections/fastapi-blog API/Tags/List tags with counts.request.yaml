@@ -7,7 +7,12 @@ scripts:
     code: |-
       pm.test("200 OK", () => pm.response.to.have.status(200));
 
-      const tags = pm.response.json();
+      const page = pm.response.json();
+      const tags = page.items;
+
+      pm.test("the same envelope as every other list", () =>
+          pm.expect(Object.keys(page).sort()).to.eql(
+              ["has_more", "items", "limit", "skip", "total"]));
 
       pm.test("returns a list of name and count", () => {
           pm.expect(tags).to.be.an("array");
@@ -21,6 +26,11 @@ scripts:
 
       pm.test("only tags that are actually used appear", () =>
           tags.forEach((t) => pm.expect(t.count).to.be.above(0)));
+
+      // total считается тем же соединением, что и строки: осиротевший
+      // тег не попадает ни в выдачу, ни в счётчик.
+      pm.test("total counts the same tags the slice comes from", () =>
+          pm.expect(page.total).to.be.at.least(tags.length));
 
       if (tags.length) pm.collectionVariables.set("knownTag", tags[0].name);
     language: text/javascript

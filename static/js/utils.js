@@ -4,6 +4,58 @@
 const NETWORK_ERROR =
   "Network error. Please check your connection and try again.";
 
+// Символы, которые в HTML значат не себя.
+const HTML_ESCAPES = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#39;",
+};
+
+/**
+ * Turn text into text that means itself inside HTML.
+ *
+ * Нужна везде, где строка из API попадает в innerHTML. Заголовок поста
+ * пишет человек, и `<img onerror=...>` в нём — это не гипотетическая
+ * атака, а обычная цитата из статьи про XSS, набранная без задней мысли.
+ *
+ * Экранируется и апостроф: значение может оказаться внутри атрибута,
+ * закрытого одинарными кавычками, и тогда &quot; его не спасёт.
+ *
+ * @param {unknown} value что угодно; null и undefined дают пустую строку.
+ * @returns {string}
+ */
+export function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => HTML_ESCAPES[char]);
+}
+
+/**
+ * A date written the way the server writes it: 05 Aug 2026.
+ *
+ * Один формат на обе стороны. Карточку в архиве рисует то Jinja на
+ * первой порции, то этот модуль на следующих, и «5 августа» рядом с
+ * «05 Aug 2026» выдало бы шов сразу.
+ *
+ * timeZone: "UTC" не косметика. Даты приходят в UTC, а браузер читателя
+ * восточнее Гринвича сдвинул бы полночь на предыдущий день — и один и
+ * тот же пост назывался бы разными датами до и после нажатия «ещё».
+ *
+ * @param {string|Date} value ISO-строка из API или готовая дата.
+ * @returns {string} пустая строка, если разобрать не удалось.
+ */
+export function formatDate(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(date);
+}
+
 // Error message extraction from API responses
 export function getErrorMessage(error) {
   if (typeof error?.detail === "string") {

@@ -42,6 +42,7 @@ graph TD
 
     subgraph L2["schemas · формы данных на границе"]
         schemas["post.py · user.py · tag.py"]
+        pagination["pagination.py<br/><i>Pagination, Page[T]</i>"]
     end
 
     subgraph L1["infrastructure · где данные лежат"]
@@ -74,6 +75,8 @@ graph TD
     s_users --> s_auth
 
     s_posts --> schemas
+    s_posts --> pagination
+    s_tags --> pagination
     s_users --> schemas
     s_users --> images
     s_auth --> security
@@ -88,8 +91,8 @@ graph TD
 it is easy to break is `presentation`. `web/` does not import `api/` — both ask
 `services/` instead, which is why «пост не найден» is one place in the code
 rather than two that drifted apart. Before the split it was not like that:
-`pages` imported the JSON routers for `posts_query` and the dependencies, and
-every page inherited whatever the API happened to need.
+`pages` imported the JSON routers for their base query and their dependencies,
+and every page inherited whatever the API happened to need.
 
 A module below importing a router is the mistake that already happened once —
 `schemas.py` imported the tags router for a tag-cleaning helper, and since that
@@ -103,6 +106,15 @@ because storing a post means creating the tags it names; `users.py` and
 current user. Nothing points back: `tags.py` returns tags, never posts, and
 what returns posts *by* tag lives in `posts.py`. Otherwise the two would
 import each other.
+
+**And the arrow that used to point back.** Pagination arrived as `SkipDep` and
+`LimitDep` living in `services/posts.py`, because posts were the first list to
+need them. Tags are paged the same way, so `tags.py` imported `posts.py`, and
+`posts.py` already imported `tags.py` — the application stopped importing.
+A slice is not a property of either entity; it belongs at the boundary, which
+is why `Pagination` and `Page[T]` sit in `schemas/pagination.py` and both
+services read them from there. This is the same mistake as the tag-cleaning
+helper above, one layer up.
 
 `seed.py` is off the diagram. It imports `core.security`, `infrastructure` and
 `services.tags` and is imported by nothing; it is a script, not part of the
@@ -200,8 +212,12 @@ Three things the columns do not say:
 graph TD
     subgraph shared["static/js — no build step, plain ES modules"]
         auth_js["auth.js<br/>the token: read, save, clear,<br/>who it belongs to"]
-        utils_js["utils.js<br/>sendJSON · wireForm<br/>the two result windows"]
+        utils_js["utils.js<br/>sendRequest · wireForm<br/>escapeHtml · formatDate<br/>the two result windows"]
+        archive_js["archive.js<br/>«ещё»: следующая порция<br/>из того же /api"]
     end
+
+    home["home.html · tags.html<br/>user_posts.html"] --> archive_js
+    archive_js --> utils_js
 
     layout["layout.html<br/>every page"] --> auth_js
     login["login.html"] --> auth_js

@@ -123,6 +123,13 @@ class PostResponse(BaseModel):
     is_pinned: bool
     tags: list[str]
 
+    # Обе берутся из свойств модели через from_attributes. Они здесь не
+    # ради полноты, а потому что карточку в архиве рисуют две стороны —
+    # Jinja на первой порции и JavaScript на следующих, — и различаться
+    # они не должны.
+    reading_minutes: int
+    outline: list[str]
+
     @field_validator("tags", mode="before")
     @classmethod
     def flatten_tags(cls, value):
@@ -131,11 +138,3 @@ class PostResponse(BaseModel):
 
 class PostDetail(PostResponse):
     content: str
-
-
-class PaginatedPostResponse(BaseModel):
-    posts: list[PostResponse]
-    total: int
-    skip: int
-    limit: int
-    has_more: bool
