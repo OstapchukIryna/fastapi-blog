@@ -1,13 +1,13 @@
-"""
-Срез: как его просят в запросе и как отдают в ответе.
+"""A slice of a list: how one is asked for, and how one is handed back.
 
-Отдельный модуль, а не пара алиасов среди постов, по прозаической
-причине: теги листаются ровно так же. Когда SkipDep жил в
-services/posts.py, услуга тегов импортировала услугу постов, а та
-импортировала теги обратно — и приложение переставало импортироваться.
+This is a module of its own rather than a couple of aliases living beside
+posts, for a plain reason: tags are paged the same way. While the aliases
+sat in services/posts.py, the tags service imported the posts service and
+the posts service imported tags back, and the application stopped
+importing at all.
 
-Срез не принадлежит ни одной сущности. Он принадлежит границе, то есть
-схемам, и оба сервиса берут его отсюда, не зная друг о друге.
+A slice is not a property of any entity. It belongs at the boundary, so
+both services read it from here and neither knows the other exists.
 """
 
 from collections.abc import Iterable
@@ -18,40 +18,57 @@ from pydantic import BaseModel, Field, computed_field
 
 from blog.core.config import settings
 
+MAX_PAGE_SIZE = 100
+
 
 class Pagination(BaseModel):
-    """
-    Сколько уже показано и сколько взять дальше.
+    """How much has already been shown, and how much to fetch next.
 
-    skip/limit, а не page/per_page: следующая порция приезжает кнопкой на
-    той же странице, а не переходом на другую, и «сколько уже показано» —
-    это буквально skip. Номер страницы пришлось бы держать во втором
-    месте и умножать обратно.
+    skip and limit rather than page and size: the next batch arrives via
+    a button on the same page rather than a jump to another one, and "how
+    many are already on screen" is literally the offset. A page number
+    would have to be kept somewhere else and multiplied back into an
+    offset at every call site.
 
-    Потолок в 100 — не вкусовщина: без него один запрос с limit=100000
-    вытаскивает всю таблицу вместе с joinedload автора.
+    Attributes:
+        skip (int): records to pass over. Zero on a first visit.
+        limit (int): how many to return. Defaults to the configured page
+            size so the number lives in settings, not in four signatures.
     """
 
     skip: int = Field(default=0, ge=0)
-    limit: int = Field(default=settings.posts_per_page, ge=1, le=100)
+    # ! The ceiling is not decoration. Without it a single request with
+    # ! limit=100000 pulls the whole table, each row joined to its author.
+    limit: int = Field(default=settings.posts_per_page, ge=1, le=MAX_PAGE_SIZE)
 
 
-# Модель за Query() описывает строку запроса так же, как модель за
-# Form() описывает форму, а модель в теле — JSON. Роут пишет `page:
-# PageParams` и получает уже проверенные числа.
+# * A model behind Query() describes the query string the way a model
+# * behind Form() describes a form and a model in the body describes
+# * JSON. A route writes `page: PageParams` and receives numbers that
+# * have already been checked.
 PageParams = Annotated[Pagination, Query()]
 
 
 class Page[T](BaseModel):
-    """
-    Порция и то, что нужно, чтобы попросить следующую.
+    """One batch of results, and what is needed to ask for the next.
 
-    Один конверт на все списки: посты, посты автора, посты по тегу,
-    теги. Раньше это были два одинаковых класса с разными именами полей,
-    и любая правка одного молча расходилась со вторым.
+    A single envelope for every list in the application: posts, an
+    author's posts, posts under a tag, and the tags themselves. It
+    replaced two identical classes with different field names, which had
+    already started to drift.
 
-    has_more считается здесь, а не у вызывающего. Арифметика ошибается на
-    единицу ровно в тех местах, где её написали второй раз.
+    Generic so each use gets its own schema in the OpenAPI document: a
+    client generating code from it sees a page of posts, not a page of
+    anything.
+
+    Attributes:
+        items (list[T]): the records in this batch.
+        total (int): how many exist under the same query — not in the
+            table. An author's page counts that author's posts, which is
+            what stops the "load more" button outliving the last one.
+        skip (int): the offset this batch was taken at.
+        limit (int): the size that was asked for. The batch may be
+            shorter; it is never longer.
     """
 
     items: list[T]
@@ -62,15 +79,34 @@ class Page[T](BaseModel):
     @computed_field
     @property
     def has_more(self) -> bool:
+        """Whether another batch exists after this one.
+
+        Derived rather than stored, and derived here rather than at the
+        four call sites that would otherwise each compute it. Off-by-one
+        errors happen in the places where an expression was written a
+        second time.
+
+        Returns:
+            bool: True when the end has not been reached.
+        """
         return self.skip + len(self.items) < self.total
 
     @classmethod
     def of(cls, items: Iterable[Any], total: int, page: Pagination) -> Self:
-        """
-        Собрать конверт из того, что вернул сервис.
+        """Wrap what a service returned, keeping the request's own numbers.
 
-        Звать нужно у параметризованного класса — `Page[PostResponse].of`,
-        — тогда ORM-объекты проверяются в PostResponse прямо здесь. У
-        голого Page параметр равен Any, и внутрь ляжет что угодно.
+        Call this on the parameterised class — `Page[PostResponse].of(…)`
+        — so the ORM objects are validated into the response model right
+        here. On the bare class the parameter is Any and anything at all
+        would be accepted.
+
+        Args:
+            items (Iterable[Any]): the records, usually ORM rows.
+            total (int): how many exist under the same query.
+            page (Pagination): the slice that was requested; its skip and
+                limit are echoed back so a client need not remember them.
+
+        Returns:
+            Self: the envelope, ready to be returned from a route.
         """
         return cls(items=list(items), total=total, skip=page.skip, limit=page.limit)

@@ -1,6 +1,9 @@
-"""
-Form state and how it turns into a page.
+"""The post form's state, and how that state becomes a page.
 
+Separate from pages.py because this is the only place on the site where
+what is rendered depends not just on the database but on what a person
+has just typed and what the validator made of it. The routes are left
+with two steps: obtain the state, render it.
 """
 
 from dataclasses import dataclass, field
@@ -42,24 +45,53 @@ class PostFormView:
 
     @property
     def editing(self) -> bool:
-        # Whether an existing post is being edited. Distinguishes editing from creating.
+        """Whether this form is editing an existing post or starting one.
+
+        Derived rather than passed, so "edit mode with no post" is not a
+        state anybody can construct by accident.
+
+        Returns:
+            bool: True when a post is being edited.
+        """
         return self.post is not None
 
     @property
     def title(self) -> str:
-        # Title for the page and the browser tab.
+        """The heading, which is also the browser tab's title.
+
+        Returns:
+            str: wording that matches what the form is actually doing.
+        """
         return "Edit post" if self.editing else "New post"
 
     @property
     def status_code(self) -> int:
-        # HTTP status the form should be returned with.
+        """The status the form should be returned with.
+
+        Derived from whether there are errors, so a page showing
+        complaints cannot be served as a 200 — which would tell a client,
+        a cache and a crawler that the submission succeeded.
+
+        Returns:
+            int: 422 when the view carries errors, 200 otherwise.
+        """
         return (
             status.HTTP_422_UNPROCESSABLE_CONTENT if self.errors else status.HTTP_200_OK
         )
 
 
 def post_to_input(post: models.Post) -> PostFormInput:
-    # Convert an existing post that is being edited into the values its form fields show.
+    """Turn a stored post back into the strings its form fields show.
+
+    The inverse of what the browser sends: tags become one comma-joined
+    string again, because that is the only shape an HTML text field has.
+
+    Args:
+        post (models.Post): the post being edited.
+
+    Returns:
+        PostFormInput: field values, ready to be rendered into the form.
+    """
     return PostFormInput(
         title=post.title,
         summary=post.summary,

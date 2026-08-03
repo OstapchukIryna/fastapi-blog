@@ -1,16 +1,19 @@
-"""
-Посты: что про них можно спросить и что с ними можно сделать.
+"""Posts: what can be asked about them, and what can be done to them.
 
-Здесь же зависимости, которые загружают пост и проверяют, что он твой.
+The dependencies that load a post and establish that it is yours live
+here too, next to the queries they are built from.
 
-Транзакция принадлежит этому модулю, а не роуту: функция, которая
-меняет пост, сама и коммитит. Иначе «сохранить» было бы двумя строками,
-и рано или поздно одна из поверхностей забыла бы вторую.
+The transaction belongs to this module rather than to the route: a
+function that changes a post commits it. Otherwise "save" would be two
+statements, and sooner or later one of the two surfaces would forget the
+second one.
 
-Список отдаётся парой (записи, всего) — ORM-объектами, не схемой.
-Конверт собирает презентация: JSON-роуту нужен Page[PostResponse],
-а странице нужны сами посты, у которых есть outline и reading_minutes.
-Сервис, возвращающий схему ответа, обслуживает только одну из двух.
+Listings return a pair — the records and the total — as ORM objects
+rather than as a response schema. The envelope is assembled by whoever
+asked: the JSON route wants Page[PostResponse], while a page wants the
+posts themselves, because it reads outline and reading_minutes off them.
+A service that returns the response shape can only serve one of the two,
+and returning it is what broke the front page once.
 """
 
 from collections.abc import Sequence
@@ -34,28 +37,29 @@ from blog.services.auth import CurrentUser
 
 
 def base_query() -> Select[tuple[models.Post]]:
-    """
-    Build the base post query with its relations already loaded.
+    """The query every listing starts from, relations already loaded.
 
-    selectinload and joinedload are not speculative optimisation: without
-    them, touching post.tags in a template issues one query per post,
-    which is the N+1 problem.
-
-    joinedload здесь безопасен вместе с LIMIT только потому, что автор —
-    это many-to-one: одна строка на пост. Заменить его на joinedload для
-    тегов — и LIMIT начнёт резать строки соединения, а не посты.
-
-    Сортировка. Закреплённый пост идёт первым не в шаблоне, а в запросе:
-    иначе он выпадает из среза на второй порции и либо исчезает, либо
-    приезжает второй раз на своём месте по дате. Сортировка по id в
-    конце делает порядок полным — без неё два поста с одной секундой
-    меняются местами между запросами, и один показывается дважды, а
-    другой не показывается вовсе.
+    Eager loading is not speculative optimisation here. Touching
+    post.tags in a template with lazy loading issues one query per post
+    — the N+1 problem — and the cost grows with the amount of content.
 
     Returns:
-        Select: pinned first, then newest by date, with tags and author loaded.
-
+        Select: posts ordered pinned first, then newest, with their tags
+            and authors attached.
     """
+    # ! joinedload is safe next to LIMIT only because the author is
+    # ! many-to-one: one row per post. Switching tags to joinedload would
+    # ! make LIMIT slice join rows instead of posts, and a page asking
+    # ! for ten would show four.
+    #
+    # * Pinned-first is decided in the query, not in the template. A
+    # * template can only reorder what it was given, so on the second
+    # * batch the pinned post is simply not in the slice: the hero spot
+    # * would fall to whatever came first, and the pinned post would
+    # * reappear later in date order. Sorting by id last makes the order
+    # * total — without it, two posts sharing a second swap places
+    # * between requests, and one shows up twice while another never
+    # * shows up at all.
     return (
         select(models.Post)
         .options(
@@ -73,20 +77,24 @@ def base_query() -> Select[tuple[models.Post]]:
 async def _slice(
     db: AsyncSession, query: Select[tuple[models.Post]], page: Pagination
 ) -> tuple[Sequence[models.Post], int]:
-    """
-    Взять порцию и посчитать, сколько всего под этот же запрос.
+    """Take one batch, and count how many exist under the same query.
 
-    Считается по тому самому query, а не по всей таблице: у постов
-    автора «всего» — это его посты, а не все на свете. Иначе кнопка
-    «ещё» остаётся видимой после последней записи.
+    The count comes from the query that was passed in, not from the
+    table: for an author's page the total is that author's posts, not
+    every post there is. Counting the table instead leaves the "load
+    more" button visible after the last record.
 
-    order_by(None) обязателен: сортировать подзапрос, который сейчас
-    посчитают, бессмысленно, а некоторые базы на этом ругаются.
+    Args:
+        db (AsyncSession): session to query through.
+        query (Select): the filtered, ordered query to take a batch from.
+        page (Pagination): the offset and size being asked for.
 
     Returns:
-        tuple: сами записи и общее число под этот запрос.
-
+        tuple[Sequence[models.Post], int]: the batch, and the total.
     """
+    # * order_by(None) before counting: sorting a subquery that is about
+    # * to be reduced to a number is wasted work, and some databases
+    # * reject it outright.
     total = await db.scalar(
         select(func.count()).select_from(query.order_by(None).subquery())
     )
@@ -207,7 +215,21 @@ async def find_related(
 
 
 async def load_post(post_id: int, db: DbSession) -> models.Post:
-    """Returns post by id, otherwise 404."""
+    """Load the post at this id, or refuse.
+
+    A dependency rather than a helper, so that "this post exists" is
+    established before a route body starts rather than inside it.
+
+    Args:
+        post_id (int): from the path.
+        db (DbSession): session to load through.
+
+    Returns:
+        models.Post: the post, with tags and author already attached.
+
+    Raises:
+        HTTPException: 404 when no post has that id.
+    """
     result = await db.execute(base_query().where(models.Post.id == post_id))
     post = result.scalars().first()
     if post is None:
@@ -221,8 +243,7 @@ PostDep = Annotated[models.Post, Depends(load_post)]
 
 
 def owned_post(post: PostDep, current_user: CurrentUser) -> models.Post:
-    """
-    The post at this id, once it is established that it is the caller's.
+    """The post at this id, once established to be the caller's.
 
     A precondition rather than a step, so it is a dependency: the routes
     that change a post have nothing to say about somebody else's, and
@@ -239,7 +260,6 @@ def owned_post(post: PostDep, current_user: CurrentUser) -> models.Post:
 
     Returns:
         models.Post: the same post, now known to be theirs.
-
     """
     if post.user_id != current_user.id:
         raise HTTPException(
@@ -256,11 +276,19 @@ OwnedPost = Annotated[models.Post, Depends(owned_post)]
 
 
 async def create(db: AsyncSession, form: PostForm, author: models.User) -> models.Post:
-    """
-    Store a new post by this author.
+    """Store a new post and return it as saved.
 
-    The relationship wants the User, not its id — assigning the id here
-    made SQLAlchemy try to treat an int as a User.
+    Args:
+        db (AsyncSession): session to write through.
+        form (PostForm): the validated post.
+        author (models.User): whoever the token belongs to. Passed as the
+            object rather than an id — the relationship expects a User,
+            and handing it an int makes SQLAlchemy try to treat the
+            number as one.
+
+    Returns:
+        models.Post: the stored post, with its author refreshed so a
+            response model can read it without a second query.
     """
     post = models.Post(
         title=form.title,
@@ -276,8 +304,7 @@ async def create(db: AsyncSession, form: PostForm, author: models.User) -> model
 
 
 async def replace(db: AsyncSession, post: models.Post, form: PostForm) -> models.Post:
-    """
-    Replace every editable field of a post.
+    """Replace every editable field of a post.
 
     PUT is a full replacement, so the body carries the whole post. Unlike
     update below, nothing is left alone: a field the client omits
@@ -292,7 +319,6 @@ async def replace(db: AsyncSession, post: models.Post, form: PostForm) -> models
 
     Returns:
         models.Post: the post as stored after the replacement.
-
     """
     replacement = form.model_dump()
     post.tags = await tag_service.get_or_create(db, replacement.pop("tags"))
@@ -307,8 +333,7 @@ async def replace(db: AsyncSession, post: models.Post, form: PostForm) -> models
 async def update(
     db: AsyncSession, post: models.Post, changes: PostUpdate
 ) -> models.Post:
-    """
-    Change some fields of a post, leaving the rest alone.
+    """Change some fields of a post, leaving the rest alone.
 
     Which fields to touch comes from exclude_unset, so an omitted field
     and a field sent as null both mean "leave it alone". The keys can
@@ -329,7 +354,6 @@ async def update(
 
     Returns:
         models.Post: the post as stored after the change.
-
     """
     wanted = changes.model_dump(exclude_unset=True, exclude_none=True)
 
@@ -343,33 +367,39 @@ async def update(
 
 
 async def delete(db: AsyncSession, post: models.Post) -> None:
-    """
-    Delete a post.
+    """Delete a post.
 
-    Asking again gives 404, not success: DELETE is idempotent in its
-    effect — the post is gone either way — but the second call honestly
-    reports that there was nothing at that id to delete.
+    Asking a second time gives 404 rather than success. DELETE is
+    idempotent in its effect — the post is gone either way — but
+    answering "done" for an id that holds nothing would be a claim about
+    the world that is false.
 
     The rows in post_tags go with the post. The tags themselves stay,
-    even when nothing references them any more; they are invisible in
-    /api/tags, which joins through posts, but they do accumulate.
+    even once nothing references them; they are invisible in /api/tags,
+    which counts through posts, but they do accumulate.
+
+    Args:
+        db (AsyncSession): session to write through.
+        post (models.Post): the post to remove.
     """
     await db.delete(post)
     await db.commit()
 
 
 async def set_pinned(db: AsyncSession, post: models.Post, *, pinned: bool) -> None:
-    """
-    Set pinned status for a post.
+    """Pin or unpin a post, keeping at most one pinned.
 
-    At most one post is pinned, and nothing in the schema enforces it —
-    the other rows are cleared here, in the same transaction.
+    The single-winner rule is enforced here rather than by a constraint,
+    because clearing the previous winner and setting the new one has to
+    happen in one transaction — a constraint could only reject the
+    second write, not perform the first.
 
     Args:
-        db (AsyncSession): current database session
-        post (models.Post): post to be pinned
-        pinned (bool): if True, pin the post; if False, unpin the post
-
+        db (AsyncSession): session to write through.
+        post (models.Post): the post to pin or unpin.
+        pinned (bool): the state to leave it in. Keyword-only, so a call
+            site cannot read as set_pinned(db, post, True) and leave the
+            reader guessing what the boolean means.
     """
     if pinned:
         await db.execute(

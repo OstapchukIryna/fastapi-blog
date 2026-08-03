@@ -1,14 +1,17 @@
-"""
-The blog application.
+"""A small blogging application, arranged in five layers.
 
-Five layers, and an import may only ever point downwards:
+Every layer is a package rather than a module, so a new entity arrives as
+a file beside its siblings instead of a section appended to a growing
+file. Imports may point downwards or sideways, never up:
 
-    presentation/  api и web — всё, что знает про HTTP и про Jinja
-    services/      что приложение умеет делать: запросы, правила, отказы
-    schemas/       формы данных на границе
-    infrastructure/ база, ORM-модели, файлы на диске
-    core/          настройки и криптография; не импортирует ничего нашего
+    presentation/   HTTP and Jinja: routes, templates, error rendering
+    services/       what the application can do, and on what conditions
+    schemas/        the shapes data takes at the boundary
+    infrastructure/ the database, the ORM classes, files on disk
+    core/           settings and cryptography; imports nothing of ours
 
-Каждый слой — пакет, а не модуль, чтобы новая сущность добавлялась
-файлом рядом, а не строкой в конце общего файла.
+The rule is enforced rather than described: `tests/test_import_graph.py`
+walks the same imports and fails on a cycle, on an upward arrow, and on a
+sideways arrow nobody has justified. Both import cycles this project has
+had began as a sideways arrow added without thinking.
 """

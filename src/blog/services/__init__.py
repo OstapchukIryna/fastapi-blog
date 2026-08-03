@@ -1,12 +1,12 @@
-"""
-Что приложение умеет делать — и на каких условиях.
+"""What the application can do, and on what conditions.
 
-Сюда переехало всё, что раньше лежало в теле роутов: запросы, правила,
-отказы. Смысл в том, что обе поверхности — JSON и страницы — зовут одни
-и те же функции, поэтому «пост принадлежит не вам» звучит одинаково там
-и там, а не двумя похожими кусками кода.
+Everything that once sat in route bodies lives here: the queries, the
+rules, the refusals, and the transaction. The point is that both surfaces
+— JSON and pages — call the same functions, so "this post is not yours"
+is one place in the code rather than two similar pieces that drift.
 
-Здесь же живут Annotated-псевдонимы (PostDep, OwnedPost, CurrentUser и
-прочие) — рядом с той функцией, которая их наполняет. Отдельного модуля
-сборки нет намеренно: роут называет нужное в сигнатуре, и этого хватает.
+The Annotated dependency aliases live here too (PostDep, OwnedPost,
+CurrentUser and the rest), each next to the function that fills it. There
+is deliberately no central wiring module: a route names what it needs in
+its signature, and that is enough.
 """
