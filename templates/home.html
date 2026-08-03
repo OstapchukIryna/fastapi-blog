@@ -1,16 +1,20 @@
 {% extends "layout.html" %}
 {% import "_contact.html" as contact %}
+{# with context обязателен: url_for Starlette кладёт в контекст рендера,
+   а import по умолчанию его не передаёт — макрос падал бы на KeyError:
+   'request'. Для _contact.html этого не нужно: site лежит в globals. #}
+{% import "_cards.html" as cards with context %}
 {% block content %}
     {% if filter_tag %}
         <header class="masthead">
             <span class="eyebrow mono-label">Tagged</span>
             <h1 class="masthead-title">#{{ filter_tag }}</h1>
             <p class="masthead-tagline">
-                {{ (rest | length) + (1 if lead else 0) }} post{{ '' if ((rest | length) + (1 if lead else 0)) == 1 else 's' }}.
+                {# feed.total, а не длина порции: на странице их десять, а всего может быть сорок. #}
+                {{ feed.total }} post{{ '' if feed.total == 1 else 's' }}.
             </p>
         </header>
     {% else %}
-
         <header class="hero">
             <div class="hero-identity">
                 <img class="avatar hero-avatar"
@@ -23,21 +27,18 @@
                     <p class="hero-role">{{ site.name }} — {{ site.role }}. FastAPI web applications</p>
                 </div>
             </div>
-
             <h1 class="hero-statement">
                 I write about the things that <em>didn't work</em> the first time.
             </h1>
         </header>
     {% endif %}
-
     {% if lead %}
-
         <article class="lead-post{% if pinned %} is-pinned{% endif %}">
             {% if pinned %}
                 <span class="pin-label mono-label">Pinned</span>
             {% endif %}
             <p class="post-meta mono-label">
-                <span>{{ lead.date_posted.strftime('%d %b %Y') }}</span>
+                <span>{{ lead.date_posted.strftime("%d %b %Y") }}</span>
                 <span class="sep">/</span>
                 <span>{{ lead.author.username }}</span>
                 <span class="sep">/</span>
@@ -57,46 +58,28 @@
             {% endif %}
             <span class="read-more mono-label">Read <span class="arrow">&rarr;</span></span>
         </article>
-
-        {% if rest %}
+        {# Заголовок секции показывается и при пустом остатке, если есть что
+           догрузить: иначе первая порция из «ещё» приехала бы без шапки. #}
+        {% if rest or feed.more %}
             <p class="section-rule mono-label">{{ 'Latest' if pinned else 'Archive' }}</p>
-
-            {% for post in rest %}
-                <article class="archive-item">
-                    <p class="post-meta mono-label">
-                        <span>{{ post.date_posted.strftime('%d %b, %Y') }}</span>
-                        <span class="sep">/</span>
-                        <span>{{ post.reading_minutes }} min</span>
-                    </p>
-                    <h2>
-                        <a class="post-title stretched"
-                           href="{{ url_for('post_page', post_id=post.id) }}">{{ post.title }}</a>
-                    </h2>
-            
-                    {% if post.outline %}
-                        <ol class="post-outline mono-label">
-                            {% for heading in post.outline %}<li>{{ heading }}</li>{% endfor %}
-                        </ol>
-                    {% else %}
-                        <p class="post-excerpt">{{ post.summary }}</p>
-                    {% endif %}
-                    {% if post.tags %}
-                        <div class="card-tags mono-label">
-                            {% for tag in post.tags %}
-                                <a href="{{ url_for('get_tag', tag=tag.name) }}">#{{ tag.name }}</a>
-                            {% endfor %}
-                        </div>
-                    {% endif %}
-                </article>
-            {% endfor %}
+            <div class="archive" data-feed-list>{% for post in rest %}{{ cards.archive_item(post) }}{% endfor %}</div>
         {% endif %}
+        {{ cards.feed_more(feed) }}
     {% else %}
         <div class="empty-state">
-            <p class="mono-label mb-2">No posts yet</p>
-            <p class="mb-0">The first one is in progress.</p>
+            {# Пусто по двум разным причинам, и врать про одну из них не нужно:
+               ?skip=100 при сорока пяти постах — это не «постов ещё нет». #}
+            {% if feed and feed.total %}
+                <p class="mono-label mb-2">Nothing on this page</p>
+                <p class="mb-0">
+                    There are {{ feed.total }} posts — <a href="{{ url_for("home") }}">start from the top</a>.
+                </p>
+            {% else %}
+                <p class="mono-label mb-2">No posts yet</p>
+                <p class="mb-0">The first one is in progress.</p>
+            {% endif %}
         </div>
     {% endif %}
-
     {% if not filter_tag %}
         <section class="now-panel closing-panel" aria-label="What I'm working on now">
             <div class="now-head">
@@ -105,9 +88,13 @@
             </div>
             <dl class="now-rows">
                 <dt class="mono-label">Building</dt>
-                <dd>This blog — FastAPI, Python, REST API architecture</dd>
+                <dd>
+                    This blog — FastAPI, Python, REST API architecture
+                </dd>
                 <dt class="mono-label">Next</dt>
-                <dd>JWT auth, file uploads, pagination</dd>
+                <dd>
+                    Alembic migrations, pytest coverage
+                </dd>
                 <dt class="mono-label">Source</dt>
                 <dd>
                     <a class="now-source"
@@ -123,3 +110,9 @@
         </section>
     {% endif %}
 {% endblock content %}
+{% block scripts %}
+    <script type="module">
+        import { wireFeeds } from "/static/js/archive.js";
+        wireFeeds();
+    </script>
+{% endblock scripts %}

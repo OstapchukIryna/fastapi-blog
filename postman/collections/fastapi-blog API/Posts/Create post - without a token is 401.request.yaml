@@ -25,7 +25,7 @@ scripts:
           const listing = await new Promise((resolve) =>
               pm.sendRequest(`${pm.variables.get("baseUrl")}/api/posts`,
                   (_err, res) => resolve(res)));
-          const titles = listing.json().map((p) => p.title);
+          const titles = listing.json().items.map((p) => p.title);
           pm.expect(titles).to.not.include("Should never be stored");
       });
     language: text/javascript

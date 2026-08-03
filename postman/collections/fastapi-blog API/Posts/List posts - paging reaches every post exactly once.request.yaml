@@ -1,0 +1,44 @@
+$kind: http-request
+description: >-
+  Walks the whole list two at a time. The bug this catches is the one that
+  does not show up on page one: a partial sort order lets a post appear in
+  two slices while another appears in none.
+url: "{{baseUrl}}/api/posts?skip=0&limit=2"
+method: GET
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("200 OK", () => pm.response.to.have.status(200));
+
+      const first = pm.response.json();
+      const seen = first.items.map((p) => p.id);
+      const total = first.total;
+
+      // Дальше страницы забираются синхронно: собрать их в afterResponse
+      // проще, чем городить цепочку из pm.sendRequest с setNextRequest.
+      const fetchPage = (skip) =>
+          new Promise((resolve) =>
+              pm.sendRequest(
+                  `${pm.variables.get("baseUrl")}/api/posts?skip=${skip}&limit=2`,
+                  (err, res) => resolve(err ? null : res.json()),
+              ));
+
+      (async () => {
+          let skip = first.items.length;
+          let guard = 0;
+
+          while (skip < total && guard < 200) {
+              const page = await fetchPage(skip);
+              if (!page) break;
+              seen.push(...page.items.map((p) => p.id));
+              skip += page.items.length;
+              guard += 1;
+              if (page.items.length === 0) break;
+          }
+
+          pm.test("every post was reached", () => pm.expect(seen.length).to.eql(total));
+          pm.test("and none of them twice", () =>
+              pm.expect(new Set(seen).size).to.eql(total));
+      })();
+    language: text/javascript
+order: 1100

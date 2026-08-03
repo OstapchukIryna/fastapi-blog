@@ -1,16 +1,19 @@
 """
-The HTML side of the site: every page a useropens in a browser.
+The HTML side of the site: every page a user opens in a browser.
 
+Первая порция записей рисуется здесь, сервером. Следующие приезжают из
+того же /api, который отвечает Postman'у, — страница только говорит
+кнопке, откуда брать и сколько уже показано.
 """
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Annotated
 
 from fastapi import APIRouter, Form, Request, Response, status
 from fastapi.responses import RedirectResponse
 from pydantic import ValidationError
 
-from blog.core.config import settings
 from blog.infrastructure import models
 from blog.infrastructure.database import DbSession
 from blog.presentation.web.forms import (
@@ -20,17 +23,10 @@ from blog.presentation.web.forms import (
     render_post_form,
 )
 from blog.presentation.web.templating import templates
-from blog.schemas import PostFormInput
+from blog.schemas import PageParams, PostFormInput
 from blog.services import posts, tags
 from blog.services.auth import CurrentUser
-from blog.services.posts import (
-    LimitDep,
-    PostDep,
-    SkipDep,
-    TaggedPostsDep,
-    all_posts,
-    count_total_posts,
-)
+from blog.services.posts import PostDep
 from blog.services.users import UserDep
 
 router = APIRouter(include_in_schema=False)
@@ -38,21 +34,54 @@ router = APIRouter(include_in_schema=False)
 
 def arrange(items: Sequence[models.Post]) -> dict:
     """
-    Separate posts onto one pinned and others
+    Split a slice into the one post at the top and the rest.
+
+    Ищет закреплённый не перебором, а первым элементом: запрос уже
+    отсортирован pinned-first. Раньше перебор был обязателен, потому что
+    закреплённый мог оказаться где угодно, — а с пагинацией он ещё и
+    выпадал из второй порции, и на второй странице в шапку попадал
+    случайный пост.
 
     Args:
-        items (Sequence[models.Post]): sequence of posts
+        items (Sequence[models.Post]): одна порция, в порядке запроса.
 
     Returns:
-        dict: Dictionary containing pinned post, lead post, and the rest of the posts
+        dict: закреплённый (если он и есть первый), ведущий и остальные.
 
     """
-    pinned = next((p for p in items if p.is_pinned), None)
-    rest = [
-        p for p in items if p is not pinned
-    ]  # we need pop method and cannot use generator
-    lead = pinned or (rest.pop(0) if rest else None)
-    return {"pinned": pinned, "lead": lead, "rest": rest}
+    lead = items[0] if items else None
+    return {
+        "pinned": lead if lead is not None and lead.is_pinned else None,
+        "lead": lead,
+        "rest": list(items[1:]),
+    }
+
+
+@dataclass(slots=True)
+class Feed:
+    """
+    Что нужно кнопке «ещё»: откуда брать, сколько показано, сколько всего.
+
+    url считается через url_for по имени роута, а не пишется строкой:
+    адрес API — не тот факт, который стоит держать в двух местах.
+
+    Attributes:
+        url (str): адрес того же списка в /api.
+        shown (int): сколько записей уже на странице — и он же offset
+            следующего запроса.
+        limit (int): по сколько брать дальше.
+        total (int): сколько всего под этот запрос.
+
+    """
+
+    url: str
+    shown: int
+    limit: int
+    total: int
+
+    @property
+    def more(self) -> bool:
+        return self.shown < self.total
 
 
 # --- Routes ---------------------------------------------------------
@@ -60,24 +89,20 @@ def arrange(items: Sequence[models.Post]) -> dict:
 
 @router.get("/", name="home")
 @router.get("/posts", name="posts")
-async def home(
-    request: Request,
-    db: DbSession,
-):
-    total = await count_total_posts(db)
-    posts = await all_posts(
-        db, skip=0, limit=settings.posts_per_page
-    )  # TODO no need in offset since that is always first page with first batch
-    has_more = len(posts) < total
-
+async def home(request: Request, db: DbSession, page: PageParams):
+    items, total = await posts.list_all(db, page)
     return templates.TemplateResponse(
         request,
         "home.html",
         {
-            **arrange(posts),
+            **arrange(items),
             "title": "Home",
-            "limit": settings.posts_per_page,
-            "has_more": has_more,
+            "feed": Feed(
+                url=str(request.url_for("list_posts")),
+                shown=page.skip + len(items),
+                limit=page.limit,
+                total=total,
+            ),
         },
     )
 
@@ -104,7 +129,7 @@ async def create_post_page(
     request: Request,
     current_user: CurrentUser,
     db: DbSession,
-    form: Annotated[PostFormInput, Form()],
+    submitted: Annotated[PostFormInput, Form()],
 ) -> Response:
     """
     Create a post from the submitted form.
@@ -124,7 +149,7 @@ async def create_post_page(
         request (Request): needed by the template and by url_for.
         current_user (CurrentUser): authorized current user.
         db (DbSession): current database session.
-        form (PostFormInput): the submitted fields, unvalidated.
+        submitted (PostFormInput): the fields as typed, unvalidated.
 
     Returns:
         Response: a 303 redirect to the new post, or the form again with
@@ -132,13 +157,13 @@ async def create_post_page(
 
     """
     try:
-        data = form.validated()
+        form = submitted.validated()
     except ValidationError as exception:
         return render_post_form(
-            request, PostFormView(values=form, errors=form_errors(exception))
+            request, PostFormView(values=submitted, errors=form_errors(exception))
         )
 
-    post = await posts.create(db, data, current_user)
+    post = await posts.create(db, form, current_user)
     return RedirectResponse(
         request.url_for("post_page", post_id=post.id),
         status_code=status.HTTP_303_SEE_OTHER,
@@ -169,7 +194,7 @@ async def update_post(
     request: Request,
     post: PostDep,
     db: DbSession,
-    form: Annotated[PostFormInput, Form()],
+    submitted: Annotated[PostFormInput, Form()],
 ) -> Response:
     """
     Save an edit to a post.
@@ -178,7 +203,7 @@ async def update_post(
         request (Request): needed by the template and by url_for.
         post (PostDep): the post being edited.
         db (DbSession): current database session.
-        form (PostFormInput): the submitted fields, unvalidated.
+        submitted (PostFormInput): the fields as typed, unvalidated.
 
     Returns:
         Response: a 303 redirect to the post, or the form again with
@@ -188,14 +213,14 @@ async def update_post(
 
     """
     try:
-        data = form.validated()
+        form = submitted.validated()
     except ValidationError as exception:
         return render_post_form(
             request,
-            PostFormView(values=form, post=post, errors=form_errors(exception)),
+            PostFormView(values=submitted, post=post, errors=form_errors(exception)),
         )
 
-    await posts.replace(db, post, data)
+    await posts.replace(db, post, form)
     return RedirectResponse(
         request.url_for("post_page", post_id=post.id),
         status_code=status.HTTP_303_SEE_OTHER,
@@ -228,47 +253,62 @@ async def post_page(request: Request, post: PostDep, db: DbSession):
 
 
 @router.get("/tags", name="tags_index")
-async def tags_index(
-    request: Request,
-    db: DbSession,
-    skip: SkipDep = 0,
-    limit: LimitDep = settings.posts_per_page,
-):
+async def tags_index(request: Request, db: DbSession, page: PageParams):
+    rows, total = await tags.with_counts(db, page)
     return templates.TemplateResponse(
         request,
         "tags.html",
-        {"topics": await tags.all_topics(db, skip, limit), "title": "Topics"},
+        {
+            "tags": rows,
+            "title": "Topics",
+            "feed": Feed(
+                url=str(request.url_for("list_tags")),
+                shown=page.skip + len(rows),
+                limit=page.limit,
+                total=total,
+            ),
+        },
     )
 
 
 @router.get("/tags/{tag}", name="get_tag")
-def get_tag(request: Request, tag: str, tagged: TaggedPostsDep):
+async def get_tag(request: Request, tag: str, db: DbSession, page: PageParams):
+    items, total = await posts.with_tag(db, tag, page)
     return templates.TemplateResponse(
         request,
         "home.html",
         {
-            **arrange(tagged),
+            **arrange(items),
             "filter_tag": tag,
             "title": f"#{tag}",
+            "feed": Feed(
+                url=str(request.url_for("get_tag_posts", tag=tag)),
+                shown=page.skip + len(items),
+                limit=page.limit,
+                total=total,
+            ),
         },
     )
 
 
 @router.get("/users/{user_id}/posts", name="user_posts")
 async def user_posts_page(
-    request: Request,
-    user: UserDep,
-    db: DbSession,
-    skip: SkipDep = 0,
-    limit: LimitDep = settings.posts_per_page,
+    request: Request, user: UserDep, db: DbSession, page: PageParams
 ):
+    items, total = await posts.for_author(db, user.id, page)
     return templates.TemplateResponse(
         request,
         "user_posts.html",
         {
-            "posts": await posts.by_author(db, user.id, skip, limit),
+            "posts": items,
             "user": user,
             "title": f"{user.username}'s posts",
+            "feed": Feed(
+                url=str(request.url_for("get_user_posts", user_id=user.id)),
+                shown=page.skip + len(items),
+                limit=page.limit,
+                total=total,
+            ),
         },
     )
 

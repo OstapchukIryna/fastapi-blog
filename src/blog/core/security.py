@@ -17,19 +17,26 @@ from blog.core.config import settings
 password_hash = PasswordHash.recommended()
 
 
-def unauthorized(detail: str) -> HTTPException:
+class Unauthorized(HTTPException):
     """
     A 401 carrying the challenge header.
 
-    Returned rather than raised, so the `raise` stays at the place that
-    decided to refuse. WWW-Authenticate is what makes it a challenge and
-    not just a status: without it the OAuth flow has nothing to answer.
+    A class rather than a function returning one: `unauthorized(...)`
+    read as a question about the caller, and the thing it returned was
+    an object nobody could tell from a value. `raise Unauthorized(...)`
+    says what it is, and the `raise` still stays at the place that
+    decided to refuse.
+
+    WWW-Authenticate is what makes it a challenge and not just a status:
+    without it the OAuth flow has nothing to answer.
     """
-    return HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail=detail,
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+
+    def __init__(self, detail: str) -> None:
+        super().__init__(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=detail,
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
 
 def hash_password(password: str) -> str:

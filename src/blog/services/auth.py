@@ -1,6 +1,5 @@
 """
 Authentication and authorization.
-- --- IGNORE ---
 
 core/security.py умеет проверить подпись и не знает про базу; здесь к
 этому добавляется база — токен превращается в строку таблицы users, а не
@@ -15,7 +14,7 @@ from fastapi import Depends
 from fastapi.security import OAuth2PasswordBearer
 
 from blog.core.config import settings
-from blog.core.security import create_access_token, unauthorized, verify_access_token
+from blog.core.security import Unauthorized, create_access_token, verify_access_token
 from blog.infrastructure import models
 from blog.infrastructure.database import DbSession
 from blog.schemas import Token
@@ -33,11 +32,11 @@ async def get_current_user(token: TokenDep, db: DbSession) -> models.User:
         # pyrefly: ignore [bad-argument-type]
         user_id = int(verify_access_token(token))
     except TypeError, ValueError:
-        raise unauthorized("Invalid or expired token") from None
+        raise Unauthorized("Invalid or expired token") from None
 
     user = await db.get(models.User, user_id)
     if not user:
-        raise unauthorized("User not found")
+        raise Unauthorized("User not found")
     return user
 
 
