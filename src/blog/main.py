@@ -5,7 +5,7 @@ shutdown releases the pool, and the rest of the file is a list of what is
 mounted where — which is the whole point of keeping it short.
 """
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -25,7 +25,7 @@ from blog.presentation.web import pages
 
 
 @asynccontextmanager
-async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
     """Create the schema on the way up, release the pool on the way down.
 
     create_all is a stand-in for migrations: it adds tables that do not
