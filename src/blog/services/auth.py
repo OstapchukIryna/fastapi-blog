@@ -1,5 +1,6 @@
 """
-Кто сейчас говорит с приложением.
+Authentication and authorization.
+- --- IGNORE ---
 
 core/security.py умеет проверить подпись и не знает про базу; здесь к
 этому добавляется база — токен превращается в строку таблицы users, а не
@@ -29,6 +30,7 @@ async def get_current_user(token: TokenDep, db: DbSession) -> models.User:
     # int() covers both refusals at once: a rejected token gives None,
     # and a sub that is not a number gives whatever was in the claim.
     try:
+        # pyrefly: ignore [bad-argument-type]
         user_id = int(verify_access_token(token))
     except TypeError, ValueError:
         raise unauthorized("Invalid or expired token") from None

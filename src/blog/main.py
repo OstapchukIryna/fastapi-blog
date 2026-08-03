@@ -10,11 +10,6 @@ from blog.presentation.api import posts, tags, users
 from blog.presentation.errors import register_error_handlers
 from blog.presentation.web import pages
 
-# models импортируется ради побочного эффекта: create_all создаёт ровно
-# те таблицы, чьи классы к этому моменту зарегистрированы в Base. Через
-# роутеры они и так подтянутся, но тогда набор таблиц зависел бы от того,
-# что кому понадобилось импортировать.
-
 
 # async await of creating db tables if they're not exist
 @asynccontextmanager
@@ -37,8 +32,6 @@ app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(posts.router, prefix="/api/posts", tags=["posts"])
 app.include_router(tags.router, prefix="/api/tags", tags=["tags"])
 
-# Без префикса и вне схемы: это адреса, которые человек набирает,
-# а не поверхность API.
 app.include_router(pages.router)
 
 register_error_handlers(app)

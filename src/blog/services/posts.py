@@ -1,26 +1,31 @@
 """
-Посты: что про них можно спросить и что с ними можно сделать.
+All about posts: what you can ask about them and what you can do with them.
 
-Транзакция принадлежит этому модулю, а не роуту: функция, которая
-меняет пост, сама и коммитит. Иначе «сохранить» было бы двумя строками,
-и рано или поздно одна из поверхностей забыла бы вторую.
+Also contains the dependencies that load a post and check that it is owned by the caller.
+
 """
 
 from collections.abc import Sequence
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, status
-from sqlalchemy import Select, select, update
+from fastapi import Depends, HTTPException, Query, status
+from sqlalchemy import Select, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
 from blog.infrastructure import models
 from blog.infrastructure.database import DbSession
 from blog.schemas import PostForm, PostUpdate
+from blog.schemas.post import PaginatedPostResponse, PostResponse
 from blog.services.auth import CurrentUser
 from blog.services.tags import get_or_create_tags
 
 # --- Queries ---------------------------------------------------------
+
+
+async def count_total_posts(db: DbSession):
+    result = await db.execute(select(func.count()).select_from(models.Post))
+    return result.scalar() or 0
 
 
 def posts_query() -> Select[tuple[models.Post]]:
@@ -45,16 +50,49 @@ def posts_query() -> Select[tuple[models.Post]]:
     )
 
 
-async def all_posts(db: AsyncSession) -> Sequence[models.Post]:
-    """Every post, newest first."""
-    result = await db.execute(posts_query())
-    return result.scalars().unique().all()
+SkipDep = Annotated[int, Query(ge=0)]
+LimitDep = Annotated[int, Query(ge=1, le=100)]
 
 
-async def by_author(db: AsyncSession, user_id: int) -> Sequence[models.Post]:
+async def all_posts(
+    db: AsyncSession,
+    skip: SkipDep,
+    limit: LimitDep,
+) -> PaginatedPostResponse:
+    """Every post, newest first, paginated."""
+    result = await db.execute(posts_query().offset(skip).limit(limit))
+    posts = result.scalars().unique().all()
+    total = await count_total_posts(db)
+    has_more = skip + len(posts) < total
+    return PaginatedPostResponse(
+        posts=[PostResponse.model_validate(post) for post in posts],
+        total=total,
+        skip=skip,
+        limit=limit,
+        has_more=has_more,
+    )
+
+
+async def by_author(
+    db: AsyncSession,
+    user_id: int,
+    skip: SkipDep,
+    limit: LimitDep,
+) -> PaginatedPostResponse:
     """Everything one person wrote, newest first."""
-    result = await db.execute(posts_query().where(models.Post.user_id == user_id))
-    return result.scalars().unique().all()
+    result = await db.execute(
+        posts_query().where(models.Post.user_id == user_id).offset(skip).limit(limit)
+    )
+    posts = result.scalars().unique().all()
+    total = await count_total_posts(db)
+    has_more = skip + len(posts) < total
+    return PaginatedPostResponse(
+        posts=[PostResponse.model_validate(post) for post in posts],
+        total=total,
+        skip=skip,
+        limit=limit,
+        has_more=has_more,
+    )
 
 
 async def find_related(

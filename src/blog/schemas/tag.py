@@ -29,3 +29,11 @@ def normalise_tags(value: list[str]) -> list[str]:
     cleaned = [tag.strip().lower() for tag in value if tag.strip()]
     # dict keeps order
     return list(dict.fromkeys(cleaned))
+
+
+class PaginatedTagResponse(BaseModel):
+    tags: list[TagCount]
+    total: int
+    skip: int
+    limit: int
+    has_more: bool

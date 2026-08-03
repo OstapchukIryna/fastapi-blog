@@ -1,18 +1,22 @@
 from fastapi import APIRouter, Response, status
 
+from blog.core.config import settings
 from blog.infrastructure.database import DbSession
-from blog.schemas import PostCreate, PostDetail, PostResponse, PostUpdate
+from blog.schemas import PostCreate, PostDetail, PostUpdate
+from blog.schemas.post import PaginatedPostResponse
 from blog.services import posts
 from blog.services.auth import CurrentUser
-from blog.services.posts import OwnedPost, PostDep
+from blog.services.posts import LimitDep, OwnedPost, PostDep, SkipDep
 
 router = APIRouter()
 
 
-@router.get("", response_model=list[PostResponse])
-async def list_posts(db: DbSession):
+@router.get("", response_model=PaginatedPostResponse)
+async def list_posts(
+    db: DbSession, skip: SkipDep = 0, limit: LimitDep = settings.posts_per_page
+):
     # List all posts
-    return await posts.all_posts(db)
+    return await posts.all_posts(db, skip, limit)
 
 
 # Show one post

@@ -1,14 +1,6 @@
 """
-The HTML side of the site: every page a person opens in a browser.
+The HTML side of the site: every page a useropens in a browser.
 
-Separate from the api/ package because those answer JSON and these answer
-pages, and the two had grown different needs — the form state, the error
-wording, the arrangement of a front page — none of which the API has any
-use for.
-
-Ни одного запроса к базе здесь нет: и страницы, и API зовут services/, и
-поэтому «пост не найден» на странице и в JSON — одно и то же место в
-коде. Route names are unchanged: url_for in the templates depends on them.
 """
 
 from collections.abc import Sequence
@@ -69,7 +61,7 @@ async def home(request: Request, db: DbSession):
 
 
 # Must be declared before /posts/{post_id} because FastAPI parses routes in the order of registration,
-# and "new" would otherwise match post_id: int and give 422
+# and "new" would otherwise match post_id: int
 @router.get("/posts/new", name="new_post")
 def new_post_form(request: Request) -> Response:
     """

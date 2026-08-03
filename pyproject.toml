@@ -21,29 +21,21 @@ dependencies = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-# src-layout: пакет лежит в src/blog и ставится в venv редактируемым,
-# поэтому `import blog` работает одинаково из приложения, из seed.py и из
-# тестов — и не зависит от того, из какого каталога запущен процесс.
 [tool.hatch.build.targets.wheel]
 packages = ["src/blog"]
 
 [tool.pyrefly]
 project-includes = ["**/*.py"]
 project-excludes = [".venv/**", "**/__pycache__/**"]
-# src/ — ради `import blog`, корень — ради seed.py, tests/ и scripts/,
-# которые пакетом не являются и живут рядом. Без корня `from .conftest
-# import ...` в тестах перестаёт разрешаться.
 search-path = ["src", "."]
 
 [tool.ruff]
-# Чтобы isort считал blog своим, а не сторонним пакетом.
 src = ["src"]
 
 [dependency-groups]
 dev = [
     "djlint>=1.42.3",
-    # Приезжает и транзитивно с fastapi[standard], но им пользуются
-    # напрямую tests/conftest.py и populate.py — значит, объявлен.
+
     "httpx>=0.28.1",
     "pyrefly>=1.1.0",
     "pytest-playwright>=0.8.0",
@@ -52,19 +44,11 @@ dev = [
 ]
 
 [tool.ruff.lint]
-# TC (flake8-type-checking) выключен целиком, и это не вкусовщина.
-# Правило предлагает унести импорты, которые «нужны только аннотациям»,
-# под TYPE_CHECKING. Для FastAPI это неверно: он читает аннотации в
-# рантайме, чтобы разрешить зависимости. Псевдоним вида
-# DbSession = Annotated[AsyncSession, Depends(get_db)] под TYPE_CHECKING
-# перестаёт существовать во время выполнения — и FastAPI не падает, а
-# молча считает db обычным query-параметром. Проверено: GET /api/tags
-# начинает отвечать 422 «Field required, loc: [query, db]», в логах
-# при этом пусто. Тихая смена контракта хуже падения.
 ignore = ["TC001", "TC002", "TC003"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-# Только chromium: три сценария проверяют логику страниц, а не отличия
-# движков. Прогнать шире — `--browser firefox --browser webkit`.
 addopts = "--browser chromium"
+
+[tool.fastapi]
+entrypoint = "src/blog/main.py"

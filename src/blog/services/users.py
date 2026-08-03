@@ -1,8 +1,5 @@
 """
-Учётные записи: регистрация, вход, профиль и картинка.
-
-Файл на диске меняется здесь же, а не в роуте, и всегда после коммита:
-если транзакция не прошла, старая картинка должна остаться на месте.
+Registration, login, profile and picture management.
 """
 
 from typing import Annotated
@@ -85,11 +82,9 @@ OwnAccount = Annotated[models.User, Depends(own_account)]
 
 async def register(db: AsyncSession, data: UserCreate) -> models.User:
     """
-    Create an account, or refuse because the name or the email is taken.
+    Create an account.
 
-    Checked before the insert and again by the unique index: two requests
-    can both pass the check and collide, and that race gives a 400 like
-    any other clash rather than the 500 an IntegrityError would produce.
+    Checked before the insert.
     """
     result = await db.execute(
         select(models.User).where(

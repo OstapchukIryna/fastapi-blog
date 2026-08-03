@@ -9,9 +9,12 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from blog.infrastructure import models
+from blog.services.posts import LimitDep, SkipDep
 
 
-async def all_topics(db: AsyncSession) -> list[tuple[str, int]]:
+async def all_topics(
+    db: AsyncSession, skip: SkipDep, limit: LimitDep
+) -> list[tuple[str, int]]:
     """
     Sort tags by counting posts with them. Return list of tuples with tag name and count of posts.
 
@@ -27,6 +30,8 @@ async def all_topics(db: AsyncSession) -> list[tuple[str, int]]:
         .join(models.Tag.posts)
         .group_by(models.Tag.id)
         .order_by(func.count(models.Post.id).desc(), models.Tag.name)
+        .offset(skip)
+        .limit(limit)
     )
     rows = result.all()
     return [(name, count) for name, count in rows]
