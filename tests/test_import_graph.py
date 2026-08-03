@@ -121,14 +121,14 @@ def layer(module: str) -> int:
     return LAYERS.get(parts[1], TOP) if len(parts) > 1 else TOP
 
 
-def runtime_imports(tree: ast.AST) -> list[ast.stmt]:
+def runtime_imports(tree: ast.AST) -> list[ast.AST]:
     """Every node except the bodies of `if TYPE_CHECKING:`.
 
     Args:
         tree (ast.AST): a parsed module.
 
     Returns:
-        list[ast.stmt]: nodes that run when the module is imported.
+        list[ast.AST]: nodes that run when the module is imported.
     """
     deferred: set[int] = set()
     for node in ast.walk(tree):
@@ -164,9 +164,13 @@ def graph() -> dict[str, set[str]]:
             if isinstance(node, ast.ImportFrom) and (node.module or "").startswith(
                 "blog"
             ):
+                # `node.module` is Optional on the AST, but a relative
+                # import (`from . import x`) never starts with "blog", so
+                # the branch above has already excluded None.
+                module = node.module or ""
                 for alias in node.names:
-                    submodule = f"{node.module}.{alias.name}"
-                    target = submodule if submodule in modules else node.module
+                    submodule = f"{module}.{alias.name}"
+                    target = submodule if submodule in modules else module
                     if target != name:
                         edges[name].add(target)
             elif isinstance(node, ast.Import):

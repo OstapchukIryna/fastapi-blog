@@ -44,3 +44,4 @@ Icon
 
 # Playwright: снимки и трассы упавших прогонов
 test-results/
+site/

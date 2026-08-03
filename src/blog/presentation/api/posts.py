@@ -7,6 +7,7 @@ route reads as the single thing it is for.
 
 from fastapi import APIRouter, Response, status
 
+from blog.infrastructure import models
 from blog.infrastructure.database import DbSession
 from blog.schemas import (
     Page,
@@ -41,7 +42,7 @@ async def list_posts(db: DbSession, page: PageParams) -> Page[PostResponse]:
 
 
 @router.get("/{post_id}", response_model=PostDetail)
-def get_post(post: PostDep) -> PostDetail:
+def get_post(post: PostDep) -> models.Post:
     """Return one post, including its body.
 
     Args:
@@ -49,7 +50,9 @@ def get_post(post: PostDep) -> PostDetail:
             post, before this body runs.
 
     Returns:
-        PostDetail: the post with its Markdown content.
+        models.Post: the row. `response_model` above turns it into a
+            PostDetail on the way out; annotating the wire shape here
+            instead would be a claim the function does not honour.
     """
     return post
 
@@ -57,7 +60,7 @@ def get_post(post: PostDep) -> PostDetail:
 @router.post("", response_model=PostDetail, status_code=status.HTTP_201_CREATED)
 async def create_post(
     form: PostCreate, current_user: CurrentUser, db: DbSession
-) -> PostDetail:
+) -> models.Post:
     """Publish a new post under the caller's name.
 
     Args:
@@ -68,7 +71,7 @@ async def create_post(
         db (DbSession): request-scoped session.
 
     Returns:
-        PostDetail: the stored post.
+        models.Post: the stored post.
     """
     return await posts.create(db, form, current_user)
 
@@ -76,7 +79,7 @@ async def create_post(
 @router.put("/{post_id}", response_model=PostDetail)
 async def update_all_post_fields(
     post: OwnedPost, form: PostCreate, db: DbSession
-) -> PostDetail:
+) -> models.Post:
     """Replace every editable field of a post.
 
     Args:
@@ -87,7 +90,7 @@ async def update_all_post_fields(
         db (DbSession): request-scoped session.
 
     Returns:
-        PostDetail: the post as stored.
+        models.Post: the post as stored.
     """
     return await posts.replace(db, post, form)
 
@@ -95,7 +98,7 @@ async def update_all_post_fields(
 @router.patch("/{post_id}", response_model=PostDetail)
 async def update_post_fields(
     post: OwnedPost, changes: PostUpdate, db: DbSession
-) -> PostDetail:
+) -> models.Post:
     """Change some fields of a post and leave the rest alone.
 
     Args:
@@ -104,7 +107,7 @@ async def update_post_fields(
         db (DbSession): request-scoped session.
 
     Returns:
-        PostDetail: the post as stored.
+        models.Post: the post as stored.
     """
     return await posts.update(db, post, changes)
 

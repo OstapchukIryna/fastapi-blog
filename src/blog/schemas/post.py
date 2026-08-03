@@ -11,6 +11,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from blog.infrastructure.models.tag import Tag
 from blog.schemas.tag import normalise_tags
 from blog.schemas.user import UserPublic
 
@@ -185,7 +186,7 @@ class PostResponse(BaseModel):
 
     @field_validator("tags", mode="before")
     @classmethod
-    def flatten_tags(cls, value: list[object]) -> list[str]:
+    def flatten_tags(cls, value: list[Tag] | list[str]) -> list[str]:
         """Accept either Tag rows or plain names.
 
         Runs before validation because at that point the value is still
@@ -193,12 +194,14 @@ class PostResponse(BaseModel):
         out, and a list of strings when a test builds the model directly.
 
         Args:
-            value (list[object]): tags as Tag rows or as strings.
+            value (list[Tag] | list[str]): tags as ORM rows on the way
+                out of the database, or as plain strings when a test
+                builds the model directly.
 
         Returns:
             list[str]: tag names.
         """
-        return [tag.name if hasattr(tag, "name") else tag for tag in value]
+        return [tag if isinstance(tag, str) else tag.name for tag in value]
 
 
 class PostDetail(PostResponse):

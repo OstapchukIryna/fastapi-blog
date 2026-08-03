@@ -11,6 +11,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, UploadFile, status
 from fastapi.security import OAuth2PasswordRequestForm
 
+from blog.infrastructure import models
 from blog.infrastructure.database import DbSession
 from blog.schemas import (
     Page,
@@ -30,7 +31,7 @@ router = APIRouter()
 
 
 @router.post("", response_model=UserPrivate, status_code=status.HTTP_201_CREATED)
-async def create_user(registration: UserCreate, db: DbSession) -> UserPrivate:
+async def create_user(registration: UserCreate, db: DbSession) -> models.User:
     """Register an account.
 
     Args:
@@ -38,8 +39,9 @@ async def create_user(registration: UserCreate, db: DbSession) -> UserPrivate:
         db (DbSession): request-scoped session.
 
     Returns:
-        UserPrivate: the new account, including its email — the caller
-            just supplied it, so returning it reveals nothing.
+        models.User: the row. `response_model` above narrows it to
+            UserPrivate on the way out — including the email, which the
+            caller has just supplied, so returning it reveals nothing.
 
     Raises:
         HTTPException: 400 when the handle or the email is taken. Which
@@ -73,7 +75,7 @@ async def login_for_access_token(
 
 
 @router.get("/me", response_model=UserPrivate)
-async def get_current_user(current_user: CurrentUser) -> UserPrivate:
+async def get_current_user(current_user: CurrentUser) -> models.User:
     """Return the account the caller's token belongs to.
 
     The page that shows a profile has no other way to find out: the token
@@ -83,20 +85,20 @@ async def get_current_user(current_user: CurrentUser) -> UserPrivate:
         current_user (CurrentUser): resolved from the token.
 
     Returns:
-        UserPrivate: the caller's own account.
+        models.User: the caller's own account.
     """
     return current_user
 
 
 @router.get("/{user_id}", response_model=UserPublic)
-def get_user(user: UserDep) -> UserPublic:
+def get_user(user: UserDep) -> models.User:
     """Return an account as anybody may see it.
 
     Args:
         user (UserDep): resolved from the path; 404 if unknown.
 
     Returns:
-        UserPublic: the account without its email.
+        models.User: the row; the response model drops the email.
     """
     return user
 
@@ -123,7 +125,7 @@ async def get_user_posts(
 @router.patch("/{user_id}", response_model=UserPublic)
 async def update_user_fields(
     user: OwnAccount, changes: UserUpdate, db: DbSession
-) -> UserPublic:
+) -> models.User:
     """Change some fields of the caller's own account.
 
     Args:
@@ -132,7 +134,7 @@ async def update_user_fields(
         db (DbSession): request-scoped session.
 
     Returns:
-        UserPublic: the account as stored.
+        models.User: the account as stored.
 
     Raises:
         HTTPException: 400 when the requested handle or email already
@@ -155,7 +157,7 @@ async def delete_user(user: OwnAccount, db: DbSession) -> None:
 @router.patch("/{user_id}/picture", response_model=UserPrivate)
 async def upload_profile_picture(
     file: UploadFile, user: OwnAccount, db: DbSession
-) -> UserPrivate:
+) -> models.User:
     """Replace the caller's profile picture.
 
     Args:
@@ -165,7 +167,7 @@ async def upload_profile_picture(
         db (DbSession): request-scoped session.
 
     Returns:
-        UserPrivate: the account, with the new image path.
+        models.User: the account, with the new image path.
 
     Raises:
         HTTPException: 400 when the upload is over the size ceiling or
@@ -175,7 +177,7 @@ async def upload_profile_picture(
 
 
 @router.delete("/{user_id}/picture", response_model=UserPrivate)
-async def delete_profile_picture(user: OwnAccount, db: DbSession) -> UserPrivate:
+async def delete_profile_picture(user: OwnAccount, db: DbSession) -> models.User:
     """Drop the caller's picture and fall back to the shared default.
 
     Args:
@@ -183,7 +185,7 @@ async def delete_profile_picture(user: OwnAccount, db: DbSession) -> UserPrivate
         db (DbSession): request-scoped session.
 
     Returns:
-        UserPrivate: the account, now pointing at the default avatar.
+        models.User: the account, now pointing at the default avatar.
 
     Raises:
         HTTPException: 400 when there was no picture to remove. Not 404:
