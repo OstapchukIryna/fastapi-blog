@@ -6,9 +6,9 @@ The HTML side of the site: every page a user opens in a browser.
 кнопке, откуда брать и сколько уже показано.
 """
 
-from collections.abc import Sequence
+from collections.abc import Sequence, Sized
 from dataclasses import dataclass
-from typing import Annotated
+from typing import Annotated, Self
 
 from fastapi import APIRouter, Form, Request, Response, status
 from fastapi.responses import RedirectResponse
@@ -23,7 +23,7 @@ from blog.presentation.web.forms import (
     render_post_form,
 )
 from blog.presentation.web.templating import templates
-from blog.schemas import PageParams, PostFormInput
+from blog.schemas import PageParams, Pagination, PostFormInput
 from blog.services import posts, tags
 from blog.services.auth import CurrentUser
 from blog.services.posts import PostDep
@@ -57,7 +57,7 @@ def arrange(items: Sequence[models.Post]) -> dict:
     }
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class Feed:
     """
     Что нужно кнопке «ещё»: откуда брать, сколько показано, сколько всего.
@@ -79,8 +79,41 @@ class Feed:
     limit: int
     total: int
 
+    @classmethod
+    def after(
+        cls,
+        request: Request,
+        route: str,
+        page: Pagination,
+        items: Sized,
+        total: int,
+        **path_params: object,
+    ) -> Self:
+        """Describe the feed a page has just rendered the first slice of.
+
+        Args:
+            request (Request): the request being answered; url_for lives on it.
+            route (str): name of the JSON route that serves the same list.
+            page (Pagination): the slice this page asked for.
+            items (Sized): what came back, so the next offset can be worked out.
+            total (int): how many records exist under the same query.
+            **path_params: values the route needs in its path, such as the
+                tag name or the author id. Passed through to url_for so the
+                address is never assembled by hand in two places.
+
+        Returns:
+            Self: state the template hands to the "load more" button.
+        """
+        return cls(
+            url=str(request.url_for(route, **path_params)),
+            shown=page.skip + len(items),
+            limit=page.limit,
+            total=total,
+        )
+
     @property
     def more(self) -> bool:
+        """Whether anything is left to fetch."""
         return self.shown < self.total
 
 
@@ -97,12 +130,7 @@ async def home(request: Request, db: DbSession, page: PageParams):
         {
             **arrange(items),
             "title": "Home",
-            "feed": Feed(
-                url=str(request.url_for("list_posts")),
-                shown=page.skip + len(items),
-                limit=page.limit,
-                total=total,
-            ),
+            "feed": Feed.after(request, "list_posts", page, items, total),
         },
     )
 
@@ -239,14 +267,16 @@ async def toggle_pin(request: Request, post: PostDep, db: DbSession):
 
 @router.get("/posts/{post_id}", name="post_page")
 async def post_page(request: Request, post: PostDep, db: DbSession):
-    related, related_label = await posts.find_related(db, post)
+    related = await posts.find_related(db, post)
+    # * A real match always shares at least one tag; a fallback never does.
+    heading = "Related" if related and related[0].shared else "More posts"
     return templates.TemplateResponse(
         request,
         "post.html",
         {
             "post": post,
             "related": related,
-            "related_label": related_label,
+            "related_label": heading,
             "title": post.title,
         },
     )
@@ -261,12 +291,7 @@ async def tags_index(request: Request, db: DbSession, page: PageParams):
         {
             "tags": rows,
             "title": "Topics",
-            "feed": Feed(
-                url=str(request.url_for("list_tags")),
-                shown=page.skip + len(rows),
-                limit=page.limit,
-                total=total,
-            ),
+            "feed": Feed.after(request, "list_tags", page, rows, total),
         },
     )
 
@@ -281,12 +306,7 @@ async def get_tag(request: Request, tag: str, db: DbSession, page: PageParams):
             **arrange(items),
             "filter_tag": tag,
             "title": f"#{tag}",
-            "feed": Feed(
-                url=str(request.url_for("get_tag_posts", tag=tag)),
-                shown=page.skip + len(items),
-                limit=page.limit,
-                total=total,
-            ),
+            "feed": Feed.after(request, "get_tag_posts", page, items, total, tag=tag),
         },
     )
 
@@ -303,11 +323,8 @@ async def user_posts_page(
             "posts": items,
             "user": user,
             "title": f"{user.username}'s posts",
-            "feed": Feed(
-                url=str(request.url_for("get_user_posts", user_id=user.id)),
-                shown=page.skip + len(items),
-                limit=page.limit,
-                total=total,
+            "feed": Feed.after(
+                request, "get_user_posts", page, items, total, user_id=user.id
             ),
         },
     )

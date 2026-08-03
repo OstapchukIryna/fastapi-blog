@@ -100,15 +100,12 @@ class PostFormInput(BaseModel):
                 catches it and redraws the form with the errors.
 
         """
+        typed = (chunk.strip() for chunk in self.tags.split(","))
         return PostForm(
             title=self.title,
             summary=self.summary,
             content=self.content,
-            tags=[
-                part
-                for part in (chunk.strip() for chunk in self.tags.split(","))
-                if part
-            ],
+            tags=[tag for tag in typed if tag],
         )
 
 

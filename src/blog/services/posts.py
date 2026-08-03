@@ -14,6 +14,7 @@
 """
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
@@ -129,51 +130,77 @@ async def with_tag(
     return items, total
 
 
+@dataclass(slots=True, frozen=True)
+class Related:
+    """One suggestion shown underneath a post, and the reason for it.
+
+    Frozen because a suggestion is a computed result rather than state:
+    it is built once per request and only ever read by the template.
+    Making that explicit means a future caller cannot quietly patch a
+    field and leave the rest of the object describing something else.
+
+    Attributes:
+        post (models.Post): the post being suggested.
+        shared (list[str]): tag names the two posts have in common,
+            sorted. Empty when the suggestion is a fallback rather than
+            a real match, which is how the page tells the two apart.
+    """
+
+    post: models.Post
+    shared: list[str]
+
+
 async def find_related(
     db: AsyncSession, post: models.Post, limit: int = 2
-) -> tuple[list[dict], str]:
-    """
-    Find related posts by tags. Returns a list of related posts with shared tags.
+) -> list[Related]:
+    """Suggest a couple of posts to read after this one.
+
+    Two strategies, in order of preference. Posts sharing at least one
+    tag come first, ranked by how many tags they share and then by
+    recency. When the post carries no tags, or nothing else uses them,
+    the newest other posts stand in so the section is never empty.
+
+    The caller distinguishes the two cases by looking at `shared`: a
+    real match always has at least one tag in common, a fallback never
+    does. Returning the heading text from here instead would put a
+    piece of English in the service layer.
 
     Args:
-        db (AsyncSession): current database session
-        post (models.Post): the post being read
-        limit (int, optional): Limit of related posts to return. Defaults to 2.
+        db (AsyncSession): session to query through.
+        post (models.Post): the post currently being read.
+        limit (int): how many suggestions to return at most.
 
     Returns:
-        tuple[list[dict], str]: List of related posts with shared tags
-        and a label indicating the type of relation
-
+        list[Related]: suggestions, best first. Empty only when this is
+            the only post in the database.
     """
     own_tags = {tag.name for tag in post.tags}
 
     if own_tags:
-        result = await db.execute(
+        by_tag = await db.execute(
             base_query()
             .join(models.Post.tags)
-            .where(
-                models.Tag.name.in_(own_tags),
-                models.Post.id != post.id,
-            )
+            .where(models.Tag.name.in_(own_tags), models.Post.id != post.id)
         )
-
-        candidates = result.scalars().unique().all()
-
-        matched = [
-            {"post": p, "shared": sorted(own_tags & {t.name for t in p.tags})}
-            for p in candidates
-        ]
-        if matched:
-            matched.sort(
-                key=lambda m: (len(m["shared"]), m["post"].date_posted), reverse=True
+        matches = [
+            Related(
+                post=candidate,
+                shared=sorted(own_tags & {t.name for t in candidate.tags}),
             )
-            return matched[:limit], "Related"
+            for candidate in by_tag.scalars().unique().all()
+        ]
+        if matches:
+            # * Most tags in common wins; recency breaks the tie. reverse
+            # * applies to both keys, which is what we want for each.
+            matches.sort(
+                key=lambda m: (len(m.shared), m.post.date_posted), reverse=True
+            )
+            return matches[:limit]
 
-    result = await db.execute(
+    newest = await db.execute(
         base_query().where(models.Post.id != post.id).limit(limit)
     )
-    fallback = result.scalars().unique().all()
-    return [{"post": p, "shared": []} for p in fallback], "More posts"
+    return [Related(post=other, shared=[]) for other in newest.scalars().unique().all()]
 
 
 # --- Dependencies ------------------------------------------------------
