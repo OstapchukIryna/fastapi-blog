@@ -120,6 +120,14 @@ helper above, one layer up.
 `services.tags` and is imported by nothing; it is a script, not part of the
 running application.
 
+**This section is a test, not a description.** `tests/test_import_graph.py`
+walks the same ASTs and fails on a cycle, on an arrow pointing up, and on a
+sideways arrow that is not in its list with a reason attached. It exists
+because the rule was broken twice — the tag-cleaning helper above, and later
+the pagination slice — and both times the ImportError named the module that
+happened to be first in the chain rather than the module that was wrong.
+The test names the edge.
+
 ---
 
 ## Two front doors
