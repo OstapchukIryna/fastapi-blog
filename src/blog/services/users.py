@@ -120,7 +120,7 @@ async def authenticate(db: AsyncSession, email: str, password: str) -> models.Us
     Which of the two was wrong is not said — an account that exists is
     itself something worth not telling an unauthenticated caller.
     """
-    # Look up user by case-**insensitive** email
+    # * Look up user by case-**insensitive** email
     result = await db.execute(
         select(models.User).where(func.lower(models.User.email) == email.lower())
     )

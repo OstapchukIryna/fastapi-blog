@@ -52,4 +52,4 @@ testpaths = ["tests"]
 addopts = "--browser chromium"
 
 [tool.fastapi]
-entrypoint = "src/blog/main.py"
+entrypoint = "src.blog.main:app"

@@ -37,8 +37,8 @@ class Pagination(BaseModel):
     """
 
     skip: int = Field(default=0, ge=0)
-    # ! The ceiling is not decoration. Without it a single request with
-    # ! limit=100000 pulls the whole table, each row joined to its author.
+    # * The ceiling is not decoration. It prevents a single request with
+    # * limit=100000 from pulling the whole table, each row joined to its author.
     limit: int = Field(default=settings.posts_per_page, ge=1, le=MAX_PAGE_SIZE)
 
 
