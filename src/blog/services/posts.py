@@ -1,34 +1,38 @@
 """
-All about posts: what you can ask about them and what you can do with them.
+Посты: что про них можно спросить и что с ними можно сделать.
 
-Also contains the dependencies that load a post and check that it is owned by the caller.
+Здесь же зависимости, которые загружают пост и проверяют, что он твой.
 
+Транзакция принадлежит этому модулю, а не роуту: функция, которая
+меняет пост, сама и коммитит. Иначе «сохранить» было бы двумя строками,
+и рано или поздно одна из поверхностей забыла бы вторую.
+
+Список отдаётся парой (записи, всего) — ORM-объектами, не схемой.
+Конверт собирает презентация: JSON-роуту нужен Page[PostResponse],
+а странице нужны сами посты, у которых есть outline и reading_minutes.
+Сервис, возвращающий схему ответа, обслуживает только одну из двух.
 """
 
 from collections.abc import Sequence
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, Query, status
-from sqlalchemy import Select, func, select, update
+from fastapi import Depends, HTTPException, status
+from sqlalchemy import Select, func, select
+from sqlalchemy import update as update_statement
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
 from blog.infrastructure import models
 from blog.infrastructure.database import DbSession
 from blog.schemas import PostForm, PostUpdate
-from blog.schemas.post import PaginatedPostResponse, PostResponse
+from blog.schemas.pagination import Pagination
+from blog.services import tags as tag_service
 from blog.services.auth import CurrentUser
-from blog.services.tags import get_or_create_tags
 
 # --- Queries ---------------------------------------------------------
 
 
-async def count_total_posts(db: DbSession):
-    result = await db.execute(select(func.count()).select_from(models.Post))
-    return result.scalar() or 0
-
-
-def posts_query() -> Select[tuple[models.Post]]:
+def base_query() -> Select[tuple[models.Post]]:
     """
     Build the base post query with its relations already loaded.
 
@@ -36,8 +40,19 @@ def posts_query() -> Select[tuple[models.Post]]:
     them, touching post.tags in a template issues one query per post,
     which is the N+1 problem.
 
+    joinedload здесь безопасен вместе с LIMIT только потому, что автор —
+    это many-to-one: одна строка на пост. Заменить его на joinedload для
+    тегов — и LIMIT начнёт резать строки соединения, а не посты.
+
+    Сортировка. Закреплённый пост идёт первым не в шаблоне, а в запросе:
+    иначе он выпадает из среза на второй порции и либо исчезает, либо
+    приезжает второй раз на своём месте по дате. Сортировка по id в
+    конце делает порядок полным — без неё два поста с одной секундой
+    меняются местами между запросами, и один показывается дважды, а
+    другой не показывается вовсе.
+
     Returns:
-        Select: posts ordered newest first by date, with tags and author loaded.
+        Select: pinned first, then newest by date, with tags and author loaded.
 
     """
     return (
@@ -46,64 +61,83 @@ def posts_query() -> Select[tuple[models.Post]]:
             selectinload(models.Post.tags),
             joinedload(models.Post.author),
         )
-        .order_by(models.Post.date_posted.desc())
+        .order_by(
+            models.Post.is_pinned.desc(),
+            models.Post.date_posted.desc(),
+            models.Post.id.desc(),
+        )
     )
 
 
-SkipDep = Annotated[int, Query(ge=0)]
-LimitDep = Annotated[int, Query(ge=1, le=100)]
+async def _slice(
+    db: AsyncSession, query: Select[tuple[models.Post]], page: Pagination
+) -> tuple[Sequence[models.Post], int]:
+    """
+    Взять порцию и посчитать, сколько всего под этот же запрос.
 
+    Считается по тому самому query, а не по всей таблице: у постов
+    автора «всего» — это его посты, а не все на свете. Иначе кнопка
+    «ещё» остаётся видимой после последней записи.
 
-async def all_posts(
-    db: AsyncSession,
-    skip: SkipDep,
-    limit: LimitDep,
-) -> PaginatedPostResponse:
-    """Every post, newest first, paginated."""
-    result = await db.execute(posts_query().offset(skip).limit(limit))
-    posts = result.scalars().unique().all()
-    total = await count_total_posts(db)
-    has_more = skip + len(posts) < total
-    return PaginatedPostResponse(
-        posts=[PostResponse.model_validate(post) for post in posts],
-        total=total,
-        skip=skip,
-        limit=limit,
-        has_more=has_more,
+    order_by(None) обязателен: сортировать подзапрос, который сейчас
+    посчитают, бессмысленно, а некоторые базы на этом ругаются.
+
+    Returns:
+        tuple: сами записи и общее число под этот запрос.
+
+    """
+    total = await db.scalar(
+        select(func.count()).select_from(query.order_by(None).subquery())
     )
+    result = await db.execute(query.offset(page.skip).limit(page.limit))
+    return result.scalars().unique().all(), total or 0
 
 
-async def by_author(
-    db: AsyncSession,
-    user_id: int,
-    skip: SkipDep,
-    limit: LimitDep,
-) -> PaginatedPostResponse:
-    """Everything one person wrote, newest first."""
-    result = await db.execute(
-        posts_query().where(models.Post.user_id == user_id).offset(skip).limit(limit)
+async def list_all(
+    db: AsyncSession, page: Pagination
+) -> tuple[Sequence[models.Post], int]:
+    """One slice of every post, pinned first."""
+    return await _slice(db, base_query(), page)
+
+
+async def for_author(
+    db: AsyncSession, author_id: int, page: Pagination
+) -> tuple[Sequence[models.Post], int]:
+    """One slice of what a person wrote."""
+    return await _slice(db, base_query().where(models.Post.user_id == author_id), page)
+
+
+async def with_tag(
+    db: AsyncSession, tag: str, page: Pagination
+) -> tuple[Sequence[models.Post], int]:
+    """
+    One slice of the posts carrying a tag.
+
+    Raises:
+        HTTPException: 404 when nothing anywhere carries this tag. Not
+            when the slice is empty — page four of a tag with thirty
+            posts is empty and perfectly found.
+
+    """
+    items, total = await _slice(
+        db, base_query().join(models.Post.tags).where(models.Tag.name == tag), page
     )
-    posts = result.scalars().unique().all()
-    total = await count_total_posts(db)
-    has_more = skip + len(posts) < total
-    return PaginatedPostResponse(
-        posts=[PostResponse.model_validate(post) for post in posts],
-        total=total,
-        skip=skip,
-        limit=limit,
-        has_more=has_more,
-    )
+    if total == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found"
+        )
+    return items, total
 
 
 async def find_related(
-    db: AsyncSession, current: models.Post, limit: int = 2
+    db: AsyncSession, post: models.Post, limit: int = 2
 ) -> tuple[list[dict], str]:
     """
     Find related posts by tags. Returns a list of related posts with shared tags.
 
     Args:
         db (AsyncSession): current database session
-        current (models.Post): current post
+        post (models.Post): the post being read
         limit (int, optional): Limit of related posts to return. Defaults to 2.
 
     Returns:
@@ -111,22 +145,22 @@ async def find_related(
         and a label indicating the type of relation
 
     """
-    current_tags = {tag.name for tag in current.tags}
+    own_tags = {tag.name for tag in post.tags}
 
-    if current_tags:
+    if own_tags:
         result = await db.execute(
-            posts_query()
+            base_query()
             .join(models.Post.tags)
             .where(
-                models.Tag.name.in_(current_tags),
-                models.Post.id != current.id,
+                models.Tag.name.in_(own_tags),
+                models.Post.id != post.id,
             )
         )
 
         candidates = result.scalars().unique().all()
 
         matched = [
-            {"post": p, "shared": sorted(current_tags & {t.name for t in p.tags})}
+            {"post": p, "shared": sorted(own_tags & {t.name for t in p.tags})}
             for p in candidates
         ]
         if matched:
@@ -136,7 +170,7 @@ async def find_related(
             return matched[:limit], "Related"
 
     result = await db.execute(
-        posts_query().where(models.Post.id != current.id).limit(limit)
+        base_query().where(models.Post.id != post.id).limit(limit)
     )
     fallback = result.scalars().unique().all()
     return [{"post": p, "shared": []} for p in fallback], "More posts"
@@ -147,7 +181,7 @@ async def find_related(
 
 async def load_post(post_id: int, db: DbSession) -> models.Post:
     """Returns post by id, otherwise 404."""
-    result = await db.execute(posts_query().where(models.Post.id == post_id))
+    result = await db.execute(base_query().where(models.Post.id == post_id))
     post = result.scalars().first()
     if post is None:
         raise HTTPException(
@@ -191,26 +225,10 @@ def owned_post(post: PostDep, current_user: CurrentUser) -> models.Post:
 OwnedPost = Annotated[models.Post, Depends(owned_post)]
 
 
-async def load_tagged_posts(tag: str, db: DbSession) -> Sequence[models.Post]:
-    """Returns posts by tag, otherwise 404. If tags are not found or no posts with this tag, return 404."""
-    result = await db.execute(
-        posts_query().join(models.Post.tags).where(models.Tag.name == tag)
-    )
-    posts = result.scalars().unique().all()
-    if not posts:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found"
-        )
-    return posts
-
-
-TaggedPostsDep = Annotated[Sequence[models.Post], Depends(load_tagged_posts)]
-
-
 # --- Changes ---------------------------------------------------------
 
 
-async def create(db: AsyncSession, data: PostForm, author: models.User) -> models.Post:
+async def create(db: AsyncSession, form: PostForm, author: models.User) -> models.Post:
     """
     Store a new post by this author.
 
@@ -218,11 +236,11 @@ async def create(db: AsyncSession, data: PostForm, author: models.User) -> model
     made SQLAlchemy try to treat an int as a User.
     """
     post = models.Post(
-        title=data.title,
-        summary=data.summary,
-        content=data.content,
+        title=form.title,
+        summary=form.summary,
+        content=form.content,
         author=author,
-        tags=await get_or_create_tags(db, data.tags),
+        tags=await tag_service.get_or_create(db, form.tags),
     )
     db.add(post)
     await db.commit()
@@ -230,12 +248,12 @@ async def create(db: AsyncSession, data: PostForm, author: models.User) -> model
     return post
 
 
-async def replace(db: AsyncSession, post: models.Post, data: PostForm) -> models.Post:
+async def replace(db: AsyncSession, post: models.Post, form: PostForm) -> models.Post:
     """
     Replace every editable field of a post.
 
     PUT is a full replacement, so the body carries the whole post. Unlike
-    apply_changes below, nothing is left alone: a field the client omits
+    update below, nothing is left alone: a field the client omits
     is not "unchanged", it becomes whatever PostForm defaults it to. That
     is why the dump has no exclude_unset — with it, PUT would quietly
     behave like PATCH and the two endpoints would be the same.
@@ -243,14 +261,14 @@ async def replace(db: AsyncSession, post: models.Post, data: PostForm) -> models
     Args:
         db (AsyncSession): current database session.
         post (models.Post): the post being replaced.
-        data (PostForm): the complete replacement, already validated.
+        form (PostForm): the complete replacement, already validated.
 
     Returns:
         models.Post: the post as stored after the replacement.
 
     """
-    replacement = data.model_dump()
-    post.tags = await get_or_create_tags(db, replacement.pop("tags"))
+    replacement = form.model_dump()
+    post.tags = await tag_service.get_or_create(db, replacement.pop("tags"))
     for name, value in replacement.items():
         setattr(post, name, value)
 
@@ -259,8 +277,8 @@ async def replace(db: AsyncSession, post: models.Post, data: PostForm) -> models
     return post
 
 
-async def apply_changes(
-    db: AsyncSession, post: models.Post, data: PostUpdate
+async def update(
+    db: AsyncSession, post: models.Post, changes: PostUpdate
 ) -> models.Post:
     """
     Change some fields of a post, leaving the rest alone.
@@ -280,17 +298,17 @@ async def apply_changes(
     Args:
         db (AsyncSession): current database session.
         post (models.Post): the post being changed.
-        data (PostUpdate): the fields to change, already validated.
+        changes (PostUpdate): the fields to change, already validated.
 
     Returns:
         models.Post: the post as stored after the change.
 
     """
-    changes = data.model_dump(exclude_unset=True, exclude_none=True)
+    wanted = changes.model_dump(exclude_unset=True, exclude_none=True)
 
-    if "tags" in changes:
-        post.tags = await get_or_create_tags(db, changes.pop("tags"))
-    for name, value in changes.items():
+    if "tags" in wanted:
+        post.tags = await tag_service.get_or_create(db, wanted.pop("tags"))
+    for name, value in wanted.items():
         setattr(post, name, value)
 
     await db.commit()
@@ -328,7 +346,7 @@ async def set_pinned(db: AsyncSession, post: models.Post, *, pinned: bool) -> No
     """
     if pinned:
         await db.execute(
-            update(models.Post)
+            update_statement(models.Post)
             .where(models.Post.id != post.id, models.Post.is_pinned.is_(True))
             .values(is_pinned=False)
         )

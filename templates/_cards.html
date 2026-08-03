@@ -1,0 +1,83 @@
+{# Карточки списков и кнопка «ещё».
+
+   Разметка archive_item воспроизводится один в один в
+   static/js/archive.js: первую порцию рисует сервер, следующие — браузер,
+   и шва между ними быть не должно. Меняешь здесь — меняй там; классы и
+   порядок узлов держит CSS, а не совпадение.
+
+   Раньше эта карточка была написана дважды — в home.html и в
+   user_posts.html, — и они уже начали расходиться: одна писала дату как
+«05 Aug, 2026», другая как «05 Aug 2026». #}
+{% macro archive_item(post) %}
+    <article class="archive-item">
+        <p class="post-meta mono-label">
+            <span>{{ post.date_posted.strftime("%d %b %Y") }}</span>
+            <span class="sep">/</span>
+            <span>{{ post.reading_minutes }} min</span>
+        </p>
+        <h2>
+            <a class="post-title stretched"
+               href="{{ url_for('post_page', post_id=post.id) }}">{{ post.title }}</a>
+        </h2>
+        {% if post.outline %}
+            <ol class="post-outline mono-label">
+                {% for heading in post.outline %}<li>{{ heading }}</li>{% endfor %}
+            </ol>
+        {% else %}
+            <p class="post-excerpt">{{ post.summary }}</p>
+        {% endif %}
+        {% if post.tags %}
+            <div class="card-tags mono-label">
+                {% for tag in post.tags %}
+                    <a href="{{ url_for('get_tag', tag=tag.name) }}">#{{ tag.name }}</a>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </article>
+{% endmacro %}
+{% macro topic_row(name, count) %}
+    <a class="topic-row" href="{{ url_for('get_tag', tag=name) }}">
+        <span class="name">{{ name }}</span>
+        <span class="count mono-label">{{ count }} post{{ '' if count == 1 else 's' }}</span>
+    </a>
+{% endmacro %}
+{# Кнопка «ещё» и счётчик.
+
+   Состояние ленты живёт в data-атрибутах, а не в переменной модуля:
+   на странице может оказаться два списка, а перезагрузка страницы
+   обязана возвращать честное «сколько уже показано» без участия JS.
+
+   Без скрипта блок остаётся читаемым — видно, сколько записей всего,
+   — но кнопка ничего не делает. Это осознанно: подгрузка порциями и
+   есть поведение, которого без JS не бывает. #}
+{% macro feed_more(feed, item='post', noun='post') %}
+    {% if feed %}
+        <div class="feed"
+             data-feed
+             data-url="{{ feed.url }}"
+             data-skip="{{ feed.shown }}"
+             data-limit="{{ feed.limit }}"
+             data-total="{{ feed.total }}"
+             data-item="{{ item }}"
+             data-noun="{{ noun }}">
+            {% if feed.more %}
+                <button class="feed-button mono-label" type="button" data-feed-button>
+                    Load more <span class="arrow">&darr;</span>
+                </button>
+            {% endif %}
+            <p class="feed-status mono-label" data-feed-status aria-live="polite">
+                {% if feed.more %}
+                    {{ feed.shown }} of {{ feed.total }}
+                {% else %}
+                    All {{ feed.total }} {{ noun }}{{ '' if feed.total == 1 else 's' }}
+                {% endif %}
+            </p>
+            <div class="feed-track" aria-hidden="true">
+                <span class="feed-fill"
+                      data-feed-fill
+                      style="--shown: {{ feed.shown }};
+                             --total: {{ feed.total }}"></span>
+            </div>
+        </div>
+    {% endif %}
+{% endmacro %}

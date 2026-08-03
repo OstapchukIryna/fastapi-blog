@@ -1,4 +1,8 @@
 {% extends "layout.html" %}
+{# with context обязателен: url_for Starlette кладёт в контекст рендера,
+   а import по умолчанию его не передаёт — макрос падал бы на KeyError:
+   'request'. Для _contact.html этого не нужно: site лежит в globals. #}
+{% import "_cards.html" as cards with context %}
 {% block content %}
     <header class="author-masthead">
         <img class="avatar"
@@ -10,42 +14,27 @@
         <div>
             <span class="eyebrow mono-label">Posts by</span>
             <h1>{{ user.username }}</h1>
-            <p class="count mono-label">
-                {{ posts | length }} post{{ '' if posts | length == 1 else 's' }}
-            </p>
+            <p class="count mono-label">{{ feed.total }} post{{ '' if feed.total == 1 else 's' }}</p>
         </div>
     </header>
-
-    {% for post in posts %}
-        <article class="archive-item">
-            <p class="post-meta mono-label">
-                <span>{{ post.date_posted.strftime('%d %b, %Y') }}</span>
-                <span class="sep">/</span>
-                <span>{{ post.reading_minutes }} min</span>
-            </p>
-            <h2>
-                <a class="post-title stretched"
-                   href="{{ url_for('post_page', post_id=post.id) }}">{{ post.title }}</a>
-            </h2>
-            <p class="post-excerpt">{{ post.summary }}</p>
-            {% if post.tags %}
-                <div class="card-tags mono-label">
-                    {% for tag in post.tags %}
-                        <a href="{{ url_for('get_tag', tag=tag.name) }}">#{{ tag.name }}</a>
-                    {% endfor %}
-                </div>
-            {% endif %}
-        </article>
+    {% if posts %}
+        <div class="archive" data-feed-list>{% for post in posts %}{{ cards.archive_item(post) }}{% endfor %}</div>
+        {{ cards.feed_more(feed) }}
     {% else %}
         <div class="empty-state">
             <p class="mono-label mb-2">Nothing here yet</p>
             <p class="mb-0">{{ user.username }} hasn't published anything.</p>
         </div>
-    {% endfor %}
-
+    {% endif %}
     <p class="mt-5">
         <a class="back-link mono-label" href="/">
             <span class="arrow">&larr;</span> All posts
         </a>
     </p>
 {% endblock content %}
+{% block scripts %}
+    <script type="module">
+        import { wireFeeds } from "/static/js/archive.js";
+        wireFeeds();
+    </script>
+{% endblock scripts %}

@@ -3,27 +3,27 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, UploadFile, status
 from fastapi.security import OAuth2PasswordRequestForm
 
-from blog.core.config import settings
 from blog.infrastructure.database import DbSession
 from blog.schemas import (
+    Page,
+    PageParams,
+    PostResponse,
     Token,
     UserCreate,
     UserPrivate,
     UserPublic,
     UserUpdate,
 )
-from blog.schemas.post import PaginatedPostResponse
 from blog.services import auth, posts, users
 from blog.services.auth import CurrentUser
-from blog.services.posts import LimitDep, SkipDep
 from blog.services.users import OwnAccount, UserDep
 
 router = APIRouter()
 
 
 @router.post("", response_model=UserPrivate, status_code=status.HTTP_201_CREATED)
-async def create_user(data: UserCreate, db: DbSession):
-    return await users.register(db, data)
+async def create_user(registration: UserCreate, db: DbSession):
+    return await users.register(db, registration)
 
 
 @router.post("/token", response_model=Token)
@@ -47,19 +47,15 @@ def get_user(user: UserDep):
     return user
 
 
-@router.get("/{user_id}/posts", response_model=PaginatedPostResponse)
-async def get_user_posts(
-    user: UserDep,
-    db: DbSession,
-    limit: LimitDep = 0,
-    skip: SkipDep = settings.posts_per_page,
-):
-    return await posts.by_author(db, user.id, skip, limit)
+@router.get("/{user_id}/posts", response_model=Page[PostResponse])
+async def get_user_posts(user: UserDep, db: DbSession, page: PageParams):
+    items, total = await posts.for_author(db, user.id, page)
+    return Page[PostResponse].of(items, total, page)
 
 
 @router.patch("/{user_id}", response_model=UserPublic)
-async def update_user_fields(user: OwnAccount, data: UserUpdate, db: DbSession):
-    return await users.apply_changes(db, user, data)
+async def update_user_fields(user: OwnAccount, changes: UserUpdate, db: DbSession):
+    return await users.update(db, user, changes)
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -74,4 +70,4 @@ async def upload_profile_picture(file: UploadFile, user: OwnAccount, db: DbSessi
 
 @router.delete("/{user_id}/picture", response_model=UserPrivate)
 async def delete_profile_picture(user: OwnAccount, db: DbSession):
-    return await users.clear_picture(db, user)
+    return await users.remove_picture(db, user)
