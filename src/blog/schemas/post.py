@@ -131,3 +131,11 @@ class PostResponse(BaseModel):
 
 class PostDetail(PostResponse):
     content: str
+
+
+class PaginatedPostResponse(BaseModel):
+    posts: list[PostResponse]
+    total: int
+    skip: int
+    limit: int
+    has_more: bool
