@@ -1,9 +1,10 @@
-"""
-Две входные двери, по пакету на каждую.
+"""Two front doors, one package each.
 
-`api/` отвечает JSON и описан в /openapi.json; `web/` отвечает
-страницами и из схемы исключён. Разделены потому, что у них разошлись
-потребности — состояние формы, формулировки ошибок, устройство главной,
-— и ни одна из них API не нужна. Общее у них ниже, в services/, и
-импортируют они только оттуда: web ничего не берёт у api.
+`api/` answers JSON and is described in /openapi.json. `web/` answers
+pages and is excluded from that document. They are separate because their
+needs diverged — form state, error wording, the arrangement of a front
+page — and none of that is any use to the API.
+
+What they have in common lives below, in services/, and that is the only
+place either of them reads from: `web` imports nothing from `api`.
 """

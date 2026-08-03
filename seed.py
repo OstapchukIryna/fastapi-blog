@@ -1,13 +1,13 @@
-"""Наполнение базы демонстрационными записями.
+"""Seed the database with the real posts this blog started from.
 
-Запуск:
     uv run python seed.py
-    uv run python seed.py --reset    # снести таблицы и создать заново
+    uv run python seed.py --reset    # drop the tables and rebuild them
 
-Скрипт идемпотентен: повторный запуск ничего не дублирует.
+Idempotent: running it twice adds nothing the second time, which is what
+lets the test harness call it before every run without thinking about it.
 
-Пять настоящих постов — этого хватает тестам, но не хватает, чтобы
-увидеть пагинацию. Объём делает populate.py, и он разрушающий.
+Five real posts is enough for the tests and not enough to see pagination.
+Volume is populate.py's job, and that script is destructive.
 """
 
 import asyncio
@@ -29,11 +29,23 @@ CONTENT_DIR = Path(__file__).parent / "content"
 AUTHOR = {
     "username": "called_mad",
     "email": "blue.hunde@gmail.com",
-    "password": "TestPassword123",  # TODO: не для боевого окружения
+    # TODO: fine for a local database, not for anything reachable.
+    "password": "TestPassword123",
 }
 
 
 class PostSeed(TypedDict):
+    """One article's metadata; its prose is read from content/<slug>.md.
+
+    Attributes:
+        slug (str): the Markdown file's name, without the extension.
+        title (str): headline, and the key idempotency is judged on.
+        summary (str): the listing blurb.
+        tags (list[str]): labels, created on demand.
+        date (datetime): publication time, timezone-aware.
+        pinned (NotRequired[bool]): whether this leads the front page.
+    """
+
     slug: str
     title: str
     summary: str
@@ -42,8 +54,9 @@ class PostSeed(TypedDict):
     pinned: NotRequired[bool]
 
 
-# Метаданные здесь, тексты в content/*.md — правится в редакторе
-# как обычный markdown, а не внутри строкового литерала
+# * Metadata here, prose in content/*.md. An article is edited in an
+# * editor as ordinary Markdown rather than inside a string literal,
+# * where every quote and backslash would have to be escaped.
 POSTS: list[PostSeed] = [
     {
         "slug": "modern-python-tooling",
@@ -100,6 +113,19 @@ POSTS: list[PostSeed] = [
 
 
 def load_content(slug: str) -> str:
+    """Read an article's body from content/.
+
+    Args:
+        slug (str): the file's name without its extension.
+
+    Returns:
+        str: the Markdown source.
+
+    Raises:
+        FileNotFoundError: the metadata names a file that is not there.
+            Loud on purpose — a post seeded with an empty body would be
+            harder to notice than a script that stops.
+    """
     path = CONTENT_DIR / f"{slug}.md"
     if not path.exists():
         raise FileNotFoundError(f"no file {path}")
@@ -107,6 +133,14 @@ def load_content(slug: str) -> str:
 
 
 async def get_or_create_author(db: AsyncSession) -> models.User:
+    """Return the blog's author, creating the account on a first run.
+
+    Args:
+        db (AsyncSession): session to query and stage through.
+
+    Returns:
+        models.User: the author, whether just made or already there.
+    """
     result = await db.execute(
         select(models.User).where(models.User.username == AUTHOR["username"])
     )
@@ -116,27 +150,29 @@ async def get_or_create_author(db: AsyncSession) -> models.User:
         return user
 
     user = models.User(
-        # Хеш считает та же функция, что и регистрация: pwdlib собран
-        # только с Argon2, поэтому bcrypt-хеш он не опознаёт и verify
-        # не возвращает False, а падает — засеянный автор не мог войти
-        # вообще, и это была 500, а не 401.
+        # ! Hashed by the same function registration uses. pwdlib is
+        # ! built with Argon2 only: it does not recognise a bcrypt hash
+        # ! and raises instead of answering "no match", so a seeded
+        # ! author hashed any other way could not sign in at all — and
+        # ! the failure surfaced as a 500 rather than a 401.
         username=AUTHOR["username"],
         email=AUTHOR["email"].lower(),
         password_hash=hash_password(AUTHOR["password"]),
     )
     db.add(user)
-    await db.flush()  # чтобы получить user.id до коммита
+    await db.flush()  # assigns user.id without ending the transaction
     return user
 
 
 async def seed() -> None:
+    """Add any of the listed posts that are not in the database yet."""
     async with AsyncSessionLocal() as db:
         author = await get_or_create_author(db)
 
         created = 0
         for item in POSTS:
-            # Идемпотентность по заголовку: колонки slug в модели нет,
-            # а заголовки здесь уникальны
+            # * Idempotency keyed on the title: the model has no slug
+            # * column, and the titles in this file are unique.
             result = await db.execute(
                 select(models.Post).where(models.Post.title == item["title"])
             )

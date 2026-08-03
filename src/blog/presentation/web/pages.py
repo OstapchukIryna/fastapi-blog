@@ -1,14 +1,16 @@
-"""
-The HTML side of the site: every page a user opens in a browser.
+"""The HTML side of the site: every page a person opens in a browser.
 
-Первая порция записей рисуется здесь, сервером. Следующие приезжают из
-того же /api, который отвечает Postman'у, — страница только говорит
-кнопке, откуда брать и сколько уже показано.
+The first batch of records is rendered here, by the server. Every batch
+after it arrives from the same /api that answers Postman — the page only
+tells the button where to fetch from and how many are already shown.
+
+No query is written in this module. Both surfaces call services/, which
+is why "post not found" reads identically on a page and in JSON.
 """
 
-from collections.abc import Sequence
+from collections.abc import Sequence, Sized
 from dataclasses import dataclass
-from typing import Annotated
+from typing import Annotated, Self
 
 from fastapi import APIRouter, Form, Request, Response, status
 from fastapi.responses import RedirectResponse
@@ -23,7 +25,7 @@ from blog.presentation.web.forms import (
     render_post_form,
 )
 from blog.presentation.web.templating import templates
-from blog.schemas import PageParams, PostFormInput
+from blog.schemas import PageParams, Pagination, PostFormInput
 from blog.services import posts, tags
 from blog.services.auth import CurrentUser
 from blog.services.posts import PostDep
@@ -33,21 +35,20 @@ router = APIRouter(include_in_schema=False)
 
 
 def arrange(items: Sequence[models.Post]) -> dict:
-    """
-    Split a slice into the one post at the top and the rest.
+    """Split one batch into the post shown large and the ones below it.
 
-    Ищет закреплённый не перебором, а первым элементом: запрос уже
-    отсортирован pinned-first. Раньше перебор был обязателен, потому что
-    закреплённый мог оказаться где угодно, — а с пагинацией он ещё и
-    выпадал из второй порции, и на второй странице в шапку попадал
-    случайный пост.
+    The pinned post is found by looking at the first element rather than
+    by scanning, because the query already sorts pinned first. Scanning
+    used to be necessary, and with pagination it also became wrong: on
+    the second batch the pinned post is not in the slice at all, so the
+    scan found nothing and an arbitrary post took the lead position.
 
     Args:
-        items (Sequence[models.Post]): одна порция, в порядке запроса.
+        items (Sequence[models.Post]): one batch, in query order.
 
     Returns:
-        dict: закреплённый (если он и есть первый), ведущий и остальные.
-
+        dict: the template context — `pinned` (only when the lead really
+            is pinned), `lead`, and `rest`.
     """
     lead = items[0] if items else None
     return {
@@ -57,21 +58,23 @@ def arrange(items: Sequence[models.Post]) -> dict:
     }
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class Feed:
-    """
-    Что нужно кнопке «ещё»: откуда брать, сколько показано, сколько всего.
+    """What the "load more" button needs: where, how far, how many.
 
-    url считается через url_for по имени роута, а не пишется строкой:
-    адрес API — не тот факт, который стоит держать в двух местах.
+    Frozen because it describes one rendered response. It is built at the
+    end of a route and read by the template; letting a field be assigned
+    afterwards would allow an object claiming to have shown ten records
+    while carrying the offset of twenty.
 
     Attributes:
-        url (str): адрес того же списка в /api.
-        shown (int): сколько записей уже на странице — и он же offset
-            следующего запроса.
-        limit (int): по сколько брать дальше.
-        total (int): сколько всего под этот запрос.
-
+        url (str): the same list under /api. Resolved through url_for by
+            route name rather than written as a string, so the address
+            is not a fact kept in two places that can disagree.
+        shown (int): how many records are on the page already — and, by
+            the same token, the offset the next request starts at.
+        limit (int): how many to fetch per batch from here on.
+        total (int): how many exist under this query.
     """
 
     url: str
@@ -79,8 +82,41 @@ class Feed:
     limit: int
     total: int
 
+    @classmethod
+    def after(
+        cls,
+        request: Request,
+        route: str,
+        page: Pagination,
+        items: Sized,
+        total: int,
+        **path_params: object,
+    ) -> Self:
+        """Describe the feed a page has just rendered the first slice of.
+
+        Args:
+            request (Request): the request being answered; url_for lives on it.
+            route (str): name of the JSON route that serves the same list.
+            page (Pagination): the slice this page asked for.
+            items (Sized): what came back, so the next offset can be worked out.
+            total (int): how many records exist under the same query.
+            **path_params: values the route needs in its path, such as the
+                tag name or the author id. Passed through to url_for so the
+                address is never assembled by hand in two places.
+
+        Returns:
+            Self: state the template hands to the "load more" button.
+        """
+        return cls(
+            url=str(request.url_for(route, **path_params)),
+            shown=page.skip + len(items),
+            limit=page.limit,
+            total=total,
+        )
+
     @property
     def more(self) -> bool:
+        """Whether anything is left to fetch."""
         return self.shown < self.total
 
 
@@ -89,7 +125,18 @@ class Feed:
 
 @router.get("/", name="home")
 @router.get("/posts", name="posts")
-async def home(request: Request, db: DbSession, page: PageParams):
+async def home(request: Request, db: DbSession, page: PageParams) -> Response:
+    """Render the front page: the lead post and the start of the archive.
+
+    Args:
+        request (Request): the request being answered.
+        db (DbSession): request-scoped session.
+        page (PageParams): which slice to render. Usually the first, but
+            a deep link with ?skip= renders that slice server-side.
+
+    Returns:
+        Response: the rendered home page.
+    """
     items, total = await posts.list_all(db, page)
     return templates.TemplateResponse(
         request,
@@ -97,12 +144,7 @@ async def home(request: Request, db: DbSession, page: PageParams):
         {
             **arrange(items),
             "title": "Home",
-            "feed": Feed(
-                url=str(request.url_for("list_posts")),
-                shown=page.skip + len(items),
-                limit=page.limit,
-                total=total,
-            ),
+            "feed": Feed.after(request, "list_posts", page, items, total),
         },
     )
 
@@ -229,7 +271,22 @@ async def update_post(
 
 # One separate action, not a form field
 @router.post("/posts/{post_id}/pin", name="toggle_pin")
-async def toggle_pin(request: Request, post: PostDep, db: DbSession):
+async def toggle_pin(request: Request, post: PostDep, db: DbSession) -> Response:
+    """Pin the post if it is not pinned, and unpin it if it is.
+
+    A route of its own rather than a field on the edit form: pinning is
+    one decision with one effect, and it should not require saving the
+    rest of the post to take hold.
+
+    Args:
+        request (Request): needed to build the redirect target.
+        post (PostDep): the post, or a 404.
+        db (DbSession): request-scoped session.
+
+    Returns:
+        Response: a 303 back to the edit page, so a refresh re-reads the
+            page rather than re-submitting the action.
+    """
     await posts.set_pinned(db, post, pinned=not post.is_pinned)
     return RedirectResponse(
         request.url_for("edit_post", post_id=post.id),
@@ -238,22 +295,44 @@ async def toggle_pin(request: Request, post: PostDep, db: DbSession):
 
 
 @router.get("/posts/{post_id}", name="post_page")
-async def post_page(request: Request, post: PostDep, db: DbSession):
-    related, related_label = await posts.find_related(db, post)
+async def post_page(request: Request, post: PostDep, db: DbSession) -> Response:
+    """Render one post, with a couple of suggestions underneath.
+
+    Args:
+        request (Request): the request being answered.
+        post (PostDep): the post, or a 404.
+        db (DbSession): request-scoped session.
+
+    Returns:
+        Response: the rendered article page.
+    """
+    related = await posts.find_related(db, post)
+    # * A real match always shares at least one tag; a fallback never does.
+    heading = "Related" if related and related[0].shared else "More posts"
     return templates.TemplateResponse(
         request,
         "post.html",
         {
             "post": post,
             "related": related,
-            "related_label": related_label,
+            "related_label": heading,
             "title": post.title,
         },
     )
 
 
 @router.get("/tags", name="tags_index")
-async def tags_index(request: Request, db: DbSession, page: PageParams):
+async def tags_index(request: Request, db: DbSession, page: PageParams) -> Response:
+    """Render the index of tags with their post counts.
+
+    Args:
+        request (Request): the request being answered.
+        db (DbSession): request-scoped session.
+        page (PageParams): which slice of tags to render.
+
+    Returns:
+        Response: the rendered topics page.
+    """
     rows, total = await tags.with_counts(db, page)
     return templates.TemplateResponse(
         request,
@@ -261,18 +340,33 @@ async def tags_index(request: Request, db: DbSession, page: PageParams):
         {
             "tags": rows,
             "title": "Topics",
-            "feed": Feed(
-                url=str(request.url_for("list_tags")),
-                shown=page.skip + len(rows),
-                limit=page.limit,
-                total=total,
-            ),
+            "feed": Feed.after(request, "list_tags", page, rows, total),
         },
     )
 
 
 @router.get("/tags/{tag}", name="get_tag")
-async def get_tag(request: Request, tag: str, db: DbSession, page: PageParams):
+async def get_tag(
+    request: Request, tag: str, db: DbSession, page: PageParams
+) -> Response:
+    """Render the posts filed under one tag.
+
+    Reuses home.html rather than having a template of its own: the two
+    show the same list, and the only difference is the header, which the
+    template picks from `filter_tag`.
+
+    Args:
+        request (Request): the request being answered.
+        tag (str): the tag, from the path.
+        db (DbSession): request-scoped session.
+        page (PageParams): which slice to render.
+
+    Returns:
+        Response: the rendered list page.
+
+    Raises:
+        HTTPException: 404 when no post anywhere carries the tag.
+    """
     items, total = await posts.with_tag(db, tag, page)
     return templates.TemplateResponse(
         request,
@@ -281,12 +375,7 @@ async def get_tag(request: Request, tag: str, db: DbSession, page: PageParams):
             **arrange(items),
             "filter_tag": tag,
             "title": f"#{tag}",
-            "feed": Feed(
-                url=str(request.url_for("get_tag_posts", tag=tag)),
-                shown=page.skip + len(items),
-                limit=page.limit,
-                total=total,
-            ),
+            "feed": Feed.after(request, "get_tag_posts", page, items, total, tag=tag),
         },
     )
 
@@ -294,7 +383,18 @@ async def get_tag(request: Request, tag: str, db: DbSession, page: PageParams):
 @router.get("/users/{user_id}/posts", name="user_posts")
 async def user_posts_page(
     request: Request, user: UserDep, db: DbSession, page: PageParams
-):
+) -> Response:
+    """Render everything one person has written.
+
+    Args:
+        request (Request): the request being answered.
+        user (UserDep): the author, or a 404.
+        db (DbSession): request-scoped session.
+        page (PageParams): which slice to render.
+
+    Returns:
+        Response: the rendered author page.
+    """
     items, total = await posts.for_author(db, user.id, page)
     return templates.TemplateResponse(
         request,
@@ -303,37 +403,82 @@ async def user_posts_page(
             "posts": items,
             "user": user,
             "title": f"{user.username}'s posts",
-            "feed": Feed(
-                url=str(request.url_for("get_user_posts", user_id=user.id)),
-                shown=page.skip + len(items),
-                limit=page.limit,
-                total=total,
+            "feed": Feed.after(
+                request, "get_user_posts", page, items, total, user_id=user.id
             ),
         },
     )
 
 
 @router.get("/about", name="about")
-def about(request: Request):
+def about(request: Request) -> Response:
+    """Render the static about page.
+
+    Args:
+        request (Request): needed by the template.
+
+    Returns:
+        Response: the rendered page.
+    """
     return templates.TemplateResponse(request, "about.html", {"title": "About"})
 
 
 @router.get("/profile", name="profile")
-def profile(request: Request):
+def profile(request: Request) -> Response:
+    """Render the profile shell.
+
+    Deliberately empty of data: the token lives in localStorage, so the
+    server cannot know whose profile this is. The page's own script
+    fetches /api/users/me and fills it in.
+
+    Args:
+        request (Request): needed by the template.
+
+    Returns:
+        Response: the rendered shell.
+    """
     return templates.TemplateResponse(request, "profile.html", {"title": "Profile"})
 
 
 @router.get("/login", name="login")
-def login_page(request: Request):
+def login_page(request: Request) -> Response:
+    """Render the sign-in form.
+
+    Args:
+        request (Request): needed by the template.
+
+    Returns:
+        Response: the rendered page. The form posts to the API from the
+            browser rather than to this route, because the answer is a
+            token the server has nowhere to put.
+    """
     return templates.TemplateResponse(request, "login.html", {"title": "Login"})
 
 
 @router.get("/register", name="register")
-def register_page(request: Request):
+def register_page(request: Request) -> Response:
+    """Render the registration form.
+
+    Args:
+        request (Request): needed by the template.
+
+    Returns:
+        Response: the rendered page.
+    """
     return templates.TemplateResponse(request, "register.html", {"title": "Register"})
 
 
 @router.post("/posts/{post_id}/delete", name="delete_post")
-async def delete_post(post: PostDep, db: DbSession):
+async def delete_post(post: PostDep, db: DbSession) -> Response:
+    """Delete a post from the edit page and return to the front page.
+
+    Args:
+        post (PostDep): the post, or a 404.
+        db (DbSession): request-scoped session.
+
+    Returns:
+        Response: a 303 to the front page. There is nothing left to show
+            at the post's own address.
+    """
     await posts.delete(db, post)
     return RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)

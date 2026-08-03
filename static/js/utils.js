@@ -4,7 +4,7 @@
 const NETWORK_ERROR =
   "Network error. Please check your connection and try again.";
 
-// Символы, которые в HTML значат не себя.
+// Characters that mean something other than themselves inside HTML.
 const HTML_ESCAPES = {
   "&": "&amp;",
   "<": "&lt;",
@@ -16,14 +16,15 @@ const HTML_ESCAPES = {
 /**
  * Turn text into text that means itself inside HTML.
  *
- * Нужна везде, где строка из API попадает в innerHTML. Заголовок поста
- * пишет человек, и `<img onerror=...>` в нём — это не гипотетическая
- * атака, а обычная цитата из статьи про XSS, набранная без задней мысли.
+ * Needed anywhere a string from the API reaches innerHTML. Post titles
+ * are written by people, and `<img onerror=...>` in one is not a
+ * hypothetical attack — it is an ordinary quotation from an article
+ * about XSS, typed without a second thought.
  *
- * Экранируется и апостроф: значение может оказаться внутри атрибута,
- * закрытого одинарными кавычками, и тогда &quot; его не спасёт.
+ * The apostrophe is escaped too: a value can end up inside an attribute
+ * delimited by single quotes, where &quot; would not save it.
  *
- * @param {unknown} value что угодно; null и undefined дают пустую строку.
+ * @param {unknown} value anything; null and undefined give "".
  * @returns {string}
  */
 export function escapeHtml(value) {
@@ -33,16 +34,18 @@ export function escapeHtml(value) {
 /**
  * A date written the way the server writes it: 05 Aug 2026.
  *
- * Один формат на обе стороны. Карточку в архиве рисует то Jinja на
- * первой порции, то этот модуль на следующих, и «5 августа» рядом с
- * «05 Aug 2026» выдало бы шов сразу.
+ * One format for both renderers. The archive card is drawn by Jinja for
+ * the first batch and by this module for every batch after it, and a
+ * "5 August" sitting next to an "05 Aug 2026" would show the seam at
+ * once.
  *
- * timeZone: "UTC" не косметика. Даты приходят в UTC, а браузер читателя
- * восточнее Гринвича сдвинул бы полночь на предыдущий день — и один и
- * тот же пост назывался бы разными датами до и после нажатия «ещё».
+ * ! timeZone: "UTC" is not cosmetic. Dates arrive in UTC, and a reader
+ * ! east of Greenwich would have midnight shifted into the previous day
+ * ! — so the same post would carry two different dates either side of a
+ * ! "load more" click.
  *
- * @param {string|Date} value ISO-строка из API или готовая дата.
- * @returns {string} пустая строка, если разобрать не удалось.
+ * @param {string|Date} value an ISO string from the API, or a Date.
+ * @returns {string} the formatted date, or "" if it could not be read.
  */
 export function formatDate(value) {
   const date = value instanceof Date ? value : new Date(value);

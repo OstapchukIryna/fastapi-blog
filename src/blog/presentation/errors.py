@@ -1,4 +1,12 @@
-from fastapi import FastAPI, Request, status
+"""Turning an exception into whatever the caller can read.
+
+The same failure has two correct renderings. A script wants JSON with a
+status; a browser wants a page it can look at. Which one is used is
+decided by the path, because that is the only thing available at the
+moment a handler runs that reliably says who is asking.
+"""
+
+from fastapi import FastAPI, Request, Response, status
 from fastapi.exception_handlers import (
     http_exception_handler,
     request_validation_exception_handler,
@@ -8,9 +16,23 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from blog.presentation.web.templating import templates
 
+API_PREFIX = "/api/"
 
-def error_page(request: Request, status_code: int, message: str):
-    """The error page both handlers fall back to when the caller is a browser."""
+GENERIC_FAILURE = "An error occurred. Please check your request and try again."
+INVALID_REQUEST = "Invalid request. Please check your input and try again."
+
+
+def error_page(request: Request, status_code: int, message: str) -> Response:
+    """Render the shared error page.
+
+    Args:
+        request (Request): needed by Jinja and by url_for.
+        status_code (int): the status to answer with.
+        message (str): a sentence a reader can act on.
+
+    Returns:
+        Response: the rendered page.
+    """
     return templates.TemplateResponse(
         request,
         "error.html",
@@ -19,46 +41,68 @@ def error_page(request: Request, status_code: int, message: str):
             "title": f"Error {status_code}",
             "message": message,
         },
-        # The original status code from the exception, not a 200
+        # ! The original status, not a 200. An error page served as 200
+        # ! is a lie that caches, crawlers and monitoring all believe.
         status_code=status_code,
     )
 
 
 def register_error_handlers(app: FastAPI) -> None:
-    """
-    Вешает обработчики на приложение.
+    """Attach the handlers to an application.
 
-    Через функцию, а не напрямую: модуль не импортирует main, поэтому
-    циклической зависимости не возникает. Декораторы внутри, а не
-    add_exception_handler, потому что тот типизирован как
-    Callable[[Request, Exception], Response] — и строгий проверяльщик
-    ругается на суженный тип второго аргумента.
+    Registered through a function rather than at import time, so this
+    module never has to import `main` and no cycle appears.
+
+    The handlers are declared with decorators rather than passed to
+    `add_exception_handler`, because that method is typed as accepting
+    `Callable[[Request, Exception], Response]`, and a strict checker
+    rejects a handler that narrows the second argument to the exception
+    it actually handles.
+
+    Args:
+        app (FastAPI): the application to attach to.
     """
 
     @app.exception_handler(StarletteHTTPException)
     async def general_http_exception_handler(
         request: Request, exception: StarletteHTTPException
-    ):
+    ) -> Response:
+        """Answer any deliberate HTTP failure in the caller's own terms.
 
-        if request.url.path.startswith("/api/"):
+        Args:
+            request (Request): the request that failed.
+            exception (StarletteHTTPException): the raised refusal.
+
+        Returns:
+            Response: JSON under /api/, an HTML page everywhere else.
+        """
+        if request.url.path.startswith(API_PREFIX):
             return await http_exception_handler(request, exception)
 
+        # `detail` is optional in Starlette; a page needs a sentence.
         return error_page(
-            request,
-            exception.status_code,
-            exception.detail
-            or "An error occurred. Please check your request and try again.",
+            request, exception.status_code, exception.detail or GENERIC_FAILURE
         )
 
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(
         request: Request, exception: RequestValidationError
-    ):
-        if request.url.path.startswith("/api/"):
+    ) -> Response:
+        """Answer a request whose shape was wrong.
+
+        Args:
+            request (Request): the request that failed.
+            exception (RequestValidationError): what Pydantic rejected.
+
+        Returns:
+            Response: for the API, the framework's own detailed body,
+                because a client can act on the field list. For a page,
+                one sentence: the field-by-field breakdown belongs beside
+                the inputs, and the form already does that itself.
+        """
+        if request.url.path.startswith(API_PREFIX):
             return await request_validation_exception_handler(request, exception)
 
         return error_page(
-            request,
-            status.HTTP_422_UNPROCESSABLE_CONTENT,
-            "Invalid request. Please check your input and try again.",
+            request, status.HTTP_422_UNPROCESSABLE_CONTENT, INVALID_REQUEST
         )

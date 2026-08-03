@@ -1,27 +1,27 @@
-"""
-Проверка того, что записано словами в docs/architecture.md.
+"""Enforcing what docs/architecture.md only describes.
 
-Циклический импорт здесь случался дважды, и оба раза одинаково: общая
-вещь, которой ничего не нужно для существования, оказывалась внутри
-модуля, у которого зависимости есть, — потому что он первым её попросил.
+This project has had an import cycle twice, the same way both times:
+something shared, which needs nothing in order to exist, ended up inside
+a module that does have dependencies — because that module asked for it
+first.
 
-    normalise_tags жила в routers/tags.py, схемам понадобилось чистить
-    теги: schemas -> routers.tags -> routers.posts -> schemas
+    normalise_tags lived in routers/tags.py, and schemas needed to clean
+    tags:  schemas -> routers.tags -> routers.posts -> schemas
 
-    SkipDep жил в services/posts.py, тегам понадобился срез:
+    SkipDep lived in services/posts.py, and tags needed a slice:
     services.tags -> services.posts -> services.tags
 
-Ловится это только при запуске приложения, и сообщение указывает не на
-плохое ребро, а на его жертву — «cannot import name 'posts_query' from
-partially initialized module», хотя виноват был вообще другой файл.
-Тесты ниже называют само ребро.
+Both were found by starting the application, and both times the error
+named the victim rather than the bad edge — "cannot import name
+'posts_query' from partially initialized module" pointed at a file that
+had done nothing wrong. The tests below name the edge.
 
-Считается граф *исполняемых* импортов: тела `if TYPE_CHECKING:` не
-выполняются и цикла вызвать не могут, поэтому пропускаются. Обратная
-сторона — под TYPE_CHECKING можно спрятать импорт, который на самом деле
-нужен в рантайме; для FastAPI это обычная ловушка (см. отключённые
-TC001-003 в pyproject.toml), и от неё страхует не этот файл, а
-test_the_application_imports вместе с прогоном API.
+The graph is of imports that actually run. Bodies of `if TYPE_CHECKING:`
+are skipped, because they never execute and cannot cause a cycle. The
+trade-off is that a runtime import can be hidden under TYPE_CHECKING and
+this file will not notice; for FastAPI that is a well-known trap (see the
+disabled TC001-003 in pyproject.toml), and what guards against it is
+test_the_application_imports together with the API run.
 """
 
 import ast
@@ -33,8 +33,8 @@ import pytest
 
 SRC = Path(__file__).resolve().parent.parent / "src"
 
-# Снизу вверх. Импорт разрешён внутрь своего уровня и на любой уровень
-# ниже; наверх — никогда.
+# * Bottom to top. An import may stay inside its own level or go to any
+# * level below it. Upwards: never.
 LAYERS = {
     "core": 0,
     "infrastructure": 1,
@@ -42,58 +42,72 @@ LAYERS = {
     "services": 3,
     "presentation": 4,
 }
-TOP = 5  # blog.main и всё, что не в пакете слоя
+TOP = 5  # blog.main, and anything not inside a layer package
 
-# Рёбра внутри одного слоя. Не запрещены — но каждое должно быть
-# осознанным, поэтому список явный и с причиной. Оба цикла в истории
-# проекта были именно боковыми рёбрами, добавленными не думая.
+# Edges inside one layer. Not forbidden — but each one should be a
+# decision, so the list is explicit and every entry carries its reason.
+# Both cycles in this project's history were sideways edges added without
+# thinking.
 #
-# Проверка на «зависимость или общий словарь»: если бы этих двух
-# сущностей не существовало, эта штука имела бы смысл? Срез — да, и
-# поэтому он уехал в schemas/pagination.py. get_or_create — нет.
+# * The test for "real dependency or shared vocabulary": if neither of
+# * these two entities existed, would the thing still make sense? A slice
+# * would — which is why it moved to schemas/pagination.py. get_or_create
+# * would not, which is why posts -> tags stays.
 ALLOWED_SIDEWAYS = {
-    ("blog.core.security", "blog.core.config"): "подписи нужен секрет",
+    ("blog.core.security", "blog.core.config"): "signing needs the secret",
     (
         "blog.infrastructure.models.post",
         "blog.infrastructure.database",
-    ): "Base объявлен там",
+    ): "Base is declared there",
     (
         "blog.infrastructure.models.tag",
         "blog.infrastructure.database",
-    ): "Base объявлен там",
+    ): "Base is declared there",
     (
         "blog.infrastructure.models.user",
         "blog.infrastructure.database",
-    ): "Base объявлен там",
+    ): "Base is declared there",
     (
         "blog.infrastructure.models.post",
         "blog.infrastructure.models.tag",
-    ): "посту нужна таблица связи post_tags",
+    ): "a post needs the post_tags association",
     (
         "blog.infrastructure.models.post",
         "blog.infrastructure.models.user",
-    ): "у поста есть автор",
+    ): "a post has an author",
     (
         "blog.presentation.errors",
         "blog.presentation.web.templating",
-    ): "страницу ошибки рисует тот же Jinja",
+    ): "the error page uses the same Jinja",
     (
         "blog.presentation.web.forms",
         "blog.presentation.web.templating",
-    ): "форма рисуется шаблоном",
+    ): "the form is drawn by a template",
     (
         "blog.presentation.web.pages",
         "blog.presentation.web.forms",
-    ): "две страницы показывают форму поста",
+    ): "two pages show the post form",
     (
         "blog.presentation.web.pages",
         "blog.presentation.web.templating",
-    ): "страницы рисуются шаблонами",
-    ("blog.schemas.post", "blog.schemas.tag"): "правила тегов общие для всех схем",
-    ("blog.schemas.post", "blog.schemas.user"): "в ответе про пост есть автор",
-    ("blog.services.posts", "blog.services.auth"): "владение — вопрос о текущем юзере",
-    ("blog.services.posts", "blog.services.tags"): "сохранить пост значит создать теги",
-    ("blog.services.users", "blog.services.auth"): "владение — вопрос о текущем юзере",
+    ): "pages are drawn by templates",
+    (
+        "blog.schemas.post",
+        "blog.schemas.tag",
+    ): "the tag rules are shared by every schema",
+    ("blog.schemas.post", "blog.schemas.user"): "a post response embeds its author",
+    (
+        "blog.services.posts",
+        "blog.services.auth",
+    ): "ownership is a question about the current user",
+    (
+        "blog.services.posts",
+        "blog.services.tags",
+    ): "storing a post means creating its tags",
+    (
+        "blog.services.users",
+        "blog.services.auth",
+    ): "ownership is a question about the current user",
 }
 
 
@@ -107,8 +121,15 @@ def layer(module: str) -> int:
     return LAYERS.get(parts[1], TOP) if len(parts) > 1 else TOP
 
 
-def runtime_imports(tree: ast.AST) -> list[ast.stmt]:
-    """Всё, кроме тел `if TYPE_CHECKING:` — они никогда не исполняются."""
+def runtime_imports(tree: ast.AST) -> list[ast.AST]:
+    """Every node except the bodies of `if TYPE_CHECKING:`.
+
+    Args:
+        tree (ast.AST): a parsed module.
+
+    Returns:
+        list[ast.AST]: nodes that run when the module is imported.
+    """
     deferred: set[int] = set()
     for node in ast.walk(tree):
         if not isinstance(node, ast.If):
@@ -125,12 +146,14 @@ def runtime_imports(tree: ast.AST) -> list[ast.stmt]:
 
 @pytest.fixture(scope="session")
 def graph() -> dict[str, set[str]]:
-    """
-    Module to the modules it imports at import time.
+    """Map each module to the modules it imports at import time.
 
-    `from blog.services import tags` и `from blog.services.tags import
-    get_or_create` — одно и то же ребро, поэтому имя разрешается до
-    файла, если такой файл есть.
+    `from blog.services import tags` and `from blog.services.tags import
+    get_or_create` are the same edge, so a name is resolved down to a
+    file whenever a file by that name exists.
+
+    Returns:
+        dict[str, set[str]]: module name to the modules it imports.
     """
     modules = {module_name(path): path for path in sorted(SRC.rglob("*.py"))}
     edges: dict[str, set[str]] = defaultdict(set)
@@ -141,9 +164,13 @@ def graph() -> dict[str, set[str]]:
             if isinstance(node, ast.ImportFrom) and (node.module or "").startswith(
                 "blog"
             ):
+                # `node.module` is Optional on the AST, but a relative
+                # import (`from . import x`) never starts with "blog", so
+                # the branch above has already excluded None.
+                module = node.module or ""
                 for alias in node.names:
-                    submodule = f"{node.module}.{alias.name}"
-                    target = submodule if submodule in modules else node.module
+                    submodule = f"{module}.{alias.name}"
+                    target = submodule if submodule in modules else module
                     if target != name:
                         edges[name].add(target)
             elif isinstance(node, ast.Import):
@@ -151,16 +178,19 @@ def graph() -> dict[str, set[str]]:
                     if alias.name in modules and alias.name != name:
                         edges[name].add(alias.name)
 
-    assert modules, f"в {SRC} не нашлось ни одного модуля — проверь путь"
+    assert modules, f"no modules found under {SRC} — check the path"
     return dict(edges)
 
 
 def test_no_import_cycles(graph):
-    """
-    Ни одного цикла — включая те, что идут через третий модуль.
+    """No cycles, including ones that travel through a third module.
 
-    Обход в глубину, а не поиск компонент связности: нужен сам путь,
-    иначе сообщение будет не полезнее исходного ImportError.
+    Depth-first rather than strongly-connected components, because the
+    path itself is the useful part: without it the message would be no
+    more help than the original ImportError.
+
+    Args:
+        graph (dict[str, set[str]]): the import graph.
     """
     cycles: list[list[str]] = []
     done: set[str] = set()
@@ -181,13 +211,17 @@ def test_no_import_cycles(graph):
     for module in sorted(graph):
         walk(module)
 
-    assert not cycles, "циклический импорт:\n" + "\n".join(
+    assert not cycles, "import cycle:\n" + "\n".join(
         "  " + " -> ".join(cycle) for cycle in cycles
     )
 
 
 def test_no_upward_imports(graph):
-    """Стрелки только вниз или вбок. Слой ниже не знает о слое выше."""
+    """Arrows point down or sideways, never up.
+
+    Args:
+        graph (dict[str, set[str]]): the import graph.
+    """
     upward = [
         f"  {source} ({layer(source)}) -> {target} ({layer(target)})"
         for source, targets in sorted(graph.items())
@@ -196,48 +230,54 @@ def test_no_upward_imports(graph):
     ]
 
     assert not upward, (
-        "импорт наверх — нижний слой не должен знать о верхнем:\n"
+        "import pointing up — a lower layer must not know an upper one:\n"
         + "\n".join(upward)
-        + "\n\nобычно это значит, что общая вещь лежит слишком высоко: "
-        "спроси, что ей нужно для существования, и положи её туда."
+        + "\n\nusually this means a shared thing is sitting too high: ask what it "
+        "needs in order to exist, and put it there."
     )
 
 
 def test_sideways_imports_are_declared(graph):
-    """
-    Каждое ребро внутри слоя объявлено в ALLOWED_SIDEWAYS.
+    """Every edge inside a layer is declared in ALLOWED_SIDEWAYS.
 
-    Пакетный __init__ не в счёт: импорт своих же подмодулей — это то,
-    что делает пакет пакетом, а не зависимость между соседями.
+    A package's own __init__ does not count: importing its submodules is
+    what makes it a package, not a dependency between siblings.
+
+    Args:
+        graph (dict[str, set[str]]): the import graph.
     """
     found = {
         (source, target)
         for source, targets in graph.items()
         for target in targets
         if layer(source) == layer(target)
-        and not target.startswith(f"{source}.")  # __init__ пакета
+        and not target.startswith(f"{source}.")  # a package's own __init__
     }
 
     undeclared = sorted(found - set(ALLOWED_SIDEWAYS))
     assert not undeclared, (
-        "боковой импорт без объяснения:\n"
+        "sideways import with no reason given:\n"
         + "\n".join(f"  {a} -> {b}" for a, b in undeclared)
-        + "\n\nесли это настоящая зависимость — впиши её в ALLOWED_SIDEWAYS "
-        "с причиной. Если общий словарь — ему место слоем ниже, а не у соседа."
+        + "\n\nif this is a real dependency, add it to ALLOWED_SIDEWAYS with its "
+        "reason. If it is shared vocabulary, it belongs a layer down, not "
+        "next door."
     )
 
     stale = sorted(set(ALLOWED_SIDEWAYS) - found)
-    assert not stale, "в ALLOWED_SIDEWAYS осталось лишнее:\n" + "\n".join(
+    assert not stale, "ALLOWED_SIDEWAYS still lists edges that are gone:\n" + "\n".join(
         f"  {a} -> {b}" for a, b in stale
     )
 
 
 def test_the_application_imports(monkeypatch):
-    """
-    Последняя проверка — та, которую граф по AST дать не может.
+    """The check an AST cannot give: import the application for real.
 
-    Порядок исполнения, побочные эффекты в __init__, импорт внутри
-    функции: всё это ловится только настоящим импортом приложения.
+    Execution order, side effects in a package __init__, an import inside
+    a function — none of that is visible in a static graph.
+
+    Args:
+        monkeypatch: pytest's environment patcher; the settings refuse to
+            load without a secret, and the database must not be a file.
     """
     monkeypatch.setenv("SECRET_KEY", "import-graph-test-secret-long-enough-32")
     monkeypatch.setenv("DATABASE_URL", "sqlite+aiosqlite:///:memory:")

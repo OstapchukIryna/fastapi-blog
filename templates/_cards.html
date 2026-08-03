@@ -1,13 +1,14 @@
-{# Карточки списков и кнопка «ещё».
+{# List cards, and the "load more" control.
 
-   Разметка archive_item воспроизводится один в один в
-   static/js/archive.js: первую порцию рисует сервер, следующие — браузер,
-   и шва между ними быть не должно. Меняешь здесь — меняй там; классы и
-   порядок узлов держит CSS, а не совпадение.
+   The archive_item markup is mirrored exactly in static/js/archive.js:
+   the server draws the first batch and the browser draws the rest, and
+   no seam should be visible between them. Change it here, change it
+   there — the class names and the node order are held together by CSS,
+   not by coincidence.
 
-   Раньше эта карточка была написана дважды — в home.html и в
-   user_posts.html, — и они уже начали расходиться: одна писала дату как
-«05 Aug, 2026», другая как «05 Aug 2026». #}
+   This card used to be written twice, in home.html and in
+   user_posts.html, and the two had already started to drift: one wrote
+   the date as "05 Aug, 2026" and the other as "05 Aug 2026". #}
 {% macro archive_item(post) %}
     <article class="archive-item">
         <p class="post-meta mono-label">
@@ -41,15 +42,16 @@
         <span class="count mono-label">{{ count }} post{{ '' if count == 1 else 's' }}</span>
     </a>
 {% endmacro %}
-{# Кнопка «ещё» и счётчик.
+{# The "load more" button and its counter.
 
-   Состояние ленты живёт в data-атрибутах, а не в переменной модуля:
-   на странице может оказаться два списка, а перезагрузка страницы
-   обязана возвращать честное «сколько уже показано» без участия JS.
+   The feed's state lives in data attributes rather than in a module
+   variable: a page may carry two lists, and a reload has to restore an
+   honest "how many are shown" without JavaScript being involved.
 
-   Без скрипта блок остаётся читаемым — видно, сколько записей всего,
-   — но кнопка ничего не делает. Это осознанно: подгрузка порциями и
-   есть поведение, которого без JS не бывает. #}
+   Without the script the block still reads — the total is visible — but
+   the button does nothing. That is deliberate: loading in batches is
+   behaviour, and behaviour is what a page without JavaScript does not
+   have. #}
 {% macro feed_more(feed, item='post', noun='post') %}
     {% if feed %}
         <div class="feed"

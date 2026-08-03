@@ -1,8 +1,9 @@
 {% extends "layout.html" %}
 {% import "_contact.html" as contact %}
-{# with context обязателен: url_for Starlette кладёт в контекст рендера,
-   а import по умолчанию его не передаёт — макрос падал бы на KeyError:
-   'request'. Для _contact.html этого не нужно: site лежит в globals. #}
+{# `with context` is required: Starlette puts url_for into the render
+   context, and an import does not pass that on by default — the macro
+   would fail with KeyError: 'request'. _contact.html needs none of this,
+   because `site` is a Jinja global rather than context. #}
 {% import "_cards.html" as cards with context %}
 {% block content %}
     {% if filter_tag %}
@@ -10,7 +11,7 @@
             <span class="eyebrow mono-label">Tagged</span>
             <h1 class="masthead-title">#{{ filter_tag }}</h1>
             <p class="masthead-tagline">
-                {# feed.total, а не длина порции: на странице их десять, а всего может быть сорок. #}
+                {# feed.total, not the length of the batch: ten are on the page, forty may exist. #}
                 {{ feed.total }} post{{ '' if feed.total == 1 else 's' }}.
             </p>
         </header>
@@ -58,8 +59,9 @@
             {% endif %}
             <span class="read-more mono-label">Read <span class="arrow">&rarr;</span></span>
         </article>
-        {# Заголовок секции показывается и при пустом остатке, если есть что
-           догрузить: иначе первая порция из «ещё» приехала бы без шапки. #}
+        {# The section heading shows even when the remainder is empty, as long
+           as more can be fetched — otherwise the first batch from "load
+           more" would arrive with no heading above it. #}
         {% if rest or feed.more %}
             <p class="section-rule mono-label">{{ 'Latest' if pinned else 'Archive' }}</p>
             <div class="archive" data-feed-list>{% for post in rest %}{{ cards.archive_item(post) }}{% endfor %}</div>
@@ -67,8 +69,9 @@
         {{ cards.feed_more(feed) }}
     {% else %}
         <div class="empty-state">
-            {# Пусто по двум разным причинам, и врать про одну из них не нужно:
-               ?skip=100 при сорока пяти постах — это не «постов ещё нет». #}
+            {# Empty for two different reasons, and there is no need to tell the
+               wrong story about either: ?skip=100 against forty-five posts is
+               not "nothing has been written yet". #}
             {% if feed and feed.total %}
                 <p class="mono-label mb-2">Nothing on this page</p>
                 <p class="mb-0">

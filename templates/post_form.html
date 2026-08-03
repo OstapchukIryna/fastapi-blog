@@ -24,7 +24,6 @@
           id="postForm"
           method="post"
           data-post-id="{{ post.id if editing else '' }}"
-          data-author-id="{{ view.author_id or '' }}"
           action="{{ url_for('update_post', post_id=post.id) if editing else url_for('create_post_page') }}">
         <div class="field">
             <label class="form-label mono-label" for="title">Title</label>
