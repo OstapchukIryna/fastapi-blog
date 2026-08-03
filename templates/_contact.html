@@ -1,4 +1,3 @@
-
 {% macro write_button(label=none) %}
     {% set target = ("mailto:" ~ site.email) if site.email else site.telegram %}
     {% if target %}
@@ -11,9 +10,7 @@
         <span class="cta-missing mono-label">Contact channels are not configured yet</span>
     {% endif %}
 {% endmacro %}
-
 {% macro channels() %}
-
     {% set primary = "email" if site.email else ("telegram" if site.telegram else none) %}
     {% if (site.telegram and primary != "telegram") or (site.email and primary != "email") or site.github %}
         <div class="channels mono-label">

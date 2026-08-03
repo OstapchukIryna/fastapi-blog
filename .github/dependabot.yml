@@ -1,0 +1,20 @@
+# Dependency updates arrive as pull requests, which means they go through
+# the same gates as any other change rather than being applied by hand.
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # One pull request for the tools, one per runtime dependency. A
+      # linter release and a SQLAlchemy release deserve different amounts
+      # of attention, and grouping them would hide that.
+      dev-tooling:
+        dependency-type: development
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
