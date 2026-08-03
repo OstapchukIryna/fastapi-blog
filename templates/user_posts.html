@@ -1,7 +1,8 @@
 {% extends "layout.html" %}
-{# with context обязателен: url_for Starlette кладёт в контекст рендера,
-   а import по умолчанию его не передаёт — макрос падал бы на KeyError:
-   'request'. Для _contact.html этого не нужно: site лежит в globals. #}
+{# `with context` is required: Starlette puts url_for into the render
+   context, and an import does not pass that on by default — the macro
+   would fail with KeyError: 'request'. _contact.html needs none of this,
+   because `site` is a Jinja global rather than context. #}
 {% import "_cards.html" as cards with context %}
 {% block content %}
     <header class="author-masthead">

@@ -6,17 +6,16 @@
             <h1 class="masthead-title auth-title">Create an account</h1>
             <p class="masthead-tagline">Reading needs no account. This one is for writing.</p>
         </header>
-
-        {# Как и профиль, форма живёт только на API: серверного POST нет,
-           чтобы не держать вторую копию проверок уникальности и хеширования
-           пароля. Без скрипта она бесполезна — noscript говорит это прямо. #}
+        {# Like the profile, this form exists only against the API: there is
+           no server-side POST, so the uniqueness checks and the password
+           hashing are not kept in a second copy. Without the script it does
+           nothing, and the noscript block says so plainly. #}
         <noscript>
             <div class="form-summary" role="alert">
                 <span class="mono-label">Needs JavaScript</span>
                 <p>This form registers through the API from the browser.</p>
             </div>
         </noscript>
-
         <form class="auth-form content-section" id="registerForm">
             <div class="field">
                 <label class="form-label mono-label" for="username">Username</label>
@@ -32,7 +31,6 @@
                 <p class="field-error mono-label" id="username-error" hidden></p>
                 <p class="field-hint mono-label">Shown on your posts</p>
             </div>
-
             <div class="field">
                 <label class="form-label mono-label" for="email">Email</label>
                 <input class="form-control"
@@ -45,7 +43,6 @@
                 <p class="field-error mono-label" id="email-error" hidden></p>
                 <p class="field-hint mono-label">You sign in with this</p>
             </div>
-
             <div class="field">
                 <label class="form-label mono-label" for="password">Password</label>
                 <input class="form-control"
@@ -59,7 +56,6 @@
                 <p class="field-error mono-label" id="password-error" hidden></p>
                 <p class="field-hint mono-label">At least 8 characters</p>
             </div>
-
             <div class="field">
                 <label class="form-label mono-label" for="confirmPassword">Repeat password</label>
                 <input class="form-control"
@@ -70,13 +66,11 @@
                        aria-describedby="confirmPassword-error">
                 <p class="field-error mono-label" id="confirmPassword-error" hidden></p>
             </div>
-
             <button class="btn btn-light write-btn w-100" type="submit">Create account</button>
             <p class="auth-note mono-label">
-                Already have one? <a href="{{ url_for('login') }}">Sign in</a>
+                Already have one? <a href="{{ url_for("login") }}">Sign in</a>
             </p>
         </form>
-
         <p class="mt-4">
             <a class="back-link mono-label" href="/">
                 <span class="arrow">&larr;</span> All posts
@@ -84,7 +78,6 @@
         </p>
     </div>
 {% endblock content %}
-
 {% block scripts %}
     <!-- Register Form Handler -->
     <script type="module">

@@ -1,3 +1,5 @@
+"""Posts: the thing the whole application exists to show."""
+
 from datetime import UTC, datetime
 from math import ceil
 
@@ -8,8 +10,37 @@ from blog.infrastructure.database import Base
 from blog.infrastructure.models.tag import Tag, post_tags
 from blog.infrastructure.models.user import User
 
+WORDS_PER_MINUTE = 200
+HEADING_PREFIX = "## "
+
 
 class Post(Base):
+    """One published article.
+
+    Attributes:
+        id (int): surrogate primary key.
+        title (str): headline.
+        summary (str): one or two sentences shown in listings. Stored
+            rather than derived from the content: the first paragraph of
+            an article is rarely a good standalone description.
+        content (str): the body, as Markdown. Rendered to HTML at display
+            time, not at write time, so a change to the renderer applies
+            to everything already published.
+        is_pinned (bool): whether this post leads the front page. At most
+            one row should be true, and nothing in the schema enforces
+            that — services.posts.set_pinned clears the others inside the
+            same transaction, so the invariant lives in one function
+            rather than in a constraint.
+        user_id (int): author. Indexed because the author page filters on
+            it, and cascading because a post without an author cannot be
+            displayed.
+        date_posted (datetime): publication time, timezone-aware and
+            indexed. Every listing sorts by it.
+        author (User): the person who wrote it.
+        tags (list[Tag]): labels, replaced wholesale when a post is
+            edited rather than merged.
+    """
+
     __tablename__ = "posts"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -24,6 +55,9 @@ class Post(Base):
 
     date_posted: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
+        # * A callable, not datetime.now(UTC). Calling it here would
+        # * freeze the default at import time and stamp every post with
+        # * the moment the process started.
         default=lambda: datetime.now(UTC),
         nullable=False,
         index=True,
@@ -34,14 +68,33 @@ class Post(Base):
 
     @property
     def outline(self) -> list[str]:
-        """Headers from post"""
+        """The second-level headings in the body, in order.
+
+        Used by listings to show what an article covers when its summary
+        would be less informative than its structure. Computed on read
+        rather than stored: it is a view of the content, and storing it
+        would create a second copy to keep in step with every edit.
+
+        Returns:
+            list[str]: heading texts without their Markdown prefix. Empty
+                when the post has no headings, which is how the template
+                decides to show the summary instead.
+        """
         return [
-            line.removeprefix("## ").strip()
+            line.removeprefix(HEADING_PREFIX).strip()
             for line in self.content.splitlines()
-            if line.startswith("## ")
+            if line.startswith(HEADING_PREFIX)
         ]
 
     @property
     def reading_minutes(self) -> int:
-        """Time to read based on resading speen 200 words per minutes, but min is one."""
-        return max(1, ceil(len(self.content.split()) / 200))
+        """Rough reading time, never less than one minute.
+
+        A word count over an assumed reading speed. Deliberately crude:
+        the number is a hint about length, and a more precise estimate
+        would not change any reader's decision.
+
+        Returns:
+            int: minutes, rounded up.
+        """
+        return max(1, ceil(len(self.content.split()) / WORDS_PER_MINUTE))

@@ -31,6 +31,7 @@ class AlreadyRegistered(HTTPException):
     """
 
     def __init__(self) -> None:
+        """Build the refusal, with a message that names neither field."""
         super().__init__(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username or email already registered",
@@ -130,6 +131,41 @@ async def authenticate(db: AsyncSession, email: str, password: str) -> models.Us
     return user
 
 
+async def _claimed_by_somebody_else(
+    db: AsyncSession, user: models.User, wanted: dict[str, object]
+) -> bool:
+    """Report whether another account already holds the requested name or email.
+
+    Only the two unique columns are worth asking about, and only when
+    the value is actually changing: re-sending the username you already
+    have is not a clash with yourself, and treating it as one would make
+    a no-op edit fail.
+
+    Args:
+        db (AsyncSession): session to query through.
+        user (models.User): the account being edited, excluded from the search.
+        wanted (dict[str, object]): the fields the caller asked to change.
+
+    Returns:
+        bool: True when at least one requested value is taken.
+    """
+    contested = {
+        name: value
+        for name, value in wanted.items()
+        if name in {"username", "email"} and value != getattr(user, name)
+    }
+    if not contested:
+        return False
+
+    clash = await db.execute(
+        select(models.User).where(
+            models.User.id != user.id,
+            or_(*[getattr(models.User, n) == v for n, v in contested.items()]),
+        )
+    )
+    return clash.scalars().first() is not None
+
+
 async def update(
     db: AsyncSession, user: models.User, changes: UserUpdate
 ) -> models.User:
@@ -163,20 +199,8 @@ async def update(
     """
     wanted = changes.model_dump(exclude_unset=True, exclude_none=True)
 
-    unique_fields = {
-        name: value
-        for name, value in wanted.items()
-        if name in {"username", "email"} and value != getattr(user, name)
-    }
-    if unique_fields:
-        result = await db.execute(
-            select(models.User).where(
-                models.User.id != user.id,
-                or_(*[getattr(models.User, n) == v for n, v in unique_fields.items()]),
-            )
-        )
-        if result.scalars().first() is not None:
-            raise AlreadyRegistered()
+    if await _claimed_by_somebody_else(db, user, wanted):
+        raise AlreadyRegistered()
 
     if "password" in wanted:
         user.password_hash = hash_password(wanted.pop("password"))

@@ -3,26 +3,22 @@
     <header class="masthead form-masthead">
         <span class="eyebrow mono-label">Account</span>
         <h1 class="masthead-title form-title">Profile</h1>
-        <p class="masthead-tagline">
-            The account you are signed in as, and the details it holds.
-        </p>
+        <p class="masthead-tagline">The account you are signed in as, and the details it holds.</p>
     </header>
-
     <noscript>
         <div class="form-summary" role="alert">
             <span class="mono-label">Needs JavaScript</span>
             <p>This page reads and saves through the API from the browser.</p>
         </div>
     </noscript>
-
-    {# Не вошедшего уводим на /login, поэтому «вы не вошли» здесь больше
-       нет — есть только ожидание ответа /me. Токен лежит в localStorage,
-       сервер его не видит, так что решение принимается уже после загрузки
-       страницы, и до ответа показывать форму было бы догадкой. #}
+    {# A signed-out visitor is sent to /login, so there is no "you are not
+       signed in" state here — only the wait for /me to answer. The token is
+       in localStorage where the server cannot see it, so the decision is
+       made after the page has loaded, and showing the form before the answer
+       arrives would be a guess. #}
     <div id="profileLoading" class="empty-state is-leading">
         <p class="mono-label mb-0">Loading your account…</p>
     </div>
-
     <div id="profileBody" hidden>
         <div class="profile-identity">
             <img class="avatar"
@@ -34,18 +30,17 @@
             <div>
                 <p class="record-action-name" id="identityName"></p>
                 <p class="record-action-note" id="identityEmail"></p>
-                {# Список постов уже есть на публичной странице автора —
-                   здесь ссылка с настоящим числом, а не второй архив. #}
+                {# The list of posts already exists on the public author
+                   page; this is a link carrying the real count, not a second
+                   archive. #}
                 <p class="record-action-note">
                     <a id="identityPosts" href="#"></a>
                 </p>
             </div>
         </div>
-
         <section class="profile-section">
             <h2 class="profile-section-title">Name and address</h2>
             <p class="profile-section-note">The name on your posts, and the address you sign in with.</p>
-
             <form id="identityForm" data-user-id="">
                 <div class="field">
                     <label class="form-label mono-label" for="username">Username</label>
@@ -59,7 +54,6 @@
                            aria-describedby="username-error">
                     <p class="field-error mono-label" id="username-error" hidden></p>
                 </div>
-
                 <div class="field">
                     <label class="form-label mono-label" for="email">Email</label>
                     <input class="form-control"
@@ -71,19 +65,16 @@
                            aria-describedby="email-error">
                     <p class="field-error mono-label" id="email-error" hidden></p>
                 </div>
-
                 <button class="btn btn-light write-btn" type="submit">Save</button>
             </form>
         </section>
-
         <section class="profile-section">
             <h2 class="profile-section-title">Photo</h2>
-
-            {# Выбор файла и есть отправка: второй клик по «сохранить»
-               ничего бы не решал, а картинку видно сразу. Нативный
-               input невозможно оформить, поэтому он спрятан, а нажимают
-               на label — он и так его цель, и остаётся доступен с
-               клавиатуры. #}
+            {# Choosing the file is the submission: a second click on "save"
+               would decide nothing, and the picture is visible immediately.
+               A native file input cannot be styled, so it is hidden and the
+               label is what gets pressed — the label already targets it, and
+               it stays reachable from the keyboard. #}
             <div class="profile-photo">
                 <img class="avatar"
                      id="photoPreview"
@@ -91,7 +82,6 @@
                      alt=""
                      width="72"
                      height="72">
-
                 <div class="profile-photo-actions">
                     <input class="visually-hidden"
                            type="file"
@@ -99,15 +89,16 @@
                            name="file"
                            accept="image/jpeg,image/png,image/gif,image/webp">
                     <label class="btn record-btn" id="photoChoose" for="photoFile">Choose a photo</label>
-                    <button class="btn record-btn is-danger" type="button" id="photoRemove" hidden>Remove</button>
+                    <button class="btn record-btn is-danger"
+                            type="button"
+                            id="photoRemove"
+                            hidden>Remove</button>
                     <p class="field-hint mono-label" id="photoHint">JPEG, PNG, GIF or WebP · up to 5 MB</p>
                 </div>
             </div>
         </section>
-
         <section class="profile-section">
             <h2 class="profile-section-title">Password</h2>
-
             <form id="passwordForm" data-user-id="">
                 <div class="field">
                     <label class="form-label mono-label" for="currentPassword">Current password</label>
@@ -119,7 +110,6 @@
                            aria-describedby="currentPassword-error">
                     <p class="field-error mono-label" id="currentPassword-error" hidden></p>
                 </div>
-
                 <div class="field">
                     <label class="form-label mono-label" for="newPassword">New password</label>
                     <input class="form-control"
@@ -133,7 +123,6 @@
                     <p class="field-error mono-label" id="newPassword-error" hidden></p>
                     <p class="field-hint mono-label">At least 8 characters</p>
                 </div>
-
                 <div class="field">
                     <label class="form-label mono-label" for="confirmPassword">Repeat new password</label>
                     <input class="form-control"
@@ -144,20 +133,16 @@
                            aria-describedby="confirmPassword-error">
                     <p class="field-error mono-label" id="confirmPassword-error" hidden></p>
                 </div>
-
                 <button class="btn btn-light write-btn" type="submit">Change password</button>
             </form>
         </section>
-
         <section class="profile-section">
             <div class="record-action">
                 <button class="btn record-btn" type="button" id="signOutHere">Sign out</button>
             </div>
         </section>
-
         <section class="profile-section is-danger">
             <h2 class="profile-section-title">Danger zone</h2>
-
             <div class="record-action">
                 <button class="btn record-btn is-danger"
                         type="button"
@@ -166,7 +151,6 @@
             </div>
         </section>
     </div>
-
     <div class="modal fade"
          id="deleteAccountModal"
          tabindex="-1"
@@ -198,7 +182,6 @@
         </div>
     </div>
 {% endblock content %}
-
 {% block scripts %}
     <!-- Profile Handler -->
     <script type="module">
@@ -223,16 +206,16 @@
         let userId = null;
         let hasPhoto = false;
 
-        // Подпись выводится из состояния, а не восстанавливается из
-        // снимка: восстановление затирало «Replace», которое только что
-        // поставил успешный ответ.
+        // The label is derived from state rather than restored from a
+        // snapshot: restoring overwrote the "Replace" that a successful
+        // response had just set.
         function showPhotoActions() {
             photoRemove.hidden = !hasPhoto;
             photoChoose.textContent = hasPhoto ? "Replace" : "Choose a photo";
         }
 
-        // Обе картинки — одна и та же: та, что в шапке профиля, и та, что
-        // рядом с кнопкой. Разъехаться им нельзя.
+        // Both images are the same picture: the one in the profile header and
+        // the one beside the button. They must not drift apart.
         function showPhoto(user) {
             userId = user.id;
             hasPhoto = Boolean(user.image_file);
@@ -245,9 +228,9 @@
             showPhotoActions();
         }
 
-        // Уводим на вход, а не показываем пустую страницу. replace, а не
-        // assign: «назад» из логина должно вести туда, откуда человек
-        // пришёл, а не обратно на профиль, который его снова отфутболит.
+        // Send them to sign in rather than show an empty page. replace, not
+        // assign: "back" from the login page should lead where the person
+        // came from, not to the profile that would bounce them again.
         const toLogin = (reason) => {
             const next = encodeURIComponent(window.location.pathname);
             const why = reason ? `&reason=${reason}` : "";
@@ -301,8 +284,8 @@
                 return;
             }
 
-            // Токен ничего не стоит через полчаса после выдачи. Выбросить
-            // его здесь — то, что мешает меню и дальше утверждать обратное.
+            // The token is worthless half an hour after it was issued.
+            // Dropping it here is what stops the menu claiming otherwise.
             if (status === 401) {
                 clearToken();
                 toLogin("expired");
@@ -312,8 +295,8 @@
             loading.querySelector("p").textContent = "Could not load your account.";
         }
 
-        // Не через wireForm: здесь нет ни полей, ни кнопки отправки —
-        // есть выбор файла, который сам себе submit.
+        // Not through wireForm: there are no fields and no submit button here
+        // — only a file input that is its own submission.
         async function changePhoto(busyLabel, options) {
             photoChoose.textContent = busyLabel;
             photoChoose.classList.add("is-busy");
@@ -334,8 +317,9 @@
                     toLogin("expired");
                     return;
                 }
-                // Отказы здесь осмысленные — «слишком большой», «не
-                // картинка», — и говорит их сервер, а не догадка страницы.
+                // The refusals here are meaningful — "too large", "not an
+                // image" — and the server states them, rather than the page
+                // guessing.
                 showError(getErrorMessage(data ?? {}), { title: "Not changed" });
             } catch {
                 showError(
@@ -346,8 +330,8 @@
                 photoChoose.classList.remove("is-busy");
                 photoRemove.disabled = false;
                 showPhotoActions();
-                // Тот же файл, выбранный второй раз, должен снова считаться
-                // выбором: без сброса change не сработает.
+                // The same file chosen twice must count as a choice both
+                // times: without the reset, `change` does not fire again.
                 photoFile.value = "";
             }
         }
@@ -358,7 +342,7 @@
 
             const body = new FormData();
             body.append("file", file);
-            // Окна об успехе нет: сменившаяся картинка и есть ответ.
+            // No success dialog: the changed picture is the answer.
             changePhoto("Uploading…", {
                 method: "PATCH",
                 encoding: "multipart",
@@ -388,8 +372,8 @@
                 message: `You are now ${user.username}.`,
                 action: "Close",
             }),
-            // Перечитываем, а не перезагружаем: форма и так заполняется
-            // из /me, полный рестарт страницы ничего не добавит.
+            // Re-read rather than reload: the form is filled from /me anyway,
+            // and a full page restart would add nothing.
             after: () => load(),
             failure: { action: "Back to the form" },
             busy: "Saving",
@@ -408,8 +392,8 @@
             confirmation.toggleAttribute("aria-invalid", show);
         };
 
-        // Пока печатают — только смягчаем: жаловаться на несовпадение до
-        // того, как пароль дописали, это придирка.
+        // While typing, only soften: complaining that the two do not match
+        // before the password is finished is nitpicking.
         confirmation.addEventListener("input", () => {
             if (matches()) showMismatch(false);
         });
@@ -426,10 +410,11 @@
         });
 
         wireForm(passwordForm, {
-            // Сервер текущий пароль не проверяет — в UserUpdate такого поля
-            // нет. Поэтому доказательство здесь: вход этим паролем. Это
-            // защита от чужих рук за открытым ноутбуком, но не гарантия:
-            // у кого есть токен, тот сменит пароль и мимо страницы.
+            // ! The server does not check the current password — UserUpdate
+            // ! has no such field. So the proof happens here: signing in with
+            // ! it. That guards against somebody else at an unlocked laptop,
+            // ! and guarantees nothing more — anyone holding the token can
+            // ! change the password without going through this page.
             guard: async (fields) => {
                 const { ok } = await sendRequest("/api/users/token", {
                     method: "POST",
@@ -479,8 +464,8 @@
                 message: "The account and its posts are gone.",
                 action: "Back to the blog",
             }),
-            // Токен переживает аккаунт, которого больше нет: убираем сами,
-            // иначе меню продолжит предлагать «выйти» из пустоты.
+            // The token outlives an account that no longer exists: drop it
+            // here, or the menu keeps offering to sign out of nothing.
             after: () => {
                 clearToken();
                 window.location.assign("/");

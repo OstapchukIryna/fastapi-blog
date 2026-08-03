@@ -1,25 +1,27 @@
 /**
- * «Ещё» для списков, которые API умеет отдавать порциями.
+ * "Load more" for the lists the API can serve in batches.
  *
- * Первую порцию рисует сервер, следующие — этот модуль, из того же
- * /api, который отвечает Postman'у. Второго источника правды нет: и
- * страница, и JSON идут через один сервис.
+ * The server renders the first batch; this module renders the rest, from
+ * the same /api that answers Postman. There is no second source of
+ * truth: the page and the JSON both go through one service.
  *
- * Состояние живёт в data-атрибутах блока, а не в переменной модуля.
- * Причин две: на странице может оказаться два списка, и перезагрузка
- * обязана возвращать честное «сколько показано» без участия скрипта.
+ * State lives in the block's data attributes rather than in a module
+ * variable. Two reasons: a page may carry more than one list, and a
+ * reload has to restore an honest "how many are shown" without the
+ * script being involved.
  *
- * Разметка карточек здесь повторяет макросы из templates/_cards.html.
- * Это единственное сознательное дублирование в проекте: без шага
- * сборки шаблон Jinja в браузере не выполнить. Меняешь там — меняй
- * здесь; шов проверяется глазами на границе первой и второй порции.
+ * ! The card markup below mirrors the macros in templates/_cards.html.
+ * ! This is the one deliberate duplication in the project — without a
+ * ! build step a Jinja macro cannot run in a browser. Change it there
+ * ! and change it here; the seam shows up between the first batch and
+ * ! the second.
  */
 
 import { escapeHtml, formatDate, sendRequest } from "./utils.js";
 
 const LOAD_FAILED = "Could not load more. Check your connection and try again.";
 
-// --- Карточки ---------------------------------------------------------
+// --- Cards ------------------------------------------------------------
 
 function tagLinks(tags) {
   if (!tags?.length) return "";
@@ -34,7 +36,7 @@ function tagLinks(tags) {
   return `<div class="card-tags mono-label">${links}</div>`;
 }
 
-// Оглавление, если оно есть, иначе аннотация — ровно как в макросе.
+// The outline when there is one, the summary otherwise — as the macro does.
 function cardBody(post) {
   if (post.outline?.length) {
     const items = post.outline
@@ -72,12 +74,12 @@ function topicRow(topic) {
 
 const RENDERERS = { post: archiveItem, topic: topicRow };
 
-// --- Лента ------------------------------------------------------------
+// --- Feed -------------------------------------------------------------
 
 /**
  * Wire one feed block to its list.
  *
- * @param {HTMLElement} feed блок с data-feed и состоянием в атрибутах.
+ * @param {HTMLElement} feed the data-feed block, state in its attributes.
  */
 function wireFeed(feed) {
   const button = feed.querySelector("[data-feed-button]");
@@ -101,8 +103,8 @@ function wireFeed(feed) {
     if (shown < total) {
       status.textContent = `${shown} of ${total}`;
     } else {
-      // Дошли до конца: кнопке больше нечего делать, и она уходит —
-      // отключённая кнопка обещает, что что-то ещё будет.
+      // * The end: the button has nothing left to do, so it goes. A
+      // * disabled button still promises that something more exists.
       status.textContent = `All ${total} ${plural(total)}`;
       button.remove();
     }
@@ -128,8 +130,8 @@ function wireFeed(feed) {
         return;
       }
 
-      // Первая из приехавших получает фокус: без этого читатель с
-      // клавиатуры остаётся на кнопке, которая уехала вниз на экран.
+      // * Focus the first arrival: without this a keyboard reader is
+      // * left on a button that has just moved down the page.
       const first = list.children.length;
       list.insertAdjacentHTML("beforeend", data.items.map(render).join(""));
       list.children[first]?.querySelector("a")?.focus({ preventScroll: true });

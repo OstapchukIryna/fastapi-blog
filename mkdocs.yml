@@ -1,0 +1,80 @@
+site_name: fastapi-blog
+site_description: A small blogging application in FastAPI, and the reasoning behind it
+repo_url: https://github.com/OstapchukIryna/fastapi-blog
+repo_name: OstapchukIryna/fastapi-blog
+edit_uri: edit/master/docs/
+
+theme:
+  name: material
+  palette:
+    # Dark first, matching the site itself.
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      accent: amber
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: black
+      accent: amber
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - toc.follow
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences:
+      # Lets the mermaid diagrams in architecture.md render as diagrams
+      # rather than as code blocks.
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            members_order: source
+            separate_signature: true
+            show_signature_annotations: true
+            signature_crossrefs: true
+            merge_init_into_class: true
+            filters: ["!^_"]
+
+nav:
+  - Home: index.md
+  - Design:
+      - The shape of this application: architecture.md
+      - How a request is authenticated: auth.md
+      - ADR-001 · Pages and API: adr-001-pages-and-api.md
+  - Working on it:
+      - Conventions: conventions.md
+  - Reference:
+      - core: reference/core.md
+      - infrastructure: reference/infrastructure.md
+      - schemas: reference/schemas.md
+      - services: reference/services.md
+      - presentation: reference/presentation.md
