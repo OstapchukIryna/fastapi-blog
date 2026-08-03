@@ -10,6 +10,7 @@ from fastapi import APIRouter, Form, Request, Response, status
 from fastapi.responses import RedirectResponse
 from pydantic import ValidationError
 
+from blog.core.config import settings
 from blog.infrastructure import models
 from blog.infrastructure.database import DbSession
 from blog.presentation.web.forms import (
@@ -22,7 +23,14 @@ from blog.presentation.web.templating import templates
 from blog.schemas import PostFormInput
 from blog.services import posts, tags
 from blog.services.auth import CurrentUser
-from blog.services.posts import PostDep, TaggedPostsDep
+from blog.services.posts import (
+    LimitDep,
+    PostDep,
+    SkipDep,
+    TaggedPostsDep,
+    all_posts,
+    count_total_posts,
+)
 from blog.services.users import UserDep
 
 router = APIRouter(include_in_schema=False)
@@ -52,11 +60,25 @@ def arrange(items: Sequence[models.Post]) -> dict:
 
 @router.get("/", name="home")
 @router.get("/posts", name="posts")
-async def home(request: Request, db: DbSession):
+async def home(
+    request: Request,
+    db: DbSession,
+):
+    total = await count_total_posts(db)
+    posts = await all_posts(
+        db, skip=0, limit=settings.posts_per_page
+    )  # TODO no need in offset since that is always first page with first batch
+    has_more = len(posts) < total
+
     return templates.TemplateResponse(
         request,
         "home.html",
-        {**arrange(await posts.all_posts(db)), "title": "Home"},
+        {
+            **arrange(posts),
+            "title": "Home",
+            "limit": settings.posts_per_page,
+            "has_more": has_more,
+        },
     )
 
 
@@ -206,9 +228,16 @@ async def post_page(request: Request, post: PostDep, db: DbSession):
 
 
 @router.get("/tags", name="tags_index")
-async def tags_index(request: Request, db: DbSession):
+async def tags_index(
+    request: Request,
+    db: DbSession,
+    skip: SkipDep = 0,
+    limit: LimitDep = settings.posts_per_page,
+):
     return templates.TemplateResponse(
-        request, "tags.html", {"topics": await tags.all_topics(db), "title": "Topics"}
+        request,
+        "tags.html",
+        {"topics": await tags.all_topics(db, skip, limit), "title": "Topics"},
     )
 
 
@@ -226,12 +255,18 @@ def get_tag(request: Request, tag: str, tagged: TaggedPostsDep):
 
 
 @router.get("/users/{user_id}/posts", name="user_posts")
-async def user_posts_page(request: Request, user: UserDep, db: DbSession):
+async def user_posts_page(
+    request: Request,
+    user: UserDep,
+    db: DbSession,
+    skip: SkipDep = 0,
+    limit: LimitDep = settings.posts_per_page,
+):
     return templates.TemplateResponse(
         request,
         "user_posts.html",
         {
-            "posts": await posts.by_author(db, user.id),
+            "posts": await posts.by_author(db, user.id, skip, limit),
             "user": user,
             "title": f"{user.username}'s posts",
         },
