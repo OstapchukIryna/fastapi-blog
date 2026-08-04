@@ -16,6 +16,7 @@ from blog.infrastructure import models  # noqa: F401
 from blog.infrastructure.database import Base, engine
 from blog.presentation.api import API_PREFIX, posts, tags, users
 from blog.presentation.errors import register_error_handlers
+from blog.presentation.static import RevalidatedStaticFiles
 from blog.presentation.web import pages
 
 # * `models` is imported for its side effect. create_all builds exactly
@@ -53,7 +54,11 @@ app = FastAPI(lifespan=lifespan)
 
 # Two mounts, two meanings. /static is shipped with the repository;
 # /media is what people upload, and is not in version control.
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+#
+# * Only /static revalidates. An uploaded picture is named after a fresh
+# * uuid every time it changes, so its address already busts its own
+# * cache — the file at a given /media path never has different contents.
+app.mount("/static", RevalidatedStaticFiles(directory=STATIC_DIR), name="static")
 app.mount("/media", StaticFiles(directory=MEDIA_DIR), name="media")
 
 app.include_router(users.router, prefix=f"{API_PREFIX}/users", tags=["users"])
