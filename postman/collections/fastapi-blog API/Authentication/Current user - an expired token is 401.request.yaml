@@ -1,6 +1,6 @@
 $kind: http-request
 description: "Tokens last thirty minutes, so expiry is ordinary rather than exceptional and is the one refusal a signed-in person will actually meet. Minted here with the run's own secret and an exp a minute in the past, so it is genuinely well formed and genuinely stale - the only thing wrong with it is the time."
-url: "{{baseUrl}}/api/users/me"
+url: "{{baseUrl}}/api/v1/users/me"
 method: GET
 headers:
   Authorization: Bearer {{mintedToken}}

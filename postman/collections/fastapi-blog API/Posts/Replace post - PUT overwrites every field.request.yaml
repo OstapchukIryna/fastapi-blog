@@ -1,6 +1,6 @@
 $kind: http-request
 description: "The author is not in the body: PUT replaces the editable fields, not the ownership. PUT is a full replacement: nothing is left alone, which is what separates it from the PATCH above."
-url: "{{baseUrl}}/api/posts/{{postId}}"
+url: "{{baseUrl}}/api/v1/posts/{{postId}}"
 method: PUT
 headers:
   Authorization: Bearer {{accessToken}}

@@ -1,5 +1,5 @@
 $kind: http-request
-url: "{{baseUrl}}/api/tags/{{knownTag}}/posts"
+url: "{{baseUrl}}/api/v1/tags/{{knownTag}}/posts"
 method: GET
 scripts:
   - type: afterResponse
@@ -20,7 +20,7 @@ scripts:
       // Пустой срез у существующего тега — это 200. 404 говорит только
       // о том, что тега нет вообще, и проверяется соседним запросом.
       pm.sendRequest(
-          `${pm.variables.get("baseUrl")}/api/tags/${tag}/posts?skip=10000`,
+          `${pm.variables.get("baseUrl")}/api/v1/tags/${tag}/posts?skip=10000`,
           (err, res) => pm.test("past the end of a real tag is an empty page", () => {
               pm.expect(res.code).to.eql(200);
               pm.expect(res.json().items).to.eql([]);

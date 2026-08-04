@@ -1,6 +1,6 @@
 $kind: http-request
 description: "verify_access_token requires exp explicitly. Without that, a token with no expiry claim would decode happily and never grow old - which is the same as handing out a password that cannot be changed."
-url: "{{baseUrl}}/api/users/me"
+url: "{{baseUrl}}/api/v1/users/me"
 method: GET
 headers:
   Authorization: Bearer {{mintedToken}}

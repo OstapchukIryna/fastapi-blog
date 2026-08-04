@@ -1,6 +1,6 @@
 $kind: http-request
 description: DELETE is idempotent in its effect - the post is gone either way - but the second call honestly reports that there was nothing at that id.
-url: "{{baseUrl}}/api/posts/{{postId}}"
+url: "{{baseUrl}}/api/v1/posts/{{postId}}"
 method: DELETE
 headers:
   Authorization: Bearer {{accessToken}}

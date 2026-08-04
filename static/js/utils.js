@@ -1,6 +1,15 @@
 //Shared helpers for the pages that talk to /api directly.
 //The two result windows — #successModal and #errorModal are in layout.html.
 
+/**
+ * Where the JSON API lives.
+ *
+ * One constant for every page, so moving to /api/v2 is one edit rather
+ * than a search. The "load more" feed does not use it — its address comes
+ * from url_for on the server, which is better still.
+ */
+export const API = "/api/v1";
+
 const NETWORK_ERROR =
   "Network error. Please check your connection and try again.";
 

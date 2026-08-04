@@ -183,7 +183,7 @@ async def create_post_page(
     because that is a property of where the token lives, not of this
     route. A plain form POST carries no Authorization header, and the token
     sits in localStorage, so CurrentUser can never be satisfied here — the
-    page's own script sends the fields to /api/posts instead. Moving the
+    page's own script sends the fields to /api/v1/posts instead. Moving the
     token into a cookie brings this path back with no change to the code
     below, which is why it stays.
 
@@ -429,7 +429,7 @@ def profile(request: Request) -> Response:
 
     Deliberately empty of data: the token lives in localStorage, so the
     server cannot know whose profile this is. The page's own script
-    fetches /api/users/me and fills it in.
+    fetches /api/v1/users/me and fills it in.
 
     Args:
         request (Request): needed by the template.

@@ -1,6 +1,6 @@
 $kind: http-request
 description: "The 403 test needed a second person to be refused. Removing them here keeps the promise the collection makes about itself: run it as often as you like and the database is as it was."
-url: "{{baseUrl}}/api/users/{{intruderId}}"
+url: "{{baseUrl}}/api/v1/users/{{intruderId}}"
 method: DELETE
 headers:
   Authorization: Bearer {{intruderToken}}

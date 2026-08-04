@@ -1,6 +1,6 @@
 $kind: http-request
 description: "OAuth2PasswordBearer accepts one scheme. A perfectly good token announced as Basic is not a bearer token, and the header has to be read rather than merely contain something that looks right."
-url: "{{baseUrl}}/api/users/me"
+url: "{{baseUrl}}/api/v1/users/me"
 method: GET
 headers:
   Authorization: Basic {{accessToken}}

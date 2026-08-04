@@ -81,7 +81,7 @@
 {% block scripts %}
     <!-- Register Form Handler -->
     <script type="module">
-        import { markFields, wireForm } from "/static/js/utils.js";
+        import { API, markFields, wireForm } from "/static/js/utils.js";
 
         const form = document.getElementById("registerForm");
         const password = document.getElementById("password");
@@ -123,7 +123,7 @@
 
         wireForm(form, {
             request: (fields) => ({
-                url: "/api/users",
+                url: `${API}/users`,
                 method: "POST",
                 payload: {
                     username: fields.get("username").trim(),

@@ -1,6 +1,6 @@
 $kind: http-request
 description: "Writing is no longer open. There is no author field to get wrong any more - the API reads the author from the token - so the way to get this wrong is to bring no token at all. This request deliberately sends none."
-url: "{{baseUrl}}/api/posts"
+url: "{{baseUrl}}/api/v1/posts"
 method: POST
 headers:
   Content-Type: application/json
@@ -23,7 +23,7 @@ scripts:
 
       pm.test("nothing was stored", async () => {
           const listing = await new Promise((resolve) =>
-              pm.sendRequest(`${pm.variables.get("baseUrl")}/api/posts`,
+              pm.sendRequest(`${pm.variables.get("baseUrl")}/api/v1/posts`,
                   (_err, res) => resolve(res)));
           const titles = listing.json().items.map((p) => p.title);
           pm.expect(titles).to.not.include("Should never be stored");

@@ -156,17 +156,24 @@ graph LR
         p3["/login · /register · /profile<br/>/forgot-password · /reset-password"]
     end
 
-    subgraph api_r["presentation/api/*.py — 13 paths, the documented surface"]
-        a1["/api/posts · /api/posts/{id}"]
-        a2["/api/users · /api/users/{id}<br/>/api/users/{id}/picture<br/>/api/users/{id}/posts"]
-        a3["/api/users/token · /api/users/me<br/>/api/users/forgot-password<br/>/api/users/reset-password<br/>/api/users/me/password"]
-        a4["/api/tags · /api/tags/{tag}/posts"]
+    subgraph api_r["presentation/api/*.py — 13 paths under /api/v1"]
+        a1["/api/v1/posts · /api/v1/posts/{id}"]
+        a2["/api/v1/users · /api/v1/users/{id}<br/>/api/v1/users/{id}/picture<br/>/api/v1/users/{id}/posts"]
+        a3["/api/v1/users/token · /api/v1/users/me<br/>/api/v1/users/forgot-password<br/>/api/v1/users/reset-password<br/>/api/v1/users/me/password"]
+        a4["/api/v1/tags · /api/v1/tags/{tag}/posts"]
     end
 
     pages_r --> jinja[Jinja templates]
     api_r --> pyd[Pydantic response models]
     p3 -. "the page is a shell;<br/>its script calls the API" .-> api_r
 ```
+
+**The version is in the path, not in the package.** Routers live in
+`presentation/api/`, and `API_PREFIX = "/api/v1"` in that package's `__init__`
+is the only line that knows the number. Splitting into `api/v1/` and `api/v2/`
+is what to do when a second version actually starts — doing it now would build
+a shape for something that may never arrive, and the prefix constant means the
+move costs one import path per module when it does.
 
 The dotted arrow is the thing to hold on to. **Sign-in, registration and the
 profile render as empty shells and fill themselves from the API**, because the
@@ -221,7 +228,7 @@ Three things the columns do not say:
   something else wrote them.
 - **Deleting a user cascades to their posts** and to their uploaded file.
   Tags are left behind even when nothing references them any more — they
-  become invisible in `/api/tags`, which counts through posts, but they do
+  become invisible in `/api/v1/tags`, which counts through posts, but they do
   accumulate.
 
 ---

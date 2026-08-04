@@ -70,7 +70,7 @@ def live_server(tmp_path_factory) -> Iterator[str]:
             output = server.stdout.read().decode() if server.stdout else ""
             raise RuntimeError(f"the application exited before it answered:\n{output}")
         try:
-            if httpx.get(f"{base_url}/api/posts", timeout=1).status_code == 200:
+            if httpx.get(f"{base_url}/api/v1/posts", timeout=1).status_code == 200:
                 break
         except httpx.HTTPError:
             time.sleep(0.2)
@@ -107,13 +107,13 @@ def make_account(api, request):
         email = f"{handle}@example.com"
 
         created = api.post(
-            "/api/users",
+            "/api/v1/users",
             json={"username": handle, "email": email, "password": PASSWORD},
         )
         created.raise_for_status()
 
         issued = api.post(
-            "/api/users/token", data={"username": email, "password": PASSWORD}
+            "/api/v1/users/token", data={"username": email, "password": PASSWORD}
         )
         issued.raise_for_status()
 

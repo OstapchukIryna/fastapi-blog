@@ -150,7 +150,7 @@
     <!-- Post Form Handler -->
     <script type="module">
         import { authHeaders } from "/static/js/auth.js";
-        import { wireForm } from "/static/js/utils.js";
+        import { API, wireForm } from "/static/js/utils.js";
 
         const form = document.getElementById("postForm");
         const postId = form.dataset.postId;
@@ -173,7 +173,7 @@
                 // longer sent: the API takes it from the token, which is
                 // the only version of it a client cannot lie about.
                 return {
-                    url: editing ? `/api/posts/${postId}` : "/api/posts",
+                    url: editing ? `${API}/posts/${postId}` : `${API}/posts`,
                     method: editing ? "PATCH" : "POST",
                     payload: post,
                     headers: authHeaders(),
@@ -198,7 +198,7 @@
         if (deleteForm) {
             wireForm(deleteForm, {
                 request: () => ({
-                    url: `/api/posts/${deleteForm.dataset.postId}`,
+                    url: `${API}/posts/${deleteForm.dataset.postId}`,
                     method: "DELETE",
                     headers: authHeaders(),
                 }),

@@ -1,6 +1,6 @@
 $kind: http-request
 description: "Replacing does not accumulate: the previous file is deleted from disk, or every change would leave one behind for ever. Checked by asking for the old path afterwards."
-url: "{{baseUrl}}/api/users/{{userId}}/picture"
+url: "{{baseUrl}}/api/v1/users/{{userId}}/picture"
 method: PATCH
 headers:
   Authorization: Bearer {{accessToken}}

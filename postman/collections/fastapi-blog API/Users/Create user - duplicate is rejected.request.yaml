@@ -1,6 +1,6 @@
 $kind: http-request
 description: username and email are unique. The route checks first and also catches the IntegrityError, so a duplicate is a 400 rather than the 500 a raw constraint violation would give.
-url: "{{baseUrl}}/api/users"
+url: "{{baseUrl}}/api/v1/users"
 method: POST
 headers:
   Content-Type: application/json
