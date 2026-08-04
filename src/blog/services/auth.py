@@ -18,9 +18,10 @@ from blog.infrastructure import models
 from blog.infrastructure.database import DbSession
 from blog.schemas import Token
 
-# The URL is documentation as much as configuration: it is what the
-# interactive docs put behind the Authorize button.
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/users/token")
+# The path is documentation as much as configuration: it is what the
+# interactive docs put behind the Authorize button. Written out rather
+# than built from API_PREFIX — services must not import presentation.
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/users/token")
 
 TokenDep = Annotated[str, Depends(oauth2_scheme)]
 

@@ -375,7 +375,7 @@ async def delete(db: AsyncSession, post: models.Post) -> None:
     the world that is false.
 
     The rows in post_tags go with the post. The tags themselves stay,
-    even once nothing references them; they are invisible in /api/tags,
+    even once nothing references them; they are invisible in /api/v1/tags,
     which counts through posts, but they do accumulate.
 
     Args:

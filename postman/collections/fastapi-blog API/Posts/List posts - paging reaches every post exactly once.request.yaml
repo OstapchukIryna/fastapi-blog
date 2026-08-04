@@ -3,7 +3,7 @@ description: >-
   Walks the whole list two at a time. The bug this catches is the one that
   does not show up on page one: a partial sort order lets a post appear in
   two slices while another appears in none.
-url: "{{baseUrl}}/api/posts?skip=0&limit=2"
+url: "{{baseUrl}}/api/v1/posts?skip=0&limit=2"
 method: GET
 scripts:
   - type: afterResponse
@@ -19,7 +19,7 @@ scripts:
       const fetchPage = (skip) =>
           new Promise((resolve) =>
               pm.sendRequest(
-                  `${pm.variables.get("baseUrl")}/api/posts?skip=${skip}&limit=2`,
+                  `${pm.variables.get("baseUrl")}/api/v1/posts?skip=${skip}&limit=2`,
                   (err, res) => resolve(err ? null : res.json()),
               ));
 

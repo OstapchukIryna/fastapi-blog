@@ -1,6 +1,6 @@
 $kind: http-request
 description: "The author is not in the body any more: the API takes it from the token, which is the one version of it a client cannot lie about. The tags sent here are deliberately messy: mixed case, padded, and a duplicate. normalise_tags trims, lowercases and de-duplicates while keeping order."
-url: "{{baseUrl}}/api/posts"
+url: "{{baseUrl}}/api/v1/posts"
 method: POST
 headers:
   Authorization: Bearer {{accessToken}}

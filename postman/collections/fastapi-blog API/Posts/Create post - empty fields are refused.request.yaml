@@ -1,6 +1,6 @@
 $kind: http-request
 description: "This is the exact response the browser turns into field errors: static/js/utils.js reads loc for the field name and ctx for the limit. If this shape changes, the form stops explaining itself."
-url: "{{baseUrl}}/api/posts"
+url: "{{baseUrl}}/api/v1/posts"
 method: POST
 headers:
   Authorization: Bearer {{accessToken}}

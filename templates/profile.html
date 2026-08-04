@@ -187,6 +187,7 @@
     <script type="module">
         import { authHeaders, clearToken, isSignedIn } from "/static/js/auth.js";
         import {
+            API,
             getErrorMessage,
             sendRequest,
             showError,
@@ -264,7 +265,7 @@
             link.href = `/users/${userId}/posts`;
             link.textContent = "Your posts";
 
-            const { ok, data } = await sendRequest(`/api/users/${userId}/posts`);
+            const { ok, data } = await sendRequest(`${API}/users/${userId}/posts`);
             if (!ok || !Array.isArray(data)) return;
             link.textContent = data.length === 1 ? "1 post" : `${data.length} posts`;
         }
@@ -275,7 +276,7 @@
                 return;
             }
 
-            const { ok, status, data } = await sendRequest("/api/users/me", {
+            const { ok, status, data } = await sendRequest(`${API}/users/me`, {
                 headers: authHeaders(),
             });
 
@@ -305,7 +306,7 @@
 
             try {
                 const { ok, status, data } = await sendRequest(
-                    `/api/users/${userId}/picture`,
+                    `${API}/users/${userId}/picture`,
                     { headers: authHeaders(), ...options },
                 );
 
@@ -357,7 +358,7 @@
 
         wireForm(identityForm, {
             request: (fields) => ({
-                url: `/api/users/${identityForm.dataset.userId}`,
+                url: `${API}/users/${identityForm.dataset.userId}`,
                 method: "PATCH",
                 // PATCH means "change these": an empty field is not a
                 // request to blank the column, it is a field left alone.
@@ -417,7 +418,7 @@
             // * a round trip that a person could watch happen, and one that
             // * put the password through a second endpoint for no gain.
             request: (fields) => ({
-                url: "/api/users/me/password",
+                url: `${API}/users/me/password`,
                 method: "PATCH",
                 payload: {
                     current_password: fields.get("currentPassword"),
@@ -444,7 +445,7 @@
 
         wireForm(deleteForm, {
             request: () => ({
-                url: `/api/users/${deleteForm.dataset.userId}`,
+                url: `${API}/users/${deleteForm.dataset.userId}`,
                 method: "DELETE",
                 headers: authHeaders(),
             }),
