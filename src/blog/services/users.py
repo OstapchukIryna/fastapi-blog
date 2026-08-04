@@ -1,27 +1,27 @@
-"""
-Registration, login, profile and picture management.
+"""The account itself: create one, change it, delete it.
+
+Signing in moved to services/auth.py, where the token it produces already
+lived. Pictures moved to services/avatars.py, which owns the storage they
+are kept in. What is left here is one subject — the row in `users`, and
+the two unique columns on it that every change has to be checked against.
+
+The dependencies that load an account and establish that it is the
+caller's live here too, beside the row they load.
 """
 
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, UploadFile, status
-from PIL import UnidentifiedImageError
+from fastapi import Depends, HTTPException, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.concurrency import run_in_threadpool
 
-from blog.core.config import settings
-from blog.core.security import (
-    Unauthorized,
-    hash_password,
-    verify_password,
-)
+from blog.core.security import hash_password
 from blog.infrastructure import models
 from blog.infrastructure.database import DbSession
-from blog.infrastructure.images import delete_profile_image, process_profile_image
 from blog.schemas import UserCreate, UserUpdate
 from blog.services.auth import CurrentUser
+from blog.services.avatars import AvatarStorage
 
 
 class AlreadyRegistered(HTTPException):
@@ -117,27 +117,6 @@ async def register(db: AsyncSession, registration: UserCreate) -> models.User:
     return user
 
 
-async def authenticate(db: AsyncSession, email: str, password: str) -> models.User:
-    """
-    The user these credentials belong to, or a 401.
-
-    Which of the two was wrong is not said — an account that exists is
-    itself something worth not telling an unauthenticated caller.
-    """
-    # * Look up user by case-**insensitive** email
-    result = await db.execute(
-        select(models.User).where(func.lower(models.User.email) == email.lower())
-    )
-    user = result.scalars().first()
-
-    # ! One refusal for both cases, and no lookup that raises on its own.
-    # ! A 404 for an unknown address and a 401 for a wrong password tells
-    # ! anybody who asks whether a given email has an account here.
-    if not user or not verify_password(password, user.password_hash):
-        raise Unauthorized("Incorrect password or email")
-    return user
-
-
 async def _already_taken(
     db: AsyncSession, user: models.User, wanted: dict[str, object]
 ) -> bool:
@@ -226,63 +205,24 @@ async def update(
     return user
 
 
-async def delete(db: AsyncSession, user: models.User) -> None:
-    """Cascading deletion of a user. All posts will be delete as well as profile picture file"""
+async def delete(db: AsyncSession, user: models.User, storage: AvatarStorage) -> None:
+    """Delete an account, its posts, and the picture it had.
+
+    The posts go by cascade, which the schema handles. The file does not:
+    nothing in the database knows that a string in `image_file` names
+    something on a disk, so the account service has to say so — and say it
+    after the commit, so a failed transaction cannot leave a live row
+    pointing at a file that has been removed.
+
+    Args:
+        db (AsyncSession): session to write through.
+        user (models.User): the account to remove.
+        storage (AvatarStorage): where its picture is kept. Taken as an
+            argument rather than imported: this module has an opinion about
+            *when* the file goes, and none about where it lives.
+    """
     old_filename = user.image_file
     await db.delete(user)
     await db.commit()
 
-    delete_profile_image(old_filename)
-
-
-async def set_picture(
-    db: AsyncSession, user: models.User, file: UploadFile
-) -> models.User:
-    """
-    Replace this user's profile picture, and drop the file it replaces.
-
-    Pillow is synchronous and the resize is not free, so it runs in a
-    worker thread rather than blocking the loop.
-
-    Raises:
-        HTTPException: 400 when the upload is over the size limit, or is
-            not something Pillow recognises as an image.
-
-    """
-    content = await file.read()
-    if len(content) > settings.max_upload_size_bytes:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File is too large. Maximum size is {settings.max_upload_size_bytes // (1024 * 1024)} MB",
-        )
-    try:
-        new_filename = await run_in_threadpool(process_profile_image, content)
-    except UnidentifiedImageError as err:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid image file. Please upload a valid file format (JPEG, PNG, GIF, WebP).",
-        ) from err
-
-    old_filename = user.image_file
-    user.image_file = new_filename
-    await db.commit()
-    await db.refresh(user)
-
-    delete_profile_image(old_filename)
-    return user
-
-
-async def remove_picture(db: AsyncSession, user: models.User) -> models.User:
-    """Back to the shared default, and the uploaded file goes."""
-    old_filename = user.image_file
-    if old_filename is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No picture to delete.",
-        )
-    user.image_file = None
-    await db.commit()
-    await db.refresh(user)
-
-    delete_profile_image(old_filename)
-    return user
+    storage.delete(old_filename)

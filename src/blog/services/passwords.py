@@ -8,9 +8,18 @@ One rule runs through all of it: a caller learns nothing about who has an
 account here. Asking to reset an unknown address answers exactly as it
 answers a known one, and every way a token can be unusable produces the
 same sentence.
+
+That rule is why sending the email is arranged from here rather than from
+the route. While the route held the `if issued is not None:`, the one
+branch that must not be observable from outside was written on the surface
+that answers — one early return away from being a way to test which
+addresses have accounts. The route now calls one function and returns the
+same sentence unconditionally, because there is nothing left for it to
+decide.
 """
 
 from datetime import UTC, datetime, timedelta
+from typing import Protocol
 
 from fastapi import HTTPException, status
 from sqlalchemy import delete, func, select
@@ -24,6 +33,40 @@ from blog.core.security import (
     verify_password,
 )
 from blog.infrastructure import models
+
+
+class ResetMailer(Protocol):
+    """Whatever can get a reset link to the person who asked for one.
+
+    Deliberately narrow: an address, a name, a token, and no answer. This
+    service has nothing to say about SMTP, about the wording of the
+    message, or about *when* it goes out — that last one is a property of
+    the response being sent, which only a route knows about.
+
+    A Protocol rather than a Callable alias because the arguments are
+    keyword-only, and `Callable[..., None]` cannot say that; a Protocol
+    with `__call__` types the names as well as the shape. A Protocol
+    rather than an ABC for the same reason as elsewhere: the
+    implementation lives in presentation/, which this layer must not
+    import, and structural typing means it does not have to import back.
+
+    ! The body of `__call__` is its docstring and nothing else. `...`
+    ! would be a statement that never runs, which coverage reports as a
+    ! missed line for good.
+    """
+
+    def __call__(self, *, to_email: str, username: str, token: str) -> None:
+        """Arrange for the link to reach this person.
+
+        Failures are the implementation's business. There is nobody left
+        to tell: the answer was deliberately the same whether or not an
+        account exists, so it cannot now become "sending failed".
+
+        Args:
+            to_email (str): where to send it.
+            username (str): how to address them.
+            token (str): the one-time token, in the clear.
+        """
 
 
 class InvalidResetToken(HTTPException):
@@ -83,11 +126,38 @@ async def _clear_tokens(db: AsyncSession, user_id: int) -> None:
     )
 
 
-async def start_reset(db: AsyncSession, email: str) -> tuple[models.User, str] | None:
+async def request_reset(db: AsyncSession, email: str, mailer: ResetMailer) -> None:
+    """Somebody has forgotten their password: do whatever that means.
+
+    Everything the situation entails, in one function — find the account
+    if there is one, invalidate the previous link, issue a new one, and
+    hand it to something that will deliver it. Returns nothing at all,
+    which is the point: there is no value a caller could branch on, so no
+    caller can accidentally answer differently for an address that exists.
+
+    Args:
+        db (AsyncSession): session to write through.
+        email (str): the address as typed; matched case-insensitively.
+        mailer (ResetMailer): how the link gets delivered. Injected rather
+            than imported, so this module knows that an email is sent and
+            not how — and so a test can pass something that records the
+            token instead of sending it.
+    """
+    issued = await _issue_token(db, email)
+    if issued is None:
+        # Nobody holds this address. The caller is told the same thing
+        # either way, and there is nothing further to do.
+        return
+
+    user, token = issued
+    mailer(to_email=user.email, username=user.username, token=token)
+
+
+async def _issue_token(db: AsyncSession, email: str) -> tuple[models.User, str] | None:
     """Issue a reset token for this address, if it belongs to anybody.
 
-    Returns None rather than raising for an unknown address, so the route
-    can answer identically either way. Raising here is what turned the
+    Returns None rather than raising for an unknown address, so the caller
+    can carry on identically either way. Raising here is what turned the
     carefully neutral "if an account exists" message into a 404 that
     contradicted it.
 

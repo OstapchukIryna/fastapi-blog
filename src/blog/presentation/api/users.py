@@ -11,8 +11,9 @@ from typing import Annotated
 from fastapi import APIRouter, BackgroundTasks, Depends, UploadFile, status
 from fastapi.security import OAuth2PasswordRequestForm
 
-from blog.infrastructure import email, models
+from blog.infrastructure import models
 from blog.infrastructure.database import DbSession
+from blog.presentation.api.mail import BackgroundMail
 from blog.schemas import (
     Page,
     PageParams,
@@ -29,8 +30,9 @@ from blog.schemas.password_reset import (
     Message,
     ResetPasswordRequest,
 )
-from blog.services import auth, passwords, posts, users
+from blog.services import auth, avatars, passwords, posts, users
 from blog.services.auth import CurrentUser
+from blog.services.avatars import AvatarStore
 from blog.services.users import OwnAccount, UserDep
 
 # The same sentence whether or not the address is known. It is the whole
@@ -81,7 +83,7 @@ async def login_for_access_token(
         Unauthorized: the email is unknown or the password is wrong. One
             message for both, deliberately.
     """
-    user = await users.authenticate(db, form_data.username, form_data.password)
+    user = await auth.authenticate(db, form_data.username, form_data.password)
     return auth.issue_token(user)
 
 
@@ -117,26 +119,21 @@ async def forgot_password(
 
     Args:
         request_data (ForgotPasswordRequest): the address to reset.
-        background_tasks (BackgroundTasks): the email is sent after the
-            response, so an unreachable mail server delays nobody — and
-            so the time taken to send does not differ measurably between
-            a known address and an unknown one.
+        background_tasks (BackgroundTasks): this response's queue, wrapped
+            in the adapter the service is handed. Delivery happens after
+            the body has gone out, so an unreachable mail server delays
+            nobody — and so the time taken to send does not differ
+            measurably between a known address and an unknown one.
         db (DbSession): request-scoped session.
 
     Returns:
-        Message: the same sentence in both cases.
+        Message: the same sentence in both cases. Unconditionally, because
+            the route no longer learns which case it was in — the service
+            takes the address and returns nothing.
     """
-    issued = await passwords.start_reset(db, request_data.email)
-
-    if issued is not None:
-        user, token = issued
-        background_tasks.add_task(
-            email.send_password_reset,
-            to_email=user.email,
-            username=user.username,
-            token=token,
-        )
-
+    await passwords.request_reset(
+        db, request_data.email, BackgroundMail(background_tasks)
+    )
     return Message(message=RESET_REQUESTED)
 
 
@@ -237,19 +234,21 @@ async def update_user_fields(
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user(user: OwnAccount, db: DbSession) -> None:
+async def delete_user(user: OwnAccount, db: DbSession, storage: AvatarStore) -> None:
     """Delete the caller's own account, and everything it wrote.
 
     Args:
         user (OwnAccount): the account, established to be the caller's.
         db (DbSession): request-scoped session.
+        storage (AvatarStore): where the account's picture is kept; the
+            posts go by cascade, the file does not.
     """
-    await users.delete(db, user)
+    await users.delete(db, user, storage)
 
 
 @router.patch("/{user_id}/picture", response_model=UserPrivate)
 async def upload_profile_picture(
-    file: UploadFile, user: OwnAccount, db: DbSession
+    file: UploadFile, user: OwnAccount, db: DbSession, storage: AvatarStore
 ) -> models.User:
     """Replace the caller's profile picture.
 
@@ -258,31 +257,37 @@ async def upload_profile_picture(
             reads. It is normalised to a square JPEG before storage.
         user (OwnAccount): the account, established to be the caller's.
         db (DbSession): request-scoped session.
+        storage (AvatarStore): where the picture goes. A dependency rather
+            than something the service reaches for, so overriding one
+            function in a test moves every avatar off the disk.
 
     Returns:
         models.User: the account, with the new image path.
 
     Raises:
-        HTTPException: 400 when the upload is over the size ceiling or
-            is not an image at all.
+        UploadTooLarge: 400 when the upload is over the size ceiling.
+        NotAnImage: 400 when the bytes are not an image at all.
     """
-    return await users.set_picture(db, user, file)
+    return await avatars.set_picture(db, user, file, storage)
 
 
 @router.delete("/{user_id}/picture", response_model=UserPrivate)
-async def delete_profile_picture(user: OwnAccount, db: DbSession) -> models.User:
+async def delete_profile_picture(
+    user: OwnAccount, db: DbSession, storage: AvatarStore
+) -> models.User:
     """Drop the caller's picture and fall back to the shared default.
 
     Args:
         user (OwnAccount): the account, established to be the caller's.
         db (DbSession): request-scoped session.
+        storage (AvatarStore): where the picture being dropped lives.
 
     Returns:
         models.User: the account, now pointing at the default avatar.
 
     Raises:
-        HTTPException: 400 when there was no picture to remove. Not 404:
-            the account exists, the request simply asks for something
-            that has already happened.
+        NoPicture: 400 when there was no picture to remove. Not 404: the
+            account exists, the request simply asks for something that
+            has already happened.
     """
-    return await users.remove_picture(db, user)
+    return await avatars.remove_picture(db, user, storage)
