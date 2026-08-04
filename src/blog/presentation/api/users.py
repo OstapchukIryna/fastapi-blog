@@ -6,34 +6,13 @@ route that changes something asks for the second, so no route body checks
 who is calling.
 """
 
-from datetime import UTC, datetime, timedelta, tzinfo
 from typing import Annotated
 
-<<<<<<< HEAD
-from email_utils import send_password_reset_email
 from fastapi import APIRouter, BackgroundTasks, Depends, UploadFile, status
-from fastapi.exceptions import HTTPException
-=======
-from fastapi import APIRouter, BackgroundTasks, Depends, UploadFile, status
->>>>>>> 922b4cf9e635a611cedb8890870a51f3197184e4
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy import delete as sql_delete
-from sqlalchemy import select
 
-<<<<<<< HEAD
-from blog.core.config import settings
-from blog.core.security import (
-    generate_reset_token,
-    hash_password,
-    hash_reset_token,
-    verify_password,
-)
-from blog.infrastructure import models
-=======
 from blog.infrastructure import email, models
->>>>>>> 922b4cf9e635a611cedb8890870a51f3197184e4
 from blog.infrastructure.database import DbSession
-from blog.infrastructure.models.reset_password import PasswordResetToken
 from blog.schemas import (
     Page,
     PageParams,
@@ -47,18 +26,12 @@ from blog.schemas import (
 from blog.schemas.password_reset import (
     ChangePasswordRequest,
     ForgotPasswordRequest,
-<<<<<<< HEAD
-    ResetPasswordRequest,
-)
-from blog.services import auth, posts, users
-=======
     Message,
     ResetPasswordRequest,
 )
 from blog.services import auth, passwords, posts, users
->>>>>>> 922b4cf9e635a611cedb8890870a51f3197184e4
 from blog.services.auth import CurrentUser
-from blog.services.users import OwnAccount, UserDep, check_email
+from blog.services.users import OwnAccount, UserDep
 
 # The same sentence whether or not the address is known. It is the whole
 # of the endpoint's answer, and saying anything more precise would turn
@@ -128,116 +101,13 @@ async def get_current_user(current_user: CurrentUser) -> models.User:
     return current_user
 
 
-<<<<<<< HEAD
-@router.post("/forgot-password", status_code=status.HTTP_202_ACCEPTED)
-=======
 @router.post(
     "/forgot-password", response_model=Message, status_code=status.HTTP_202_ACCEPTED
 )
->>>>>>> 922b4cf9e635a611cedb8890870a51f3197184e4
 async def forgot_password(
     request_data: ForgotPasswordRequest,
     background_tasks: BackgroundTasks,
     db: DbSession,
-<<<<<<< HEAD
-):
-    user = await check_email(db, request_data.email)
-    # Delete any existing reset tokens
-    await db.execute(
-        sql_delete(PasswordResetToken).where(PasswordResetToken.user_id == user.id)
-    )
-    token = generate_reset_token()
-    token_hash = hash_reset_token(token)
-    expires_at = datetime.now(UTC) + timedelta(
-        minutes=settings.reset_token_expire_minutes
-    )
-    reset_token = PasswordResetToken(
-        user_id=user.id, token_hash=token_hash, expires_at=expires_at
-    )
-
-    db.add(reset_token)
-    await db.commit()
-
-    background_tasks.add_task(
-        send_password_reset_email,
-        to_email=user.email,
-        username=user.username,
-        token=token,
-    )
-    return {
-        "message": "If an account exists with this email, you will receive password reset instrunctions."
-    }
-
-
-@router.post("/reset-password", status_code=status.HTTP_200_OK)
-async def reset_password(request_data: ResetPasswordRequest, db: DbSession):
-    token_hash = hash_reset_token(request_data.token)
-
-    result = await db.execute(
-        select(PasswordResetToken.token_hash).where(
-            PasswordResetToken.token_hash == token_hash
-        )
-    )
-
-    reset_token = result.scalars().first()
-
-    if not reset_token:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token"
-        )
-    # SQLight tricks: the token is stored as a string withour timezone info, but the query returns a PasswordResetToken object.
-    # We need to get the actual token_hash from the object.
-    # pyrefly: ignore [missing-attribute]
-    if reset_token.expires_at.replace(tzinfo=UTC) < datetime.now(UTC):
-        await db.delete(reset_token)
-        await db.commit()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token"
-        )
-    result = await db.execute(
-        # pyrefly: ignore [missing-attribute]
-        select(models.User).where(models.User.id == reset_token.user_id)
-    )
-
-    user = result.scalars().first()
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token"
-        )
-
-    user.password_hash = users.hash_password(request_data.new_password)
-    await db.execute(
-        sql_delete(PasswordResetToken).where(PasswordResetToken.user_id == user.id)
-    )
-    await db.commit()
-
-    return {
-        "massage": "Password reset successfully. You can now log in with your new password"
-    }
-
-
-@router.patch("/me/password", status_code=status.HTTP_200_OK)
-async def change_password(
-    password_data: ChangePasswordRequest, current_user: CurrentUser, db: DbSession
-):
-    if not verify_password(password_data.current_password, current_user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Current password is incorrect",
-        )
-
-    current_user.password_hash = hash_password(password_data.new_password)
-
-    await db.execute(
-        sql_delete(PasswordResetToken).where(
-            PasswordResetToken.user_id == current_user.id
-        )
-    )
-
-    await db.commit()
-    return {"message": "Password changed successfully"}
-=======
 ) -> Message:
     """Start a password reset, and say nothing about whether it applied.
 
@@ -311,7 +181,6 @@ async def change_password(
         db, current_user, password_data.current_password, password_data.new_password
     )
     return Message(message="Password changed.")
->>>>>>> 922b4cf9e635a611cedb8890870a51f3197184e4
 
 
 @router.get("/{user_id}", response_model=UserPublic)

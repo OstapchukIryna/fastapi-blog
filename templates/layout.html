@@ -77,22 +77,19 @@
                                href="{{ url_for("about") }}">About</a>
                         </div>
                         <div class="navbar-nav align-items-md-center">
-                            {# is_author is still hard-coded to True, so "Write"
-                               and "Profile" were shown to signed-out visitors
-                               too — and a profile without a token has nothing
-                               to display. The second gate is on the client,
-                               using the same flag as sign-in.
+                            {# Rendered for everyone and shown by CSS only when data-signed-in is
+                               true — the same mechanism as the Sign in / Sign out pair
+                               below. There is no server-side condition here because the
+                               server has nothing to condition on: the token is in
+                               localStorage.
 
-                               ! Appearance only: the addresses and the API
-                               ! stay reachable until a server-side dependency
-                               ! closes them. #}
-                            {% if is_author %}
-                                <a class="nav-link nav-auth nav-write{{ ' active' if path.startswith("/posts/new") }}"
-                                   href="{{ url_for("new_post") }}">Write</a>
-                                <a class="nav-link nav-auth{{ ' active' if path.startswith("/profile") }}"
-                                   {% if path.startswith('/profile') %}aria-current="page"{% endif %}
-                                   href="{{ url_for("profile") }}">Profile</a>
-                            {% endif %}
+                               ! Appearance only: the addresses and the API stay
+                               ! reachable until a server-side dependency closes them. #}
+                            <a class="nav-link nav-auth nav-write{{ ' active' if path.startswith("/posts/new") }}"
+                               href="{{ url_for("new_post") }}">Write</a>
+                            <a class="nav-link nav-auth{{ ' active' if path.startswith("/profile") }}"
+                               {% if path.startswith('/profile') %}aria-current="page"{% endif %}
+                               href="{{ url_for("profile") }}">Profile</a>
                             {# Both links are rendered and the right one is
                                shown — see data-signed-in in <head>. Signing
                                out leads to no address, so it is a button

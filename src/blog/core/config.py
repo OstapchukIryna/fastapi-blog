@@ -70,27 +70,19 @@ class Settings(BaseSettings):
     reset_token_expire_minutes: int = 30
 
     mail_server: str = "localhost"
-<<<<<<< HEAD
-    mail_port: int = 578  # standard for tls
-=======
     # * 587 is submission with STARTTLS. The previous value, 578, is not
     # * an SMTP port at all — mail would have gone nowhere, slowly.
     mail_port: int = 587
->>>>>>> 922b4cf9e635a611cedb8890870a51f3197184e4
     mail_username: str = ""
     mail_password: SecretStr = SecretStr("")
     mail_from: str = "noreply@example.com"
     mail_use_tls: bool = True
 
-<<<<<<< HEAD
-    fromtend_url: str = "http://localhost:8000"
-=======
     # ! The name has to match the environment variable: pydantic-settings
     # ! maps FRONTEND_URL onto frontend_url. It was spelt `fromtend_url`,
     # ! so .env.example's FRONTEND_URL was never read and every reset
     # ! link in every email pointed at the default.
     frontend_url: str = "http://localhost:8000"
->>>>>>> 922b4cf9e635a611cedb8890870a51f3197184e4
 
 
 settings = Settings()
