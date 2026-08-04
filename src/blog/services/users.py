@@ -12,7 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
 from blog.core.config import settings
-from blog.core.security import Unauthorized, hash_password, verify_password
+from blog.core.security import (
+    Unauthorized,
+    hash_password,
+    verify_password,
+)
 from blog.infrastructure import models
 from blog.infrastructure.database import DbSession
 from blog.infrastructure.images import delete_profile_image, process_profile_image
@@ -126,12 +130,15 @@ async def authenticate(db: AsyncSession, email: str, password: str) -> models.Us
     )
     user = result.scalars().first()
 
+    # ! One refusal for both cases, and no lookup that raises on its own.
+    # ! A 404 for an unknown address and a 401 for a wrong password tells
+    # ! anybody who asks whether a given email has an account here.
     if not user or not verify_password(password, user.password_hash):
         raise Unauthorized("Incorrect password or email")
     return user
 
 
-async def _claimed_by_somebody_else(
+async def _already_taken(
     db: AsyncSession, user: models.User, wanted: dict[str, object]
 ) -> bool:
     """Report whether another account already holds the requested name or email.
@@ -199,7 +206,7 @@ async def update(
     """
     wanted = changes.model_dump(exclude_unset=True, exclude_none=True)
 
-    if await _claimed_by_somebody_else(db, user, wanted):
+    if await _already_taken(db, user, wanted):
         raise AlreadyRegistered()
 
     if "password" in wanted:

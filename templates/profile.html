@@ -99,7 +99,7 @@
         </section>
         <section class="profile-section">
             <h2 class="profile-section-title">Password</h2>
-            <form id="passwordForm" data-user-id="">
+            <form id="passwordForm">
                 <div class="field">
                     <label class="form-label mono-label" for="currentPassword">Current password</label>
                     <input class="form-control"
@@ -188,7 +188,6 @@
         import { authHeaders, clearToken, isSignedIn } from "/static/js/auth.js";
         import {
             getErrorMessage,
-            markFields,
             sendRequest,
             showError,
             wireForm,
@@ -244,7 +243,9 @@
 
             showPhoto(user);
 
-            for (const form of [identityForm, passwordForm, deleteForm]) {
+            // Only the two forms whose endpoint carries the id. Changing a
+            // password goes to /me/password, which takes it from the token.
+            for (const form of [identityForm, deleteForm]) {
                 form.dataset.userId = user.id;
             }
 
@@ -410,37 +411,25 @@
         });
 
         wireForm(passwordForm, {
-            // ! The server does not check the current password — UserUpdate
-            // ! has no such field. So the proof happens here: signing in with
-            // ! it. That guards against somebody else at an unlocked laptop,
-            // ! and guarantees nothing more — anyone holding the token can
-            // ! change the password without going through this page.
-            guard: async (fields) => {
-                const { ok } = await sendRequest("/api/users/token", {
-                    method: "POST",
-                    encoding: "form",
-                    payload: {
-                        username: identityForm.email.value.trim(),
-                        password: fields.get("currentPassword"),
-                    },
-                });
-                if (ok) return null;
-
-                markFields(passwordForm, {
-                    currentPassword: "That is not your current password.",
-                });
-                document.getElementById("currentPassword").focus();
-                return "The current password is wrong, so nothing was changed.";
-            },
+            // * The current password is proved on the server now. This used
+            // * to sign in with it a second time, because UserUpdate had no
+            // * field for it and there was nowhere else to make the check —
+            // * a round trip that a person could watch happen, and one that
+            // * put the password through a second endpoint for no gain.
             request: (fields) => ({
-                url: `/api/users/${passwordForm.dataset.userId}`,
+                url: "/api/users/me/password",
                 method: "PATCH",
-                payload: { password: fields.get("newPassword") },
+                payload: {
+                    current_password: fields.get("currentPassword"),
+                    new_password: fields.get("newPassword"),
+                },
                 headers: authHeaders(),
             }),
             result: () => ({
                 title: "Password changed",
-                message: "Your next sign-in will use the new one.",
+                message:
+                    "Your next sign-in will use the new one. Any reset link " +
+                    "you asked for has stopped working.",
                 action: "Close",
             }),
             after: () => passwordForm.reset(),

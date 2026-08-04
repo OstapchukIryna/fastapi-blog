@@ -14,7 +14,8 @@ imported.
 """
 
 from blog.infrastructure.models.post import Post
+from blog.infrastructure.models.reset_password import PasswordResetToken
 from blog.infrastructure.models.tag import Tag, post_tags
 from blog.infrastructure.models.user import User
 
-__all__ = ["Post", "Tag", "User", "post_tags"]
+__all__ = ["PasswordResetToken", "Post", "Tag", "User", "post_tags"]
