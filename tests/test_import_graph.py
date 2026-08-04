@@ -68,6 +68,10 @@ ALLOWED_SIDEWAYS = {
         "blog.infrastructure.database",
     ): "Base is declared there",
     (
+        "blog.infrastructure.models.reset_password",
+        "blog.infrastructure.database",
+    ): "Base is declared there",
+    (
         "blog.infrastructure.models.post",
         "blog.infrastructure.models.tag",
     ): "a post needs the post_tags association",

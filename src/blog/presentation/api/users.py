@@ -9,13 +9,18 @@ who is calling.
 from datetime import UTC, datetime, timedelta, tzinfo
 from typing import Annotated
 
+<<<<<<< HEAD
 from email_utils import send_password_reset_email
 from fastapi import APIRouter, BackgroundTasks, Depends, UploadFile, status
 from fastapi.exceptions import HTTPException
+=======
+from fastapi import APIRouter, BackgroundTasks, Depends, UploadFile, status
+>>>>>>> 922b4cf9e635a611cedb8890870a51f3197184e4
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import delete as sql_delete
 from sqlalchemy import select
 
+<<<<<<< HEAD
 from blog.core.config import settings
 from blog.core.security import (
     generate_reset_token,
@@ -24,6 +29,9 @@ from blog.core.security import (
     verify_password,
 )
 from blog.infrastructure import models
+=======
+from blog.infrastructure import email, models
+>>>>>>> 922b4cf9e635a611cedb8890870a51f3197184e4
 from blog.infrastructure.database import DbSession
 from blog.infrastructure.models.reset_password import PasswordResetToken
 from blog.schemas import (
@@ -39,11 +47,23 @@ from blog.schemas import (
 from blog.schemas.password_reset import (
     ChangePasswordRequest,
     ForgotPasswordRequest,
+<<<<<<< HEAD
     ResetPasswordRequest,
 )
 from blog.services import auth, posts, users
+=======
+    Message,
+    ResetPasswordRequest,
+)
+from blog.services import auth, passwords, posts, users
+>>>>>>> 922b4cf9e635a611cedb8890870a51f3197184e4
 from blog.services.auth import CurrentUser
 from blog.services.users import OwnAccount, UserDep, check_email
+
+# The same sentence whether or not the address is known. It is the whole
+# of the endpoint's answer, and saying anything more precise would turn
+# the form into a way of testing which addresses have accounts.
+RESET_REQUESTED = "If an account exists for that address, a reset link is on its way."
 
 router = APIRouter()
 
@@ -108,11 +128,18 @@ async def get_current_user(current_user: CurrentUser) -> models.User:
     return current_user
 
 
+<<<<<<< HEAD
 @router.post("/forgot-password", status_code=status.HTTP_202_ACCEPTED)
+=======
+@router.post(
+    "/forgot-password", response_model=Message, status_code=status.HTTP_202_ACCEPTED
+)
+>>>>>>> 922b4cf9e635a611cedb8890870a51f3197184e4
 async def forgot_password(
     request_data: ForgotPasswordRequest,
     background_tasks: BackgroundTasks,
     db: DbSession,
+<<<<<<< HEAD
 ):
     user = await check_email(db, request_data.email)
     # Delete any existing reset tokens
@@ -210,6 +237,81 @@ async def change_password(
 
     await db.commit()
     return {"message": "Password changed successfully"}
+=======
+) -> Message:
+    """Start a password reset, and say nothing about whether it applied.
+
+    202 rather than 200: whatever happens, all that is certain when this
+    returns is that the request was accepted. The email is still to be
+    attempted.
+
+    Args:
+        request_data (ForgotPasswordRequest): the address to reset.
+        background_tasks (BackgroundTasks): the email is sent after the
+            response, so an unreachable mail server delays nobody — and
+            so the time taken to send does not differ measurably between
+            a known address and an unknown one.
+        db (DbSession): request-scoped session.
+
+    Returns:
+        Message: the same sentence in both cases.
+    """
+    issued = await passwords.start_reset(db, request_data.email)
+
+    if issued is not None:
+        user, token = issued
+        background_tasks.add_task(
+            email.send_password_reset,
+            to_email=user.email,
+            username=user.username,
+            token=token,
+        )
+
+    return Message(message=RESET_REQUESTED)
+
+
+@router.post("/reset-password", response_model=Message)
+async def reset_password(request_data: ResetPasswordRequest, db: DbSession) -> Message:
+    """Set a new password using the token from a reset email.
+
+    Args:
+        request_data (ResetPasswordRequest): the token and the new password.
+        db (DbSession): request-scoped session.
+
+    Returns:
+        Message: confirmation that the password now works.
+
+    Raises:
+        InvalidResetToken: 400 for every way the token can be unusable.
+            Which way is never said.
+    """
+    await passwords.complete_reset(db, request_data.token, request_data.new_password)
+    return Message(message="Password changed. You can sign in with it now.")
+
+
+@router.patch("/me/password", response_model=Message)
+async def change_password(
+    password_data: ChangePasswordRequest, current_user: CurrentUser, db: DbSession
+) -> Message:
+    """Change the password of the account the caller is signed in as.
+
+    Args:
+        password_data (ChangePasswordRequest): the current password as
+            proof, and the replacement.
+        current_user (CurrentUser): resolved from the token.
+        db (DbSession): request-scoped session.
+
+    Returns:
+        Message: confirmation.
+
+    Raises:
+        WrongPassword: 400 when the current password does not match.
+    """
+    await passwords.change(
+        db, current_user, password_data.current_password, password_data.new_password
+    )
+    return Message(message="Password changed.")
+>>>>>>> 922b4cf9e635a611cedb8890870a51f3197184e4
 
 
 @router.get("/{user_id}", response_model=UserPublic)

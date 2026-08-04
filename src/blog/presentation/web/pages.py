@@ -468,6 +468,48 @@ def register_page(request: Request) -> Response:
     return templates.TemplateResponse(request, "register.html", {"title": "Register"})
 
 
+# ! Named *_page, unlike the other pages here. Route names are unique
+# ! across the whole application, and the API endpoints of the same
+# ! purpose already hold `forgot_password` and `reset_password` — with
+# ! the short names, url_for in a template silently returned /api/… .
+@router.get("/forgot-password", name="forgot_password_page")
+def forgot_password_page(request: Request) -> Response:
+    """Render the form that asks for a reset link.
+
+    Args:
+        request (Request): needed by the template.
+
+    Returns:
+        Response: the rendered page. Like sign-in, it is a shell: the
+            form posts to the API, because the answer is deliberately the
+            same whether or not the address is known and the server has
+            no session in which to remember which was asked.
+    """
+    return templates.TemplateResponse(
+        request, "forgot_password.html", {"title": "Reset your password"}
+    )
+
+
+@router.get("/reset-password", name="reset_password_page")
+def reset_password_page(request: Request) -> Response:
+    """Render the form that sets a new password from an emailed link.
+
+    The token is not read here. It stays in the query string and is sent
+    by the page's own script, so it never reaches the server as part of a
+    page request — where it would end up in access logs and in the
+    Referer header of anything the page loads.
+
+    Args:
+        request (Request): needed by the template.
+
+    Returns:
+        Response: the rendered page.
+    """
+    return templates.TemplateResponse(
+        request, "reset_password.html", {"title": "Choose a new password"}
+    )
+
+
 @router.post("/posts/{post_id}/delete", name="delete_post")
 async def delete_post(post: PostDep, db: DbSession) -> Response:
     """Delete a post from the edit page and return to the front page.

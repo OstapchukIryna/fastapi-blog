@@ -28,8 +28,8 @@ graph TD
     main["main.py · 44 lines<br/><i>lifespan, mounts, routers</i>"]
 
     subgraph L4["presentation · what HTTP and Jinja look like"]
-        pages["web/pages.py · 16 routes<br/>web/forms.py · состояние формы<br/>web/templating.py<br/><b>HTML</b>"]
-        api["api/posts.py · api/users.py<br/>api/tags.py<br/><b>JSON</b> · 10 paths"]
+        pages["web/pages.py · 18 routes<br/>web/forms.py · состояние формы<br/>web/templating.py<br/><b>HTML</b>"]
+        api["api/posts.py · api/users.py<br/>api/tags.py<br/><b>JSON</b> · 13 paths"]
         errors["errors.py"]
     end
 
@@ -38,6 +38,7 @@ graph TD
         s_users["users.py<br/><i>UserDep, OwnAccount</i>"]
         s_tags["tags.py"]
         s_auth["auth.py<br/><i>CurrentUser</i>"]
+        s_pw["passwords.py<br/><i>забыл, сброс, смена</i>"]
     end
 
     subgraph L2["schemas · формы данных на границе"]
@@ -46,9 +47,10 @@ graph TD
     end
 
     subgraph L1["infrastructure · где данные лежат"]
-        models["models/post.py<br/>models/user.py · models/tag.py"]
+        models["models/post.py · models/user.py<br/>models/tag.py · models/reset_password.py"]
         database["database.py<br/><i>engine, DbSession</i>"]
         images["images.py"]
+        mail["email.py<br/><i>SMTP, свои шаблоны писем</i>"]
     end
 
     subgraph L0["core · не импортирует ничего нашего"]
@@ -79,6 +81,9 @@ graph TD
     s_tags --> pagination
     s_users --> schemas
     s_users --> images
+    api --> s_pw
+    api --> mail
+    s_pw --> schemas
     s_auth --> security
 
     schemas --> models
@@ -116,6 +121,13 @@ is why `Pagination` and `Page[T]` sit in `schemas/pagination.py` and both
 services read them from there. This is the same mistake as the tag-cleaning
 helper above, one layer up.
 
+**A third cycle, and the same shape.** Password reset arrived with
+`models/user.py` importing `PasswordResetToken` at runtime while
+`models/reset_password.py` imported `User` back — and the application
+stopped starting. Both sides now name each other in annotations only, as
+`tag.py` and `post.py` already did. The test caught it and printed the
+edge; what it could not do was run, because the branch predated CI.
+
 `seed.py` is off the diagram. It imports `core.security`, `infrastructure` and
 `services.tags` and is imported by nothing; it is a script, not part of the
 running application.
@@ -137,17 +149,17 @@ graph LR
     person([a person]) --> pages_r
     script([a script,<br/>Postman, fetch]) --> api_r
 
-    subgraph pages_r["presentation/web/pages.py — 16 routes, include_in_schema=False"]
+    subgraph pages_r["presentation/web/pages.py — 18 routes, include_in_schema=False"]
         direction TB
         p1["/ · /posts · /posts/{id}<br/>/tags · /tags/{tag}<br/>/users/{id}/posts · /about"]
         p2["/posts/new · /posts/{id}/edit<br/>/posts/{id}/pin · /posts/{id}/delete"]
-        p3["/login · /register · /profile"]
+        p3["/login · /register · /profile<br/>/forgot-password · /reset-password"]
     end
 
-    subgraph api_r["presentation/api/*.py — 10 paths, the documented surface"]
+    subgraph api_r["presentation/api/*.py — 13 paths, the documented surface"]
         a1["/api/posts · /api/posts/{id}"]
         a2["/api/users · /api/users/{id}<br/>/api/users/{id}/picture<br/>/api/users/{id}/posts"]
-        a3["/api/users/token · /api/users/me"]
+        a3["/api/users/token · /api/users/me<br/>/api/users/forgot-password<br/>/api/users/reset-password<br/>/api/users/me/password"]
         a4["/api/tags · /api/tags/{tag}/posts"]
     end
 
@@ -162,7 +174,7 @@ token lives in `localStorage` and Jinja cannot see it. Every other page is
 rendered whole by the server.
 
 That is also why the pages are `include_in_schema=False`: `/openapi.json`
-describes the ten API paths and nothing else, so the contract test in the
+describes the thirteen API paths and nothing else, so the contract test in the
 Postman collection compares like with like.
 
 ---
