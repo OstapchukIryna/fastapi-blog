@@ -1,6 +1,6 @@
 # What is worth testing, and why
 
-Eighty-four invariants, collected by reading the source rather than by
+Eighty-six invariants, collected by reading the source rather than by
 brainstorming. Every row is a claim the code already makes about itself, in a
 docstring or behind a `# *` / `# !` marker. Nothing here was invented for this
 document: the comments were written at the moment each decision was made, which
@@ -75,7 +75,9 @@ a post twice and another never.
 | `Page.of` echoes the request's own `skip`/`limit` back | a client having to remember what it asked for | `unit` |
 | `tags.with_counts` breaks ties by name after count | same swap as above, on the topics page | `db` |
 | `tags.with_counts` counts the same subquery it selects from | orphan tags inflating the total, so "load more" outlives the last tag | `db` |
-| `selectinload` for tags, `joinedload` for the author | `joinedload` on a collection makes `LIMIT` slice join rows instead of posts — a page asking for ten shows four | `db` |
+| `selectinload` for tags, `joinedload` for the author | a JOIN to a collection repeats the whole post row, `content` and all, once per tag — 4× the bytes at four tags. *Not* a correctness issue: SQLAlchemy wraps the parent query in a subquery so `LIMIT` still counts posts | `db` |
+| a query passed to `_slice` returns one row per post | an explicit `.join()` is **not** wrapped, so `LIMIT` and `func.count()` both count join rows. Measured: `Tag.name.in_(4 tags)` returned 1 post for a page of 3, and a total of 48 for 12 posts. `with_tag` is safe only because it filters on a single name | `db` |
+| `_slice` calls `.unique()` | SQLAlchemy refuses a joined eager load against a collection without it, and an explicit join can return the same post twice | `db` |
 | `arrange` reads `items[0]` rather than scanning for `is_pinned` | on batch two the pinned post is not in the slice, so a scan finds nothing and an arbitrary post takes the lead position. *Already happened* | `unit` |
 | `arrange` reports `pinned=None` when the lead is not actually pinned | the hero treatment given to whatever sorted first | `unit` |
 
