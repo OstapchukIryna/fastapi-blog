@@ -115,3 +115,72 @@ The question to ask before adding one:
 
 If yes, it is shared vocabulary and belongs a layer down. If no, it is a
 real dependency and belongs where it is, with a line explaining why.
+
+## Protocols, not abstract base classes
+
+When a module needs something done and has no business knowing how, it
+declares a `Protocol` saying what it needs — and the thing that does the
+work never mentions it:
+
+```python
+# services/avatars.py — the side with the requirement
+class AvatarStorage(Protocol):
+    """Somewhere profile pictures can be kept."""
+
+    def save(self, content: bytes) -> str:
+        """Store these bytes and return the name to keep."""
+
+    def delete(self, filename: str | None) -> None:
+        """Remove a stored avatar, if there is one."""
+
+
+# infrastructure/images.py — the side that does the work, and imports nothing
+@dataclass(frozen=True, slots=True)
+class DiskAvatars:
+    """Avatars kept as JPEG files in one directory."""
+
+    directory: Path = PROFILE_PICS_DIR
+```
+
+Three rules come out of that:
+
+- **Declare the protocol next to the code that needs it**, never beside
+  the implementation. The interface belongs to whoever has the
+  requirement; that is the whole of dependency inversion.
+- **`Protocol`, not `ABC`.** An abstract base class has to be inherited,
+  so the implementation would have to import the interface — and here
+  that is `infrastructure` importing `services`, an arrow pointing up,
+  which `tests/test_import_graph.py` refuses. Structural typing gets the
+  inversion with no import at all. It is also the reason nothing in this
+  project subclasses anything of ours: hold the collaborator as a field
+  and call it.
+- **Ask for the narrowest thing that works.** Two methods, because two is
+  what the caller uses. A wider interface is a promise every future
+  implementation has to keep in order to serve code that never asks.
+
+One concrete implementation is named per protocol, in one place, and
+everything else is typed against the abstraction:
+
+```python
+def get_avatar_storage() -> AvatarStorage:
+    """Hand out the storage this application actually runs on."""
+    return DiskAvatars()
+
+
+AvatarStore = Annotated[AvatarStorage, Depends(get_avatar_storage)]
+```
+
+That function is the composition root for avatars, and overriding it via
+`app.dependency_overrides` is how a test keeps pictures off the disk
+without any route being told.
+
+!!! tip "A docstring, not `...`"
+
+    A protocol method's body is its docstring and nothing else.
+
+    `...` is a *statement*, and a statement in a body that never runs is
+    a line `coverage` reports as missed for as long as the protocol
+    exists — every protocol quietly lowering the number. A docstring is
+    not a statement, so there is nothing left to miss. The same goes for
+    `pass` in an exception class, and it costs nothing, because the
+    convention above already asks for a docstring on every method.

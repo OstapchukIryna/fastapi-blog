@@ -125,4 +125,27 @@ moved the whole application into `src/blog/` and split it by layer, so:
   imports `api/` at all. Both ask `services/`, so the post form and
   `POST /api/v1/posts` now go through the same function.
 
+### Option C, taken
+
+`presentation/web/pages.py` is now `presentation/web/pages/`, split as option C
+proposed. The trigger written above was the wrong one: the file stopped at 526
+lines and never reached 600, and what made it hard to read was not its length
+but that it held three unrelated jobs. Those are the seams, and the objection
+that they would have to be «invented rather than found» was answered by
+waiting — the routes divided themselves along what they *do*:
+
+| Module | Routes | What they have in common |
+|---|---|---|
+| `listings.py` | 4 | a slice, arranged, plus a "load more" feed |
+| `posts.py` | 7 | the article, and everything that changes it: a form that must survive being wrong, and a 303 |
+| `shells.py` | 6 | no data at all, because the token is in localStorage |
+| `feed.py` | — | not routes: the state a paged template is handed |
+
+`pages/__init__.py` includes the three sub-routers and is what `main` mounts,
+so the split is invisible from outside — `main.py` did not change, and neither
+did a route name, which is what kept every `url_for` in the templates working.
+
+The lesson for the next «to revisit» clause: a line count is easy to write down
+and is not what goes wrong. Count responsibilities.
+
 See [architecture.md](architecture.md) for the layout as it stands.

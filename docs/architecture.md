@@ -6,7 +6,7 @@ the data actually is, and what runs in the browser.
 
 All of them were generated from the code rather than from memory — the import
 graph by walking every module's AST, the API paths out of `/openapi.json`, the
-page paths out of the decorators in `presentation/web/pages.py`. If a diagram
+page paths out of the decorators in `presentation/web/pages/`. If a diagram
 here is wrong, the code moved.
 
 For how a request is *authenticated*, see [auth.md](auth.md). For why the
@@ -28,17 +28,18 @@ graph TD
     main["main.py · 44 lines<br/><i>lifespan, mounts, routers</i>"]
 
     subgraph L4["presentation · what HTTP and Jinja look like"]
-        pages["web/pages.py · 18 routes<br/>web/forms.py · состояние формы<br/>web/templating.py<br/><b>HTML</b>"]
-        api["api/posts.py · api/users.py<br/>api/tags.py<br/><b>JSON</b> · 13 paths"]
+        pages["web/pages/ · 18 routes<br/><i>listings · posts · shells · feed</i><br/>web/forms.py · состояние формы<br/>web/templating.py<br/><b>HTML</b>"]
+        api["api/posts.py · api/users.py<br/>api/tags.py · api/mail.py<br/><b>JSON</b> · 13 paths"]
         errors["errors.py"]
     end
 
     subgraph L3["services · что приложение умеет и на каких условиях"]
         s_posts["posts.py<br/><i>запросы, PostDep, OwnedPost</i>"]
         s_users["users.py<br/><i>UserDep, OwnAccount</i>"]
+        s_avatars["avatars.py<br/><i>AvatarStorage · протокол</i>"]
         s_tags["tags.py"]
-        s_auth["auth.py<br/><i>CurrentUser</i>"]
-        s_pw["passwords.py<br/><i>забыл, сброс, смена</i>"]
+        s_auth["auth.py<br/><i>CurrentUser, authenticate</i>"]
+        s_pw["passwords.py<br/><i>забыл, сброс, смена<br/>ResetMailer · протокол</i>"]
     end
 
     subgraph L2["schemas · формы данных на границе"]
@@ -75,16 +76,25 @@ graph TD
     s_posts --> s_tags
     s_posts --> s_auth
     s_users --> s_auth
+    s_users --> s_avatars
 
     s_posts --> schemas
     s_posts --> pagination
     s_tags --> pagination
     s_users --> schemas
-    s_users --> images
+    api --> s_avatars
+    s_avatars --> images
     api --> s_pw
     api --> mail
     s_pw --> schemas
     s_auth --> security
+
+    %% Dotted: satisfies, not imports. The protocol is declared by the
+    %% service that needs it; the implementation matches it by shape and
+    %% never names it, which is what keeps these two arrows pointing up
+    %% without an import doing the same.
+    images -.->|satisfies AvatarStorage| s_avatars
+    mail -.->|satisfies ResetMailer via api/mail.py| s_pw
 
     schemas --> models
     models --> database
@@ -110,7 +120,31 @@ because storing a post means creating the tags it names; `users.py` and
 `posts.py` both import `auth.py` because ownership is a question about the
 current user. Nothing points back: `tags.py` returns tags, never posts, and
 what returns posts *by* tag lives in `posts.py`. Otherwise the two would
-import each other.
+import each other. `users.py` imports `avatars.py` for one reason only —
+deleting an account has to delete the file its picture is in.
+
+**The two dotted arrows are the interesting ones.** They point up, and no
+import does. Two services state what they need as a `Protocol` and are handed
+something that matches:
+
+| Protocol | Declared in | Satisfied by |
+|---|---|---|
+| `AvatarStorage` | `services/avatars.py` | `infrastructure/images.py` · `DiskAvatars` |
+| `ResetMailer` | `services/passwords.py` | `presentation/api/mail.py` · `BackgroundMail` |
+
+Neither implementation imports the protocol it satisfies, and neither has to:
+`typing.Protocol` is structural, so matching the shape is the whole of the
+requirement. An abstract base class would have needed inheritance, and
+inheritance would have needed the import — `infrastructure` importing
+`services`, an arrow pointing up, and a test failure. This is dependency
+inversion done in the direction the layering already insists on: the policy
+(«a picture is stored, then the old file goes») owns the interface, and the
+mechanism (Pillow, a directory, SMTP) is what gets swapped.
+
+Each protocol is also as narrow as its one caller needs. `AvatarStorage` has
+`save` and `delete` and nothing else, though `images.py` could offer more; a
+wider interface is a promise every future implementation has to keep in order
+to serve code that never asks.
 
 **And the arrow that used to point back.** Pagination arrived as `SkipDep` and
 `LimitDep` living in `services/posts.py`, because posts were the first list to
@@ -149,11 +183,11 @@ graph LR
     person([a person]) --> pages_r
     script([a script,<br/>Postman, fetch]) --> api_r
 
-    subgraph pages_r["presentation/web/pages.py — 18 routes, include_in_schema=False"]
+    subgraph pages_r["presentation/web/pages/ — 18 routes, include_in_schema=False"]
         direction TB
-        p1["/ · /posts · /posts/{id}<br/>/tags · /tags/{tag}<br/>/users/{id}/posts · /about"]
-        p2["/posts/new · /posts/{id}/edit<br/>/posts/{id}/pin · /posts/{id}/delete"]
-        p3["/login · /register · /profile<br/>/forgot-password · /reset-password"]
+        p1["<b>listings.py</b><br/>/ · /posts · /tags<br/>/tags/{tag} · /users/{id}/posts"]
+        p2["<b>posts.py</b><br/>/posts/{id} · /posts/new<br/>/posts/{id}/edit · /posts/{id}/pin<br/>/posts/{id}/delete"]
+        p3["<b>shells.py</b><br/>/about · /login · /register<br/>/profile · /forgot-password<br/>/reset-password"]
     end
 
     subgraph api_r["presentation/api/*.py — 13 paths under /api/v1"]

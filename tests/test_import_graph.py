@@ -80,6 +80,10 @@ ALLOWED_SIDEWAYS = {
         "blog.infrastructure.models.user",
     ): "a post has an author",
     (
+        "blog.presentation.api.users",
+        "blog.presentation.api.mail",
+    ): "the reset route supplies the mailer the service asks for",
+    (
         "blog.presentation.errors",
         "blog.presentation.web.templating",
     ): "the error page uses the same Jinja",
@@ -88,11 +92,23 @@ ALLOWED_SIDEWAYS = {
         "blog.presentation.web.templating",
     ): "the form is drawn by a template",
     (
-        "blog.presentation.web.pages",
+        "blog.presentation.web.pages.listings",
+        "blog.presentation.web.pages.feed",
+    ): "every list page has a load-more button",
+    (
+        "blog.presentation.web.pages.listings",
+        "blog.presentation.web.templating",
+    ): "pages are drawn by templates",
+    (
+        "blog.presentation.web.pages.posts",
         "blog.presentation.web.forms",
     ): "two pages show the post form",
     (
-        "blog.presentation.web.pages",
+        "blog.presentation.web.pages.posts",
+        "blog.presentation.web.templating",
+    ): "pages are drawn by templates",
+    (
+        "blog.presentation.web.pages.shells",
         "blog.presentation.web.templating",
     ): "pages are drawn by templates",
     (
@@ -112,6 +128,10 @@ ALLOWED_SIDEWAYS = {
         "blog.services.users",
         "blog.services.auth",
     ): "ownership is a question about the current user",
+    (
+        "blog.services.users",
+        "blog.services.avatars",
+    ): "deleting an account removes the picture it had",
 }
 
 
