@@ -1,0 +1,7 @@
+$kind: collection
+description: >-
+  Forgetting a password, resetting it from a link, and changing it while
+  signed in. Two of the three are mostly about what the answers withhold.
+# After Authentication, which establishes the token these use, and before
+# Cleanup, which deletes the account they run against.
+order: 2700

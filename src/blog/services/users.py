@@ -139,6 +139,9 @@ async def authenticate(db: AsyncSession, email: str, password: str) -> models.Us
     # * Look up user by case-**insensitive** email
     user = await check_email(db, email)
 
+    # ! One refusal for both cases, and no lookup that raises on its own.
+    # ! A 404 for an unknown address and a 401 for a wrong password tells
+    # ! anybody who asks whether a given email has an account here.
     if not user or not verify_password(password, user.password_hash):
         raise Unauthorized("Incorrect password or email")
     return user

@@ -4,11 +4,8 @@
     <header class="masthead">
         <span class="eyebrow mono-label">About</span>
         <h1 class="masthead-title">{{ site.handle }}</h1>
-        <p class="masthead-tagline">
-            {{ site.name }} — backend in Python, written down while I'm still learning it.
-        </p>
+        <p class="masthead-tagline">{{ site.name }} — backend in Python, written down while I'm still learning it.</p>
     </header>
-
     <div class="about-intro">
         <img class="avatar"
              src="{{ url_for('static', path='profile_pics/avatar-256.jpg') }}"
@@ -30,28 +27,29 @@
             </p>
         </div>
     </div>
-
-
     <dl class="spec-list mono-label">
         <dt>Language</dt>
-        <dd>Python</dd>
-
+        <dd>
+            Python
+        </dd>
         <dt>Backend</dt>
-        <dd>FastAPI, SQLAlchemy, Pydantic</dd>
-
+        <dd>
+            FastAPI, SQLAlchemy, Pydantic
+        </dd>
         <dt>Data</dt>
-        <dd>MySQL, pandas, NumPy</dd>
-
+        <dd>
+            MySQL, pandas, NumPy
+        </dd>
         <dt>Tooling</dt>
-        <dd>uv, ruff, pyrefly, pytest, Docker</dd>
-
+        <dd>
+            uv, ruff, pyrefly, pytest, Docker
+        </dd>
         <dt>This site</dt>
         <dd>
             FastAPI, SQLAlchemy, Asyncronous funcs —
             <a href="{{ site.repo }}" target="_blank" rel="noopener noreferrer">{{ site.repo_label }}</a>
         </dd>
     </dl>
-
     <section class="contact-block">
         <span class="eyebrow mono-label">Get in touch</span>
         <p class="contact-lead">
@@ -63,7 +61,6 @@
             {{ contact.channels() }}
         </div>
     </section>
-
     <p class="mt-5">
         <a class="back-link mono-label" href="/">
             <span class="arrow">&larr;</span> All posts
