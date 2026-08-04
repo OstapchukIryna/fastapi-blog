@@ -1,11 +1,13 @@
-"""Passwords and the token protocol — and nothing else.
+"""Passwords and the token protocols.
 
 There is no session and no request here. These functions turn a password
-into a hash, and a user id into a token and back. Whether that id belongs
-to anyone is a question for services/auth.py, one layer up, because
+into a hash, a user id into a token and back, and imlements a resets tokens.
+Whether that id belongs to anyone is a question for services/auth.py, one layer up, because
 answering it needs the database.
 """
 
+import hashlib
+import secrets
 from datetime import UTC, datetime, timedelta
 
 import jwt
@@ -73,6 +75,16 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         bool: whether they match.
     """
     return password_hash.verify(plain_password, hashed_password)
+
+
+def generate_reset_token() -> str:
+    return secrets.token_urlsafe(32)
+
+
+# Security issue when sending token via web.
+# Much faster than argon and already random so no need to prevent brutforce attacks
+def hash_reset_token(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
