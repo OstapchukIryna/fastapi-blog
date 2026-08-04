@@ -6,6 +6,7 @@ from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from blog.infrastructure.database import Base
+from blog.infrastructure.models.reset_password import PasswordResetToken
 
 if TYPE_CHECKING:
     from blog.infrastructure.models.post import Post
@@ -46,6 +47,11 @@ class User(Base):
         back_populates="author",
         # delete-orphan as well as delete: detaching a post from its
         # author would otherwise leave a row with a dangling user_id.
+        cascade="all, delete-orphan",
+    )
+
+    reset_token: Mapped[list[PasswordResetToken]] = relationship(
+        back_populates="user",
         cascade="all, delete-orphan",
     )
 
