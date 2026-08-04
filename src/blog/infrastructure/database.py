@@ -63,9 +63,4 @@ async def get_db() -> AsyncIterator[AsyncSession]:
         yield session
 
 
-# ! This alias must exist at runtime. FastAPI reads annotations to
-# ! resolve dependencies, so moving the import under TYPE_CHECKING does
-# ! not fail loudly — `db` silently becomes a query parameter and the
-# ! endpoint starts answering 422 with nothing in the log. This is why
-# ! flake8-type-checking is disabled for the project.
 DbSession = Annotated[AsyncSession, Depends(get_db)]
