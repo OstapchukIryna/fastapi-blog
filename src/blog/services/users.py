@@ -117,18 +117,6 @@ async def register(db: AsyncSession, registration: UserCreate) -> models.User:
     return user
 
 
-async def check_email(db: AsyncSession, email: str) -> models.User:
-    result = await db.execute(
-        select(models.User).where(func.lower(models.User.email) == email.lower())
-    )
-    user = result.scalars().first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Email does not correct"
-        )
-    return user
-
-
 async def authenticate(db: AsyncSession, email: str, password: str) -> models.User:
     """
     The user these credentials belong to, or a 401.
@@ -137,8 +125,14 @@ async def authenticate(db: AsyncSession, email: str, password: str) -> models.Us
     itself something worth not telling an unauthenticated caller.
     """
     # * Look up user by case-**insensitive** email
-    user = await check_email(db, email)
+    result = await db.execute(
+        select(models.User).where(func.lower(models.User.email) == email.lower())
+    )
+    user = result.scalars().first()
 
+    # ! One refusal for both cases, and no lookup that raises on its own.
+    # ! A 404 for an unknown address and a 401 for a wrong password tells
+    # ! anybody who asks whether a given email has an account here.
     if not user or not verify_password(password, user.password_hash):
         raise Unauthorized("Incorrect password or email")
     return user

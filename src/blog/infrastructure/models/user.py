@@ -6,10 +6,10 @@ from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from blog.infrastructure.database import Base
-from blog.infrastructure.models.reset_password import PasswordResetToken
 
 if TYPE_CHECKING:
     from blog.infrastructure.models.post import Post
+    from blog.infrastructure.models.reset_password import PasswordResetToken
 
 DEFAULT_AVATAR = "/static/profile_pics/default.jpg"
 
@@ -30,6 +30,8 @@ class User(Base):
             Nullable and meaningful: None is "no picture of their own",
             not "unknown", and it is what image_path turns into the
             shared default.
+        reset_tokens (list[PasswordResetToken]): outstanding "I forgot my
+            password" requests. Deleted with the account.
         posts (list[Post]): everything this person wrote. Deleting the
             account deletes them — an orphaned post has no author to
             display and nothing to fall back to.
@@ -50,7 +52,10 @@ class User(Base):
         cascade="all, delete-orphan",
     )
 
-    reset_token: Mapped[list[PasswordResetToken]] = relationship(
+    # Plural: a row per outstanding request. In practice there is at
+    # most one, because issuing a new token clears the old ones — but
+    # that is a rule the service keeps, not one the schema enforces.
+    reset_tokens: Mapped[list[PasswordResetToken]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
     )

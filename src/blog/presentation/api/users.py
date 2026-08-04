@@ -6,26 +6,13 @@ route that changes something asks for the second, so no route body checks
 who is calling.
 """
 
-from datetime import UTC, datetime, timedelta, tzinfo
 from typing import Annotated
 
-from email_utils import send_password_reset_email
 from fastapi import APIRouter, BackgroundTasks, Depends, UploadFile, status
-from fastapi.exceptions import HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy import delete as sql_delete
-from sqlalchemy import select
 
-from blog.core.config import settings
-from blog.core.security import (
-    generate_reset_token,
-    hash_password,
-    hash_reset_token,
-    verify_password,
-)
-from blog.infrastructure import models
+from blog.infrastructure import email, models
 from blog.infrastructure.database import DbSession
-from blog.infrastructure.models.reset_password import PasswordResetToken
 from blog.schemas import (
     Page,
     PageParams,
@@ -39,11 +26,17 @@ from blog.schemas import (
 from blog.schemas.password_reset import (
     ChangePasswordRequest,
     ForgotPasswordRequest,
+    Message,
     ResetPasswordRequest,
 )
-from blog.services import auth, posts, users
+from blog.services import auth, passwords, posts, users
 from blog.services.auth import CurrentUser
-from blog.services.users import OwnAccount, UserDep, check_email
+from blog.services.users import OwnAccount, UserDep
+
+# The same sentence whether or not the address is known. It is the whole
+# of the endpoint's answer, and saying anything more precise would turn
+# the form into a way of testing which addresses have accounts.
+RESET_REQUESTED = "If an account exists for that address, a reset link is on its way."
 
 router = APIRouter()
 
@@ -108,108 +101,86 @@ async def get_current_user(current_user: CurrentUser) -> models.User:
     return current_user
 
 
-@router.post("/forgot-password", status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/forgot-password", response_model=Message, status_code=status.HTTP_202_ACCEPTED
+)
 async def forgot_password(
     request_data: ForgotPasswordRequest,
     background_tasks: BackgroundTasks,
     db: DbSession,
-):
-    user = await check_email(db, request_data.email)
-    # Delete any existing reset tokens
-    await db.execute(
-        sql_delete(PasswordResetToken).where(PasswordResetToken.user_id == user.id)
-    )
-    token = generate_reset_token()
-    token_hash = hash_reset_token(token)
-    expires_at = datetime.now(UTC) + timedelta(
-        minutes=settings.reset_token_expire_minutes
-    )
-    reset_token = PasswordResetToken(
-        user_id=user.id, token_hash=token_hash, expires_at=expires_at
-    )
+) -> Message:
+    """Start a password reset, and say nothing about whether it applied.
 
-    db.add(reset_token)
-    await db.commit()
+    202 rather than 200: whatever happens, all that is certain when this
+    returns is that the request was accepted. The email is still to be
+    attempted.
 
-    background_tasks.add_task(
-        send_password_reset_email,
-        to_email=user.email,
-        username=user.username,
-        token=token,
-    )
-    return {
-        "message": "If an account exists with this email, you will receive password reset instrunctions."
-    }
+    Args:
+        request_data (ForgotPasswordRequest): the address to reset.
+        background_tasks (BackgroundTasks): the email is sent after the
+            response, so an unreachable mail server delays nobody — and
+            so the time taken to send does not differ measurably between
+            a known address and an unknown one.
+        db (DbSession): request-scoped session.
 
+    Returns:
+        Message: the same sentence in both cases.
+    """
+    issued = await passwords.start_reset(db, request_data.email)
 
-@router.post("/reset-password", status_code=status.HTTP_200_OK)
-async def reset_password(request_data: ResetPasswordRequest, db: DbSession):
-    token_hash = hash_reset_token(request_data.token)
-
-    result = await db.execute(
-        select(PasswordResetToken.token_hash).where(
-            PasswordResetToken.token_hash == token_hash
-        )
-    )
-
-    reset_token = result.scalars().first()
-
-    if not reset_token:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token"
-        )
-    # SQLight tricks: the token is stored as a string withour timezone info, but the query returns a PasswordResetToken object.
-    # We need to get the actual token_hash from the object.
-    # pyrefly: ignore [missing-attribute]
-    if reset_token.expires_at.replace(tzinfo=UTC) < datetime.now(UTC):
-        await db.delete(reset_token)
-        await db.commit()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token"
-        )
-    result = await db.execute(
-        # pyrefly: ignore [missing-attribute]
-        select(models.User).where(models.User.id == reset_token.user_id)
-    )
-
-    user = result.scalars().first()
-
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token"
+    if issued is not None:
+        user, token = issued
+        background_tasks.add_task(
+            email.send_password_reset,
+            to_email=user.email,
+            username=user.username,
+            token=token,
         )
 
-    user.password_hash = users.hash_password(request_data.new_password)
-    await db.execute(
-        sql_delete(PasswordResetToken).where(PasswordResetToken.user_id == user.id)
-    )
-    await db.commit()
-
-    return {
-        "massage": "Password reset successfully. You can now log in with your new password"
-    }
+    return Message(message=RESET_REQUESTED)
 
 
-@router.patch("/me/password", status_code=status.HTTP_200_OK)
+@router.post("/reset-password", response_model=Message)
+async def reset_password(request_data: ResetPasswordRequest, db: DbSession) -> Message:
+    """Set a new password using the token from a reset email.
+
+    Args:
+        request_data (ResetPasswordRequest): the token and the new password.
+        db (DbSession): request-scoped session.
+
+    Returns:
+        Message: confirmation that the password now works.
+
+    Raises:
+        InvalidResetToken: 400 for every way the token can be unusable.
+            Which way is never said.
+    """
+    await passwords.complete_reset(db, request_data.token, request_data.new_password)
+    return Message(message="Password changed. You can sign in with it now.")
+
+
+@router.patch("/me/password", response_model=Message)
 async def change_password(
     password_data: ChangePasswordRequest, current_user: CurrentUser, db: DbSession
-):
-    if not verify_password(password_data.current_password, current_user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Current password is incorrect",
-        )
+) -> Message:
+    """Change the password of the account the caller is signed in as.
 
-    current_user.password_hash = hash_password(password_data.new_password)
+    Args:
+        password_data (ChangePasswordRequest): the current password as
+            proof, and the replacement.
+        current_user (CurrentUser): resolved from the token.
+        db (DbSession): request-scoped session.
 
-    await db.execute(
-        sql_delete(PasswordResetToken).where(
-            PasswordResetToken.user_id == current_user.id
-        )
+    Returns:
+        Message: confirmation.
+
+    Raises:
+        WrongPassword: 400 when the current password does not match.
+    """
+    await passwords.change(
+        db, current_user, password_data.current_password, password_data.new_password
     )
-
-    await db.commit()
-    return {"message": "Password changed successfully"}
+    return Message(message="Password changed.")
 
 
 @router.get("/{user_id}", response_model=UserPublic)
