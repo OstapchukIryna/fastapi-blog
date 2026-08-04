@@ -9,7 +9,6 @@ from collections.abc import MutableMapping
 from typing import Any
 
 import markdown
-from fastapi import Request
 from fastapi.templating import Jinja2Templates
 
 from blog.core.config import TEMPLATES_DIR
@@ -32,28 +31,23 @@ SITE = {
 MARKDOWN_EXTENSIONS = ["fenced_code", "tables"]
 
 
-def author_flag(request: Request) -> dict[str, Any]:
-    """Tell every template whether the visitor may edit.
-
-    A context processor rather than a route argument, because the answer
-    is needed by the layout — the header decides what to show before any
-    page-specific template runs.
-
-    Args:
-        request (Request): the request being rendered. Unused for now;
-            it is the whole input the real check will need.
-
-    Returns:
-        dict[str, Any]: the flag, merged into every template context.
-
-    # TODO: answer from the request instead of always saying yes. The
-    # token lives in localStorage, so the server cannot see it — this
-    # becomes answerable once the token also travels in a cookie.
-    """
-    return {"is_author": True}
-
-
-templates = Jinja2Templates(directory=TEMPLATES_DIR, context_processors=[author_flag])
+# * There is no `is_author` in this context, and there deliberately is
+# * not one. It used to be a context processor that always returned True,
+# * because the token lives in localStorage where the server cannot see
+# * it — a name that promised a check nobody was making.
+# *
+# * What actually hides the author-only controls is the browser, and it
+# * already worked: `.nav-auth` is display:none until <head> sets
+# * data-signed-in, and the edit link on a post carries data-author-only
+# * with the author id for the layout script to compare. Removing the
+# * flag removed a second mechanism that was doing nothing.
+# *
+# ! Neither is enforcement. /posts/{id}/edit and the API stay reachable
+# ! to anyone who types the address; what stops them is the OwnedPost
+# ! dependency on the server, not anything in a template. A real
+# ! server-side answer needs the token in a cookie, which is a change to
+# ! how sign-in works rather than a change here.
+templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 jinja_globals: MutableMapping[str, Any] = templates.env.globals
 jinja_globals["site"] = SITE

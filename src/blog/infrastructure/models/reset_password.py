@@ -1,20 +1,3 @@
-<<<<<<< HEAD
-from datetime import UTC, datetime
-
-from sqlalchemy import DateTime, ForeignKey, Integer, String
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-
-from blog.infrastructure.database import Base
-from blog.infrastructure.models.user import User
-
-
-class PasswordResetToken(Base):
-    __tablename__ = "password_reset_tokens"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
-    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
-=======
 """One-time tokens for resetting a forgotten password."""
 
 from datetime import UTC, datetime
@@ -66,7 +49,6 @@ class PasswordResetToken(Base):
     token_hash: Mapped[str] = mapped_column(
         String(TOKEN_HASH_LENGTH), unique=True, nullable=False
     )
->>>>>>> 922b4cf9e635a611cedb8890870a51f3197184e4
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
@@ -74,9 +56,6 @@ class PasswordResetToken(Base):
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
 
-<<<<<<< HEAD
-    user: Mapped[User] = relationship(back_populates="reset_token")
-=======
     # * Imported for typing only. User names this class in its own
     # * relationship, so importing it back at runtime would be a cycle —
     # * and was: the application stopped starting with an ImportError
@@ -100,4 +79,3 @@ class PasswordResetToken(Base):
         if expires_at.tzinfo is None:
             expires_at = expires_at.replace(tzinfo=UTC)
         return expires_at < datetime.now(UTC)
->>>>>>> 922b4cf9e635a611cedb8890870a51f3197184e4
