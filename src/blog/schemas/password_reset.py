@@ -1,9 +1,3 @@
-<<<<<<< HEAD
-from pydantic import BaseModel, EmailStr, Field
-
-
-class ForgotPasswordRequest(BaseModel):
-=======
 """What the password endpoints accept and answer.
 
 Three requests rather than one, because they happen in three different
@@ -25,20 +19,10 @@ class ForgotPasswordRequest(BaseModel):
             address is never revealed by the response.
     """
 
->>>>>>> 922b4cf9e635a611cedb8890870a51f3197184e4
     email: EmailStr = Field(max_length=120)
 
 
 class ResetPasswordRequest(BaseModel):
-<<<<<<< HEAD
-    token: str
-    new_password: str = Field(min_length=8)
-
-
-class ChangePasswordRequest(BaseModel):
-    current_password: str
-    new_password: str = Field(min_length=8)
-=======
     """The link has been opened; here is the new password.
 
     Attributes:
@@ -83,4 +67,3 @@ class Message(BaseModel):
     """
 
     message: str
->>>>>>> 922b4cf9e635a611cedb8890870a51f3197184e4

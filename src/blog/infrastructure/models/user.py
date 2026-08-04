@@ -6,7 +6,6 @@ from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from blog.infrastructure.database import Base
-from blog.infrastructure.models.reset_password import PasswordResetToken
 
 if TYPE_CHECKING:
     from blog.infrastructure.models.post import Post
@@ -53,14 +52,10 @@ class User(Base):
         cascade="all, delete-orphan",
     )
 
-<<<<<<< HEAD
-    reset_token: Mapped[list[PasswordResetToken]] = relationship(
-=======
     # Plural: a row per outstanding request. In practice there is at
     # most one, because issuing a new token clears the old ones — but
     # that is a rule the service keeps, not one the schema enforces.
     reset_tokens: Mapped[list[PasswordResetToken]] = relationship(
->>>>>>> 922b4cf9e635a611cedb8890870a51f3197184e4
         back_populates="user",
         cascade="all, delete-orphan",
     )
