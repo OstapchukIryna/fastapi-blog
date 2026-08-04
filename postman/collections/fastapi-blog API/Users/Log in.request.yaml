@@ -1,6 +1,6 @@
 $kind: http-request
 description: "Lives in this folder, right after the account is created, because every request after it needs the token. OAuth2PasswordRequestForm insists on a field called username, but this API authenticates by email - the form field carries the address. The lookup is case-insensitive, so the mixed-case address registered earlier signs in as typed."
-url: "{{baseUrl}}/api/users/token"
+url: "{{baseUrl}}/api/v1/users/token"
 method: POST
 headers:
   Content-Type: application/x-www-form-urlencoded

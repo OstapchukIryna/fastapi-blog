@@ -1,6 +1,6 @@
 $kind: http-request
 description: Tags are replaced wholesale rather than merged, so sending [] clears them while omitting the key keeps them.
-url: "{{baseUrl}}/api/posts/{{postId}}"
+url: "{{baseUrl}}/api/v1/posts/{{postId}}"
 method: PATCH
 headers:
   Authorization: Bearer {{accessToken}}

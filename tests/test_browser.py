@@ -117,7 +117,7 @@ def test_edit_is_offered_to_the_author_only(
     stranger = make_account("stranger")
 
     written = api.post(
-        "/api/posts",
+        "/api/v1/posts",
         json={
             "title": "Only its author may edit this",
             "summary": "One post, three readers.",

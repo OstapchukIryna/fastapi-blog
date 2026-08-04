@@ -1,6 +1,6 @@
 $kind: http-request
 description: "Addresses are stored lower-cased and looked up with func.lower on both sides, so the case someone types is not a way to fail to sign in. Sends the same address the account was made with, shouted."
-url: "{{baseUrl}}/api/users/token"
+url: "{{baseUrl}}/api/v1/users/token"
 method: POST
 headers:
   Content-Type: application/x-www-form-urlencoded

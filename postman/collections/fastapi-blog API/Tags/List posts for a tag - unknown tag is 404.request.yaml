@@ -1,6 +1,6 @@
 $kind: http-request
 description: "An unused tag is not an empty list: the tag itself does not exist, and saying so is more useful than an empty array."
-url: "{{baseUrl}}/api/tags/no-such-tag-exists/posts"
+url: "{{baseUrl}}/api/v1/tags/no-such-tag-exists/posts"
 method: GET
 scripts:
   - type: afterResponse

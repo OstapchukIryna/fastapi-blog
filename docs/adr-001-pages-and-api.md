@@ -5,7 +5,7 @@
 
 ## Context
 
-This application serves two interfaces from one codebase. `/api/*` answers
+This application serves two interfaces from one codebase. `/api/v1/*` answers
 JSON to scripts. Everything else answers HTML to a person with a browser.
 
 Only one of them had a home. The API lived in `routers/`, one module per
@@ -123,6 +123,6 @@ moved the whole application into `src/blog/` and split it by layer, so:
   `services/posts.py`, the six JSON routes into `presentation/api/posts.py`.
 - The seam this ADR argued for got sharper, not softer: `web/` no longer
   imports `api/` at all. Both ask `services/`, so the post form and
-  `POST /api/posts` now go through the same function.
+  `POST /api/v1/posts` now go through the same function.
 
 See [architecture.md](architecture.md) for the layout as it stands.

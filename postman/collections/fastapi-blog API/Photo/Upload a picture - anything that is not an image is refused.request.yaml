@@ -1,6 +1,6 @@
 $kind: http-request
 description: "A name ending in .jpg proves nothing about the bytes. The server opens the file rather than trusting the extension, and answers 400 when it cannot."
-url: "{{baseUrl}}/api/users/{{userId}}/picture"
+url: "{{baseUrl}}/api/v1/users/{{userId}}/picture"
 method: PATCH
 headers:
   Authorization: Bearer {{accessToken}}
@@ -20,7 +20,7 @@ scripts:
 
       pm.test("the picture already there was left alone", () => {
           pm.sendRequest({
-              url: `${pm.variables.get("baseUrl")}/api/users/me`,
+              url: `${pm.variables.get("baseUrl")}/api/v1/users/me`,
               method: "GET",
               header: { Authorization: `Bearer ${pm.collectionVariables.get("accessToken")}` },
           }, (_e, res) =>

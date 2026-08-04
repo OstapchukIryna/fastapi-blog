@@ -16,7 +16,12 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from blog.presentation.web.templating import templates
 
-API_PREFIX = "/api/"
+# ! Deliberately the unversioned root, not blog.presentation.api's
+# ! API_PREFIX. This asks "is the caller a script or a browser", and the
+# ! answer is the same for /api/v1 and for whatever comes after it.
+# ! Matching one version would leave the next one rendering HTML errors
+# ! to clients that asked for JSON.
+API_PATH_ROOT = "/api/"
 
 GENERIC_FAILURE = "An error occurred. Please check your request and try again."
 INVALID_REQUEST = "Invalid request. Please check your input and try again."
@@ -76,7 +81,7 @@ def register_error_handlers(app: FastAPI) -> None:
         Returns:
             Response: JSON under /api/, an HTML page everywhere else.
         """
-        if request.url.path.startswith(API_PREFIX):
+        if request.url.path.startswith(API_PATH_ROOT):
             return await http_exception_handler(request, exception)
 
         # `detail` is optional in Starlette; a page needs a sentence.
@@ -100,7 +105,7 @@ def register_error_handlers(app: FastAPI) -> None:
                 one sentence: the field-by-field breakdown belongs beside
                 the inputs, and the form already does that itself.
         """
-        if request.url.path.startswith(API_PREFIX):
+        if request.url.path.startswith(API_PATH_ROOT):
             return await request_validation_exception_handler(request, exception)
 
         return error_page(

@@ -1,6 +1,6 @@
 $kind: http-request
 description: "Removing falls back to the shared default rather than leaving the account without a face. The response is UserPrivate, which is the part worth pinning — without a response_model this route returned the model itself and the password hash went out with it."
-url: "{{baseUrl}}/api/users/{{userId}}/picture"
+url: "{{baseUrl}}/api/v1/users/{{userId}}/picture"
 method: DELETE
 headers:
   Authorization: Bearer {{accessToken}}

@@ -20,7 +20,7 @@
             <p id="loginReasonNote"></p>
         </div>
         {# The field is an address, not a handle. OAuth2PasswordRequestForm
-           requires a field named `username`, but /api/users/token looks the
+           requires a field named `username`, but /api/v1/users/token looks the
            account up by email. The label tells the truth about what is
            typed; the script below supplies the field name the request
            needs. #}
@@ -65,7 +65,7 @@
     <!-- Sign-in Form Handler -->
     <script type="module">
         import { saveToken } from "/static/js/auth.js";
-        import { wireForm } from "/static/js/utils.js";
+        import { API, wireForm } from "/static/js/utils.js";
 
         const form = document.getElementById("loginForm");
         const params = new URLSearchParams(window.location.search);
@@ -91,7 +91,7 @@
 
         wireForm(form, {
             request: (fields) => ({
-                url: "/api/users/token",
+                url: `${API}/users/token`,
                 method: "POST",
                 // The token endpoint reads a form body, not JSON, and its
                 // field is called username however much it holds an address.

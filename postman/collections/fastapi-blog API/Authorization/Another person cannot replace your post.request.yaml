@@ -1,6 +1,6 @@
 $kind: http-request
 description: "PUT replaces every editable field at once, so it is the most damaging of the three and gets its own check rather than being assumed to behave like PATCH."
-url: "{{baseUrl}}/api/posts/{{guardedPostId}}"
+url: "{{baseUrl}}/api/v1/posts/{{guardedPostId}}"
 method: PUT
 headers:
   Authorization: Bearer {{intruderToken}}

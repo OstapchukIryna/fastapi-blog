@@ -1,6 +1,6 @@
 $kind: http-request
 description: "sub is required for the same reason: a token that authenticates without saying who would leave the route to guess."
-url: "{{baseUrl}}/api/users/me"
+url: "{{baseUrl}}/api/v1/users/me"
 method: GET
 headers:
   Authorization: Bearer {{mintedToken}}
