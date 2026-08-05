@@ -1,6 +1,6 @@
 # What is worth testing, and why
 
-Eighty-six invariants, collected by reading the source rather than by
+Eighty-seven invariants, collected by reading the source rather than by
 brainstorming. Every row is a claim the code already makes about itself, in a
 docstring or behind a `# *` / `# !` marker. Nothing here was invented for this
 document: the comments were written at the moment each decision was made, which
@@ -191,6 +191,7 @@ with the best ratio of confidence to effort.
 | the match is on the **unversioned** `/api/` root | `/api/v2` rendering HTML errors to clients that asked for JSON | `api` |
 | the error page carries the **original** status, not 200 | a lie that caches, crawlers and monitoring all believe | `api` |
 | validation errors: the field list for the API, one sentence for a page | the field-by-field breakdown belonging beside the inputs, which the form already does | `api` |
+| the reset email's plain-text and HTML parts say the same thing | they are alternatives for one message and the reader's client picks between them, so a difference in wording is one nobody chose. They had already drifted — "You asked" against "You requested" — because editing either shows only that one. *Already happened* | `unit` |
 | `PostFormView.status_code` is 422 when it holds errors | a page full of complaints served as 200, telling a client, a cache and a crawler that the submission succeeded | `unit` |
 | `PostFormView.editing` is derived, not passed | `mode="edit"` with `post=None` being constructible | `unit` |
 | `form_errors` maps `min_length == 1` to "Required." and gives one message per field | Pydantic's raw wording reaching a reader | `unit` |
@@ -222,7 +223,7 @@ Structural, and cheap because the type checker already agrees.
    no event loop. This is a couple of evenings and it covers every boundary
    that is currently checked by nobody.
 2. **The `session` and `client` fixtures.** They block everything else.
-3. **The rows marked *already happened*.** Eight of them, spread across
+3. **The rows marked *already happened*.** Seven of them, spread across
    sections. Each is a bug that reached `master` once; a test that fails on it
    is worth more than any number of new ones.
 4. **Sections 2 and 3.** The security family and the transaction ordering —
