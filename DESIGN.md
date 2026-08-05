@@ -288,6 +288,15 @@ the lead post, related posts, the `Now` panel, the contact block.
 Fixed navigation sits at the top at 3.75rem, with a blurred translucent ground
 (`backdrop-filter: blur(10px)`) so content passing beneath stays legible.
 
+Only two things on the page are allowed to be wider than the measure, and both
+are the navigation: its translucent ground and the hairline that ends it. A
+fixed bar has to span the viewport or content would show past its edge. **Every
+other rule on the page is 760px**, the footer's included — it is drawn on the
+footer's inner container rather than on the `<footer>`, because a full-bleed
+line under a 760px column is the one thing that makes a deliberately narrow
+column read as a phone layout stretched onto a desktop. Rules align to the
+measure; grounds may bleed.
+
 Responsive behaviour has one breakpoint at 575.98px. Below it: horizontal pairs
 become vertical stacks (author masthead, author byline, about intro, spec and
 `Now` rows), full-width buttons become the primary touch target, and card insets
