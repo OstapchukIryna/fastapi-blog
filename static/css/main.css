@@ -512,11 +512,23 @@ h4 {
 .feed-fill {
     display: block;
     height: 100%;
+    width: 100%;
+
     /* Деление без единиц — обе величины приходят из шаблона числами,
-       и JS правит только --shown. */
-    width: calc(var(--shown) / var(--total) * 100%);
+       и JS правит только --shown. scaleX берёт как раз число, так что
+       та же дробь работает без множителя на 100%. */
+    transform: scaleX(calc(var(--shown) / var(--total)));
+
+    /* ! Иначе полоса растёт от середины в обе стороны: у scaleX точка
+       ! отсчёта по умолчанию — центр элемента. */
+    transform-origin: left;
     background-color: var(--accent);
-    transition: width 0.3s ease;
+
+    /* * Было `transition: width 0.3s`. Do-лист в DESIGN.md разрешает
+       * переходы «at 200ms on colour, border-colour or transform» — width
+       * там нет, и 0.3s тоже мимо. Плюс width заставляет браузер считать
+       * раскладку на каждом кадре, а transform живёт на композиторе. */
+    transition: transform 0.2s ease;
 }
 
 /* --- Шапка авторской страницы --------------------------------- */
