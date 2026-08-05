@@ -22,6 +22,19 @@ TEMPLATES_DIR = BASE_DIR / "templates"
 STATIC_DIR = BASE_DIR / "static"
 MEDIA_DIR = BASE_DIR / "media"
 
+# * What the site calls itself. Down here rather than beside the Jinja
+# * globals in presentation/web/templating.py, because two layers need it:
+# * the pages put it in the navbar, and infrastructure/email.py signs
+# * outgoing mail with it. Applying the usual test — would this make sense
+# * if neither the web templating nor the mailer existed? — it would, so
+# * it is shared vocabulary and belongs below both.
+# *
+# ! The email said "FastAPI Blog" for a while, which is the name of the
+# ! framework rather than of anything a reader has visited. A brand kept
+# ! in two files is a brand that ends up with two values.
+SITE_HANDLE = "called_mad"
+SITE_NAME = "Iryna Ostapchuk"
+
 
 class Settings(BaseSettings):
     """Everything the application reads from the environment.

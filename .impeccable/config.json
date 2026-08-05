@@ -1,0 +1,9 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [
+      "templates/email/password_reset.html"
+    ],
+    "ignoreValues": []
+  }
+}

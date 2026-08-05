@@ -11,14 +11,19 @@ from typing import Any
 import markdown
 from fastapi.templating import Jinja2Templates
 
-from blog.core.config import TEMPLATES_DIR
+from blog.core.config import SITE_HANDLE, SITE_NAME, TEMPLATES_DIR
 
 # Facts about the site itself rather than about any request: the byline,
 # the contact links, the repository. A global because it is the same on
 # every page, and threading it through sixteen routes would say nothing.
+#
+# * The handle and the name come from core/config.py. Everything else here
+# * is web-only — a mail footer has no use for a Telegram link — but those
+# * two are also what signs an outgoing email, so they live one layer down
+# * where both surfaces can read the same value.
 SITE = {
-    "handle": "called_mad",
-    "name": "Iryna Ostapchuk",
+    "handle": SITE_HANDLE,
+    "name": SITE_NAME,
     "role": "backend Python dev",
     "now_updated": "28 Jul 2026",
     "github": "https://github.com/OstapchukIryna",

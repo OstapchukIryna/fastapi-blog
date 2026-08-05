@@ -72,6 +72,7 @@ nav:
       - ADR-001 · Pages and API: adr-001-pages-and-api.md
   - Working on it:
       - Conventions: conventions.md
+      - Test plan: test-plan.md
   - Reference:
       - core: reference/core.md
       - infrastructure: reference/infrastructure.md
