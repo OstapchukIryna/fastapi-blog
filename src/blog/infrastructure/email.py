@@ -11,12 +11,14 @@ difference between an inconvenience and a locked account.
 """
 
 import logging
+from collections.abc import MutableMapping
 from email.message import EmailMessage
+from typing import Any
 
 import aiosmtplib
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from blog.core.config import TEMPLATES_DIR, settings
+from blog.core.config import SITE_HANDLE, SITE_NAME, TEMPLATES_DIR, settings
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +28,19 @@ _environment = Environment(
     # ! whatever somebody typed at registration.
     autoescape=select_autoescape(["html"]),
 )
+
+# * The same two facts the navbar shows, so a message and the site it came
+# * from agree about what the site is called. Globals rather than arguments
+# * at each render: they are properties of the sender, not of the message,
+# * and a second template should not have to remember to pass them.
+#
+# ! Assigned through an annotated alias, as presentation/web/templating.py
+# ! does for the same reason. Jinja types `Environment.globals` from the
+# ! handful of helpers it ships with — cycler, joiner, namespace — so a
+# ! plain `globals["x"] = "y"` is an assignment the checker rejects.
+jinja_globals: MutableMapping[str, Any] = _environment.globals
+jinja_globals["site_handle"] = SITE_HANDLE
+jinja_globals["site_name"] = SITE_NAME
 
 
 async def send(
@@ -79,12 +94,17 @@ async def send_password_reset(to_email: str, username: str, token: str) -> None:
     reset_url = f"{settings.frontend_url}/reset-password?token={token}"
     minutes = settings.reset_token_expire_minutes
 
+    # * Word for word what the HTML part says. The two are alternatives for
+    # * one message, and which one a reader gets is decided by their client,
+    # * so a difference in wording is a difference nobody chose. They had
+    # * drifted — "You asked" here against "You requested" there — because
+    # * only one of the two is visible while editing either.
     plain_text = (
         f"Hi {username},\n\n"
         "You asked to reset your password. Open the link below to choose "
         "a new one:\n\n"
         f"{reset_url}\n\n"
-        f"The link stops working in {minutes} minutes.\n\n"
+        f"The link works once, and stops working in {minutes} minutes.\n\n"
         "If you did not ask for this, you can ignore this message — your "
         "password has not changed.\n"
     )

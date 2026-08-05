@@ -127,7 +127,10 @@
             {% block content %}
             {% endblock content %}
         </main>
-        <footer class="site-footer mt-5 py-4">
+        {# pb-4, не py-4: отступ сверху задан на контейнере, потому что
+           линейка подвала живёт там — иначе она уходила бы во всю ширину
+           окна, единственная линия на странице мимо меры. #}
+        <footer class="site-footer mt-5 pb-4">
             <div class="container d-flex flex-wrap justify-content-between align-items-center gap-3">
                 <span class="mono-label">© <span id="year"></span> {{ site.handle }}</span>
                 {{ contact.channels() }}

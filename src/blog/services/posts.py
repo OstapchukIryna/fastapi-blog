@@ -39,18 +39,36 @@ from blog.services.auth import CurrentUser
 def base_query() -> Select[tuple[models.Post]]:
     """The query every listing starts from, relations already loaded.
 
-    Eager loading is not speculative optimisation here. Touching
-    post.tags in a template with lazy loading issues one query per post
-    — the N+1 problem — and the cost grows with the amount of content.
+    Eager loading is not speculative optimisation here, and it is not
+    optimisation at all: under asyncio a lazy load raises MissingGreenlet
+    rather than issuing the query it wants, because the attribute access
+    that triggers it is synchronous and there is no way to await from
+    inside it. On a synchronous stack the same access would quietly become
+    one query per post — the N+1 problem. Either way the relations have to
+    be loaded up front.
 
     Returns:
         Select: posts ordered pinned first, then newest, with their tags
             and authors attached.
     """
-    # ! joinedload is safe next to LIMIT only because the author is
-    # ! many-to-one: one row per post. Switching tags to joinedload would
-    # ! make LIMIT slice join rows instead of posts, and a page asking
-    # ! for ten would show four.
+    # * Two strategies, because the two relations multiply differently.
+    # * The author is many-to-one — one row per post — so joining costs
+    # * nothing. Tags are a collection, and a JOIN repeats the whole post
+    # * row once per tag, `content` included. Measured on 12 posts with 4
+    # * tags each: joinedload ships 12 rows and 4.8 kB for a page of 3,
+    # * selectinload ships 3 rows plus 12 tiny tag rows, 1.2 kB. The
+    # * factor is the number of tags, and it is paid on the widest column
+    # * in the table.
+    #
+    # ? An earlier version of this comment claimed joinedload would break
+    # ? LIMIT here — that a page asking for ten would show four. It does
+    # ? not: SQLAlchemy detects LIMIT with joined eager loading against a
+    # ? collection and wraps the parent query in a subquery, so the limit
+    # ? still counts posts. Verified — the SQL comes back as `FROM (SELECT
+    # ? ... LIMIT ?) AS anon_1 LEFT OUTER JOIN ...` and returns exactly
+    # ? three. The volume above is the real reason; the correctness
+    # ? argument was wrong. What *does* break that way is an explicit
+    # ? .join() — see the warning on _slice.
     #
     # * Pinned-first is decided in the query, not in the template. A
     # * template can only reorder what it was given, so on the second
@@ -87,11 +105,26 @@ async def _slice(
     Args:
         db (AsyncSession): session to query through.
         query (Select): the filtered, ordered query to take a batch from.
+            ! It must return one row per post. See the warning below.
         page (Pagination): the offset and size being asked for.
 
     Returns:
         tuple[Sequence[models.Post], int]: the batch, and the total.
     """
+    # ! The query handed in must not multiply rows, and nothing here can
+    # ! check that. Eager loading is safe — SQLAlchemy wraps the parent
+    # ! query in a subquery so LIMIT still counts posts. An explicit
+    # ! .join() is not wrapped, because it was asked for and may be
+    # ! load-bearing for the filter, so LIMIT counts join rows and
+    # ! func.count() counts them too.
+    # !
+    # ! with_tag gets away with it: it joins the tags and filters on a
+    # ! single name, so a post appears exactly once. Measured — asking for
+    # ! three returns three. Widen that filter to `Tag.name.in_(...)` and
+    # ! both numbers break at once: with four tags matching, a page of
+    # ! three returned ONE post and the total read 48 for 12 posts.
+    # ! Aggregate with a subquery or DISTINCT before slicing, not after.
+    #
     # * order_by(None) before counting: sorting a subquery that is about
     # * to be reduced to a number is wasted work, and some databases
     # * reject it outright.
@@ -99,6 +132,10 @@ async def _slice(
         select(func.count()).select_from(query.order_by(None).subquery())
     )
     result = await db.execute(query.offset(page.skip).limit(page.limit))
+    # * .unique() deduplicates in Python. Required rather than tidy:
+    # * SQLAlchemy refuses a joined eager load against a collection
+    # * without it (InvalidRequestError), and with_tag's explicit join can
+    # * hand back the same post twice if the filter ever matches two tags.
     return result.scalars().unique().all(), total or 0
 
 

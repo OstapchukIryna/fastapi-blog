@@ -288,6 +288,35 @@ the lead post, related posts, the `Now` panel, the contact block.
 Fixed navigation sits at the top at 3.75rem, with a blurred translucent ground
 (`backdrop-filter: blur(10px)`) so content passing beneath stays legible.
 
+### Two measures
+
+The column has a measure. The chrome — the navbar and the footer — does not: it
+is inset from the window by the same 1.25rem the column uses, with no ceiling.
+Below 760px the two coincide exactly, so the brand sits directly above the text
+and the footer's label below it, and no second breakpoint is needed. Above it,
+the chrome tracks the window while the column stays 760px.
+
+**The Competing-Box Rule.** The chrome may be wider than the measure, but it may
+never be a *centred box* of its own. That, not the size of the gap, is what
+reads as a craft error: two centred containers of nearly the same width look
+like a failed attempt to match. Bootstrap's 1140px container was exactly that,
+and it is why the chrome was pinned to the measure for a while — which fixed the
+misalignment and cost the page its desktop, since a full-bleed bar with its
+contents pinched into the middle 760px is what makes a deliberately narrow
+column read as a phone layout stretched onto a desktop.
+
+The gap itself is not the thing to police. It is `(viewport - 760) / 2`, so it
+passes through any interval you try to forbid — at 1280px it lands on 260px,
+inside the range the old comment called the error. Measured at 1280 with the
+chrome flush to the glass, nothing reads as misaligned, because there is no box
+to fail to match. A ceiling is what to avoid: with one, a wide enough window
+turns the chrome back into a centred box, and at 2560px its contents float
+nearly 500px inside a full-bleed bar — the original disease, milder.
+
+Grounds and their edges bleed to the window: the navbar's translucent ground,
+the hairline that ends it, and the footer's rule, which spans the chrome it
+belongs to. Rules *inside* the column stay on the measure.
+
 Responsive behaviour has one breakpoint at 575.98px. Below it: horizontal pairs
 become vertical stacks (author masthead, author byline, about intro, spec and
 `Now` rows), full-width buttons become the primary touch target, and card insets
@@ -297,7 +326,9 @@ heading is a `clamp()`.
 ### Named Rules
 
 **The 760 Rule.** The column is 760px and prose is 68ch. Widening either to fill
-a large screen is a regression, not a fix.
+a large screen is a regression, not a fix. It governs the column and the prose
+inside it, and nothing else — the navbar and the footer are not the column, and
+they follow the Competing-Box Rule above instead.
 
 **The Hairline-Over-Box Rule.** A list is divided by a rule, not wrapped in
 cards. Reach for a card only when the thing inside it is a discrete object that
