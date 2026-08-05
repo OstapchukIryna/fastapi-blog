@@ -79,8 +79,8 @@ def register_page(request: Request) -> Response:
 # ! across the whole application, and the API endpoints of the same
 # ! purpose already hold `forgot_password` and `reset_password` — with
 # ! the short names, url_for in a template silently returned /api/… .
-@router.get("/forgot-password", name="forgot_password_page")
-def forgot_password_page(request: Request) -> Response:
+@router.get("/forgot-password", include_in_schema=False, name="forgot_password_page")
+async def forgot_password_page(request: Request) -> Response:
     """Render the form that asks for a reset link.
 
     Args:
@@ -93,12 +93,12 @@ def forgot_password_page(request: Request) -> Response:
             no session in which to remember which was asked.
     """
     return templates.TemplateResponse(
-        request, "forgot_password.html", {"title": "Reset your password"}
+        request, "forgot_password.html", {"title": "Forgot password"}
     )
 
 
-@router.get("/reset-password", name="reset_password_page")
-def reset_password_page(request: Request) -> Response:
+@router.get("/reset-password", include_in_schema=False, name="reset_password_page")
+async def reset_password_page(request: Request) -> Response:
     """Render the form that sets a new password from an emailed link.
 
     The token is not read here. It stays in the query string and is sent
@@ -112,6 +112,9 @@ def reset_password_page(request: Request) -> Response:
     Returns:
         Response: the rendered page.
     """
-    return templates.TemplateResponse(
-        request, "reset_password.html", {"title": "Choose a new password"}
+    response = templates.TemplateResponse(
+        request, "reset_password.html", {"title": "Reset password"}
     )
+    # Security measure
+    response.headers["Refferer-Policy"] = "no-refferer"
+    return response
