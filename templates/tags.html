@@ -4,12 +4,9 @@
    would fail with KeyError: 'request'. _contact.html needs none of this,
    because `site` is a Jinja global rather than context. #}
 {% import "_cards.html" as cards with context %}
+{% import "_masthead.html" as head %}
 {% block content %}
-    <header class="masthead">
-        <span class="eyebrow mono-label">Index</span>
-        <h1 class="masthead-title">Topics</h1>
-        <p class="masthead-tagline">Everything written here, grouped by what it's about.</p>
-    </header>
+    {{ head.masthead('Index', 'Topics', "Everything written here, grouped by what it's about.", title_class='page-title') }}
     {% if tags %}
         <div class="topic-list" data-feed-list>
             {% for name, count in tags %}{{ cards.topic_row(name, count) }}{% endfor %}

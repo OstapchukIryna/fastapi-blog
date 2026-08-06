@@ -25,7 +25,7 @@ put a check that something cheaper could make. The split:
 
 | Question | Answered by |
 |---|---|
-| Does the API keep its promises? | `postman/`, 289 assertions |
+| Does the API keep its promises? | `postman/`, 375 assertions |
 | Do the pure JS functions parse what they are given? | not yet written |
 | Do the routes render? | not yet written |
 | Does the page do the right thing with a real answer? | here |

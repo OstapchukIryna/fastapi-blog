@@ -241,6 +241,7 @@ erDiagram
         string summary "250"
         text content "markdown"
         bool is_pinned "at most one true, enforced in set_pinned"
+        int likes "default 0 — column only, not in schemas or the API yet"
         int user_id FK "cascade on delete"
         datetime date_posted "indexed, newest first"
     }
@@ -307,7 +308,7 @@ marked `data-author-only`.
 
 | Layer | Tool | Count | What it can see |
 |---|---|---|---|
-| API contract | Postman / Newman | 81 requests, 325 assertions | Every documented path, every refusal, ownership |
+| API contract | Postman / Newman | 101 requests, 375 assertions | Every documented path, every refusal, ownership |
 | Live pages | Playwright | 3 journeys | What the scripts do with real answers |
 | Pure JS functions | — | none yet | `currentUserId` parsing, error wording |
 | Routes and templates | — | none yet | That a page renders at all |
@@ -323,5 +324,6 @@ contract, and the browser tests because a dialog that leaves the page
 scroll-locked cannot be seen from anywhere else. `node --test` needs no
 dependency at all for the first of them.
 
-Nothing runs automatically: there is no CI workflow in the repository. Both
-commands are things to run by hand before pushing.
+Both run in CI on every pull request (`.github/workflows/ci.yml`), alongside
+ruff, djlint, pyrefly, a strict docs build and an Alembic-drift check. Running
+them locally first is faster than waiting for the answer.

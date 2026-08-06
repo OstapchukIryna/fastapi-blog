@@ -1,11 +1,8 @@
 {% extends "layout.html" %}
 {% import "_contact.html" as contact %}
+{% import "_masthead.html" as head %}
 {% block content %}
-    <header class="masthead">
-        <span class="eyebrow mono-label">About</span>
-        <h1 class="masthead-title">{{ site.handle }}</h1>
-        <p class="masthead-tagline">{{ site.name }} — backend in Python, written down while I'm still learning it.</p>
-    </header>
+    {{ head.masthead("About", site.handle, site.name ~ " — backend in Python, written down while I'm still learning it.", title_class="page-title") }}
     <div class="about-intro">
         <img class="avatar"
              src="{{ url_for('static', path='profile_pics/avatar-256.jpg') }}"
@@ -36,31 +33,99 @@
         <dd>
             FastAPI, SQLAlchemy, Pydantic
         </dd>
-        <dt>Data</dt>
-        <dd>
-            MySQL, pandas, NumPy
-        </dd>
         <dt>Tooling</dt>
         <dd>
             uv, ruff, pyrefly, pytest, Docker
         </dd>
         <dt>This site</dt>
         <dd>
-            FastAPI, SQLAlchemy, Asyncronous funcs —
+            FastAPI, SQLAlchemy, asynchronous end to end —
             <a href="{{ site.repo }}" target="_blank" rel="noopener noreferrer">{{ site.repo_label }}</a>
         </dd>
     </dl>
-    <section class="contact-block">
-        <span class="eyebrow mono-label">Get in touch</span>
-        <p class="contact-lead">
-            Working on the same stack, spotted a mistake in a post, or just want
-            to compare notes? Write to me — that's what this is for.
-        </p>
-        <div class="contact-actions">
-            {{ contact.write_button() }}
-            {{ contact.channels() }}
+    <h2 class="section-rule mono-label">FAQ</h2>
+    <div class="faq-list">
+        <div class="faq-item">
+            <h3 class="faq-question">
+                <button class="faq-trigger"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#faq-1"
+                        aria-expanded="false"
+                        aria-controls="faq-1">
+                    <span>What database does this run on?</span>
+                    <span class="faq-icon mono-label" aria-hidden="true"></span>
+                </button>
+            </h3>
+            <div class="collapse" id="faq-1">
+                <p class="faq-answer">
+                    PostgreSQL, through SQLAlchemy's async engine and Alembic migrations — the
+                    schema is in the repository, not a claim.
+                </p>
+            </div>
         </div>
-    </section>
+        <div class="faq-item">
+            <h3 class="faq-question">
+                <button class="faq-trigger"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#faq-2"
+                        aria-expanded="false"
+                        aria-controls="faq-2">
+                    <span>Can I reuse the code?</span>
+                    <span class="faq-icon mono-label" aria-hidden="true"></span>
+                </button>
+            </h3>
+            <div class="collapse" id="faq-2">
+                <p class="faq-answer">
+                    It's public on
+                    <a href="{{ site.repo }}" target="_blank" rel="noopener noreferrer">{{ site.repo_label }}</a>
+                    to read, but there's no license attached yet, so it isn't open for reuse by
+                    default. Ask first.
+                </p>
+            </div>
+        </div>
+        <div class="faq-item">
+            <h3 class="faq-question">
+                <button class="faq-trigger"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#faq-3"
+                        aria-expanded="false"
+                        aria-controls="faq-3">
+                    <span>What's not built yet?</span>
+                    <span class="faq-icon mono-label" aria-hidden="true"></span>
+                </button>
+            </h3>
+            <div class="collapse" id="faq-3">
+                <p class="faq-answer">
+                    No RSS feed and no comment system. The read-only JSON API
+                    (<code>/api/v1/posts</code>) is the closest thing to a feed; if something's
+                    wrong or worth discussing, write to me directly — see below.
+                </p>
+            </div>
+        </div>
+        <div class="faq-item">
+            <h3 class="faq-question">
+                <button class="faq-trigger"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#faq-4"
+                        aria-expanded="false"
+                        aria-controls="faq-4">
+                    <span>Why does this look like a code editor?</span>
+                    <span class="faq-icon mono-label" aria-hidden="true"></span>
+                </button>
+            </h3>
+            <div class="collapse" id="faq-4">
+                <p class="faq-answer">
+                    On purpose — a Monokai-style palette, one accent color, the ground a syntax
+                    theme uses, laid out for reading long prose instead of scanning code.
+                </p>
+            </div>
+        </div>
+    </div>
+    {{ contact.cta_panel('Get in touch', "Working on the same stack, spotted a mistake in a post, or just want to compare notes? Write to me — that's what this is for.") }}
     <p class="mt-5">
         <a class="back-link mono-label" href="/">
             <span class="arrow">&larr;</span> All posts

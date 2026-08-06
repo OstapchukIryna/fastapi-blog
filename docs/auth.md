@@ -25,7 +25,7 @@ sequenceDiagram
     autonumber
     participant B as Browser
     participant API as POST /api/v1/users/token
-    participant DB as SQLite
+    participant DB as PostgreSQL
     participant JWT as create_access_token
 
     B->>API: username=<email>&password=… (form-urlencoded)
