@@ -73,6 +73,9 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
+    # Needs to be taken from the environment
+    DATABASE_URL: str
+
     secret_key: SecretStr
     algorithm: str = "HS256"
     accesse_token_expire_minutes: int = 30

@@ -56,26 +56,13 @@ class PasswordResetToken(Base):
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
 
-    # * Imported for typing only. User names this class in its own
-    # * relationship, so importing it back at runtime would be a cycle —
-    # * and was: the application stopped starting with an ImportError
-    # * naming a partially initialised module.
     user: Mapped[User] = relationship(back_populates="reset_tokens")
 
     @property
     def expired(self) -> bool:
         """Whether this token is past its expiry.
 
-        SQLite has no timezone-aware column type, so a datetime read back
-        from it arrives naive even though a timezone-aware one went in.
-        Comparing that to an aware "now" raises rather than answering, so
-        the stored value is labelled UTC on the way out — which is what
-        it always was.
-
         Returns:
             bool: True when the token should no longer be accepted.
         """
-        expires_at = self.expires_at
-        if expires_at.tzinfo is None:
-            expires_at = expires_at.replace(tzinfo=UTC)
-        return expires_at < datetime.now(UTC)
+        return self.expires_at < datetime.now(UTC)

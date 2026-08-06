@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from blog.core.config import MEDIA_DIR, STATIC_DIR
 from blog.infrastructure import models  # noqa: F401
-from blog.infrastructure.database import Base, engine
+from blog.infrastructure.database import engine
 from blog.presentation.api import API_PREFIX, posts, tags, users
 from blog.presentation.errors import register_error_handlers
 from blog.presentation.static import RevalidatedStaticFiles
@@ -40,11 +40,7 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
     Yields:
         None: control, for as long as the application is serving.
 
-    # TODO: replace with Alembic once migrations are on the roadmap.
     """
-    async with engine.begin() as connection:
-        await connection.run_sync(Base.metadata.create_all)
-
     yield
 
     await engine.dispose()
