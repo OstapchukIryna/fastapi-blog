@@ -121,7 +121,7 @@ def issue_token(user: models.User) -> Token:
             # * The subject is a string because JWT says so; turning it
             # * back into an int is get_current_user's problem.
             data={"sub": str(user.id)},
-            expires_delta=timedelta(minutes=settings.accesse_token_expire_minutes),
+            expires_delta=timedelta(minutes=settings.access_token_expire_minutes),
         ),
         token_type="bearer",
     )

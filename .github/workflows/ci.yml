@@ -65,6 +65,31 @@ jobs:
   tests:
     name: Tests
     runs-on: ubuntu-latest
+
+    # The tests run on PostgreSQL because the application does. They used
+    # to run on SQLite, which meant anything the two engines disagree
+    # about was untested by construction — timezone handling on a
+    # timestamp being the one that had already bitten.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: blog
+        ports:
+          - 5432:5432
+        # Without this the steps start racing the container: postgres
+        # accepts TCP before it accepts queries.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/blog
+
     steps:
       - uses: actions/checkout@v4
 
@@ -74,6 +99,23 @@ jobs:
 
       - name: Install
         run: uv sync --locked
+
+      # The fixtures derive their database from DATABASE_URL by adding
+      # `_test`, so that one has to exist too. Separate rather than
+      # shared: every session drops its schema, and the migration check
+      # below needs a database nothing is dropping underneath it.
+      - name: Create the test database
+        run: psql "postgresql://postgres:postgres@localhost:5432/postgres" -c 'CREATE DATABASE blog_test'
+
+      # The gate that catches the failure this whole change is about: a
+      # migration that has drifted from the models. `check` autogenerates
+      # against the migrated database and fails if the diff is not empty,
+      # so a model edited without a migration stops here instead of on a
+      # deploy. Cheap — it is one connection and no data.
+      - name: Migrations match the models
+        run: |
+          uv run alembic upgrade head
+          uv run alembic check
 
       # Only chromium: the browser tests check the pages' logic, not how
       # engines differ. --with-deps brings the system libraries a headless
@@ -98,6 +140,28 @@ jobs:
   api:
     name: API contract
     runs-on: ubuntu-latest
+
+    # Same engine as the tests job, and for the same reason: the
+    # collection writes through the real API, so it should write into the
+    # database the API actually runs on.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: blog
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/blog
+
     steps:
       - uses: actions/checkout@v4
 
@@ -113,6 +177,11 @@ jobs:
 
       - name: Install
         run: uv sync --locked
+
+      # api-tests.sh derives `blog_test` from DATABASE_URL the same way
+      # the pytest fixtures do, then drops and rebuilds its schema.
+      - name: Create the test database
+        run: psql "postgresql://postgres:postgres@localhost:5432/postgres" -c 'CREATE DATABASE blog_test'
 
       - name: Run the collection
         run: ./scripts/api-tests.sh
