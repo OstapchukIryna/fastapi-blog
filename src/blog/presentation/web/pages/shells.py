@@ -116,5 +116,5 @@ async def reset_password_page(request: Request) -> Response:
         request, "reset_password.html", {"title": "Reset password"}
     )
     # Security measure
-    response.headers["Refferer-Policy"] = "no-refferer"
+    response.headers["Referrer-Policy"] = "no-referrer"
     return response
