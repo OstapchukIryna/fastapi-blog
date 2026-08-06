@@ -5,16 +5,11 @@
    would fail with KeyError: 'request'. _contact.html needs none of this,
    because `site` is a Jinja global rather than context. #}
 {% import "_cards.html" as cards with context %}
+{% import "_masthead.html" as head %}
 {% block content %}
     {% if filter_tag %}
-        <header class="masthead">
-            <span class="eyebrow mono-label">Tagged</span>
-            <h1 class="masthead-title">#{{ filter_tag }}</h1>
-            <p class="masthead-tagline">
-                {# feed.total, not the length of the batch: ten are on the page, forty may exist. #}
-                {{ feed.total }} post{{ '' if feed.total == 1 else 's' }}.
-            </p>
-        </header>
+        {# feed.total, not the length of the batch: ten are on the page, forty may exist. #}
+        {{ head.masthead("Tagged", "#" ~ filter_tag, feed.total ~ " post" ~ ('' if feed.total == 1 else 's') ~ ".", title_class="page-title") }}
     {% else %}
         <header class="hero">
             <div class="hero-identity">
@@ -111,6 +106,12 @@
                 {{ contact.channels() }}
             </div>
         </section>
+    {% else %}
+        {# The untagged front page ends on the Now panel, which carries its
+           own write_button()/channels(). A tag view has no equivalent —
+           without this, the only way to reach a contact link here was the
+           footer's bare channels() row. #}
+        {{ contact.cta_panel('Get in touch', 'Spotted a mistake in one of these, or working on the same thing? Write to me.') }}
     {% endif %}
 {% endblock content %}
 {% block scripts %}

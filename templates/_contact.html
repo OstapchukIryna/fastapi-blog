@@ -10,6 +10,16 @@
         <span class="cta-missing mono-label">Contact channels are not configured yet</span>
     {% endif %}
 {% endmacro %}
+{% macro cta_panel(eyebrow, lead) %}
+    <section class="contact-block">
+        <span class="eyebrow mono-label">{{ eyebrow }}</span>
+        <p class="contact-lead">{{ lead }}</p>
+        <div class="contact-actions">
+            {{ write_button() }}
+            {{ channels() }}
+        </div>
+    </section>
+{% endmacro %}
 {% macro channels() %}
     {% set primary = "email" if site.email else ("telegram" if site.telegram else none) %}
     {% if (site.telegram and primary != "telegram") or (site.email and primary != "email") or site.github %}

@@ -1,11 +1,8 @@
 {% extends "layout.html" %}
+{% import "_masthead.html" as head %}
 {% block content %}
     <div class="auth-page">
-        <header class="masthead">
-            <span class="eyebrow mono-label">Account</span>
-            <h1 class="masthead-title auth-title">Sign in</h1>
-            <p class="masthead-tagline">For writing and editing. Reading needs no account.</p>
-        </header>
+        {{ head.masthead("Account", "Sign in", "For writing and editing. Reading needs no account.", title_class="auth-title") }}
         <noscript>
             <div class="form-summary" role="alert">
                 <span class="mono-label">Needs JavaScript</span>

@@ -285,6 +285,15 @@ h4 {
     margin-bottom: 1.25rem;
 }
 
+/* Every masthead except the untagged front page: same rhythm, one size
+   down. --display-hero is the front page's gesture — About, Topics and
+   a tag view have less to say with their title than the front page does
+   with its name, so they don't get to shout as loud. */
+.page-title {
+    font-size: var(--display-page);
+    letter-spacing: -0.035em;
+}
+
 .masthead-tagline {
     font-size: var(--text-md);
     color: var(--bs-secondary-color);
@@ -742,6 +751,11 @@ h4 {
 
 /* --- Разделитель секции ------------------------------------- */
 
+/* .mono-label already wins the tag/weight/tracking fight against the
+   h1-h4 rule above (class beats tag), but not line-height — this used
+   to be a <p> everywhere; About now uses <h2> here so a screen reader
+   gets a "FAQ" landmark, and without this line the label would pick up
+   the heading rule's tighter 1.2 instead of the body's 1.7. */
 .section-rule {
     display: flex;
     align-items: center;
@@ -749,6 +763,7 @@ h4 {
     margin-bottom: 0.5rem;
     color: var(--bs-secondary-color);
     letter-spacing: 0.14em;
+    line-height: var(--bs-body-line-height);
 }
 
 .section-rule::after {
@@ -1643,6 +1658,67 @@ h4 {
     text-transform: none;
     letter-spacing: 0;
     color: var(--bs-body-color);
+}
+
+/* FAQ: строки, разделённые линейкой, а не карточки — тот же приём,
+   что в архиве и spec-list. Bootstrap даёт только механику collapse;
+   вид полностью свой. Открытое/закрытое состояние называется словом
+   в акценте (Show/Hide), а не цветной рамкой — как .pin-label выше. */
+.faq-list {
+    margin: 3rem 0 2rem;
+}
+
+.faq-item {
+    border-top: 1px solid var(--bs-border-color);
+}
+
+.faq-item:last-child {
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.faq-question {
+    margin: 0;
+    font-size: inherit;
+}
+
+.faq-trigger {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+    padding: 1.1rem 0;
+    background: none;
+    border: 0;
+    color: var(--bs-body-color);
+    font-family: var(--font-display);
+    font-size: var(--text-base);
+    text-align: left;
+    cursor: pointer;
+}
+
+.faq-icon {
+    flex-shrink: 0;
+    color: var(--bs-secondary-color);
+}
+
+.faq-icon::before {
+    content: "Show";
+}
+
+.faq-trigger[aria-expanded="true"] .faq-icon {
+    color: var(--accent);
+}
+
+.faq-trigger[aria-expanded="true"] .faq-icon::before {
+    content: "Hide";
+}
+
+.faq-answer {
+    max-width: 58ch;
+    margin: 0 0 1.4rem;
+    color: var(--bs-secondary-color);
+    font-size: var(--text-sm);
 }
 
 @media (max-width: 575.98px) {

@@ -1,11 +1,8 @@
 {% extends "layout.html" %}
+{% import "_masthead.html" as head %}
 {% block content %}
     <div class="auth-page">
-        <header class="masthead">
-            <span class="eyebrow mono-label">Account</span>
-            <h1 class="masthead-title auth-title">Create an account</h1>
-            <p class="masthead-tagline">Reading needs no account. This one is for writing.</p>
-        </header>
+        {{ head.masthead("Account", "Create an account", "Reading needs no account. This one is for writing.", title_class="auth-title") }}
         {# Like the profile, this form exists only against the API: there is
            no server-side POST, so the uniqueness checks and the password
            hashing are not kept in a second copy. Without the script it does

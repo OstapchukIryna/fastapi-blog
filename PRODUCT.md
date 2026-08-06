@@ -65,27 +65,38 @@ Built and working:
   split HTML and JSON responses by path.
 - Full post management: create, edit, pin/unpin, delete, as server-rendered
   forms sharing the API's validation schema.
-- Read JSON API for posts, tags and users; post and user creation.
+- JWT authentication: sign in, sign up, current-user resolution, and password
+  reset by emailed token.
+- Profile pictures: upload, replace and remove, validated before decoding.
+- Read JSON API for posts, tags and users; post and user creation; pagination
+  on every list.
+- Alembic migrations, checked against model drift in CI.
+- A pytest suite (three browser journeys, plus import-graph and layering
+  checks) and a Postman API-contract suite (101 requests, 375 assertions),
+  both run in CI.
 - Light and dark themes, dark by default.
-- CI on GitHub Actions running ruff, ruff format and pyrefly.
+- CI on GitHub Actions: ruff, ruff format, djlint, pyrefly and a strict docs
+  build; pytest against a real PostgreSQL database; the Postman collection as
+  an API contract test; Alembic migrations checked against model drift.
 
-Planned, in the course's order: JWT authentication, file uploads, pagination,
-Alembic migrations, pytest. Also intended by the author: async work, Docker
-deployment, and likes.
+Every item the course originally ordered — JWT authentication, file uploads,
+pagination, Alembic migrations, pytest — is built. In progress: a `likes`
+column exists on the post model (migration `e0cb386df82a`) but has no schema
+field or endpoint yet. Also intended by the author: Docker deployment. The
+application's I/O paths (routes, services, mail) are already async throughout.
 
 Technical constraints, binding:
 
-- Server-rendered templates, SQLite, no build step, no frontend framework, and
-  as few dependencies as possible, until something measured says otherwise.
-  Every dependency added early is one that has to be kept alive.
+- Server-rendered templates, PostgreSQL, no build step, no frontend framework,
+  and as few dependencies as possible, until something measured says
+  otherwise. Every dependency added early is one that has to be kept alive.
 - Python 3.14, uv, ruff, pyrefly.
 
 Undecided product facts:
 
-- The project description names MySQL, but the app runs on SQLite and no move
-  has been made. Treated as deliberate for now, not as a defect.
-- There is no authentication yet, so author-only controls are shown to everyone;
-  this is a known temporary state that JWT will resolve.
+- The project description names MySQL, but the app runs on PostgreSQL and no
+  move has been made to match the description. Treated as deliberate for now,
+  not as a defect.
 
 ## Brand Commitments
 

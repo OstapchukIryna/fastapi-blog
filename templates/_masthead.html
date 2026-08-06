@@ -1,0 +1,7 @@
+{% macro masthead(eyebrow, title, tagline, title_class=none) %}
+    <header class="masthead">
+        <span class="eyebrow mono-label">{{ eyebrow }}</span>
+        <h1 class="masthead-title{% if title_class %} {{ title_class }}{% endif %}">{{ title }}</h1>
+        <p class="masthead-tagline">{{ tagline }}</p>
+    </header>
+{% endmacro %}
