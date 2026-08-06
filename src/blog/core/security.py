@@ -104,7 +104,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
         expire = datetime.now(UTC) + expires_delta
     else:
         expire = datetime.now(UTC) + timedelta(
-            minutes=settings.accesse_token_expire_minutes
+            minutes=settings.access_token_expire_minutes
         )
 
     to_encode.update({"exp": expire})

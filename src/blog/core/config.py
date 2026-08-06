@@ -49,7 +49,7 @@ class Settings(BaseSettings):
             knows. SecretStr rather than str so it cannot be printed by
             accident in a traceback or a log line.
         algorithm (str): JWT signing algorithm.
-        accesse_token_expire_minutes (int): how long an issued token
+        access_token_expire_minutes (int): how long an issued token
             stays valid.
         max_upload_size_bytes (int): ceiling for an uploaded profile
             picture, checked before the image is decoded.
@@ -74,11 +74,11 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     # Needs to be taken from the environment
-    DATABASE_URL: str
+    database_url: str
 
     secret_key: SecretStr
     algorithm: str = "HS256"
-    accesse_token_expire_minutes: int = 30
+    access_token_expire_minutes: int = 30
 
     max_upload_size_bytes: int = 5 * 1024 * 1024
     posts_per_page: int = 10
