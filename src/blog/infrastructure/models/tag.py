@@ -2,7 +2,7 @@
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Column, ForeignKey, String, Table
+from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from blog.infrastructure.database import Base
@@ -10,16 +10,27 @@ from blog.infrastructure.database import Base
 if TYPE_CHECKING:
     from blog.infrastructure.models.post import Post
 
-# A plain table rather than a model: the association carries no data of
-# its own, and nothing in the application ever needs to hold a row of it.
-# Both sides cascade, so deleting a post or a tag removes the links
-# without leaving rows pointing at nothing.
-post_tags = Table(
-    "post_tags",
-    Base.metadata,
-    Column("post_id", ForeignKey("posts.id", ondelete="CASCADE"), primary_key=True),
-    Column("tag_id", ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True),
-)
+# Association table for the many-to-many relationship between posts and tags
+# Also can make it a model class if you want to add extra fields
+
+
+class PostTag(Base):
+    """Association table for the many-to-many relationship between posts and tags.
+
+    Attributes:
+        post_id (int): Foreign key to the posts table.
+        tag_id (int): Foreign key to the tags table.
+    """
+
+    __tablename__ = "post_tags"
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    post_id: Mapped[int] = mapped_column(
+        ForeignKey("posts.id", ondelete="CASCADE"), primary_key=True
+    )
+    tag_id: Mapped[int] = mapped_column(
+        ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True
+    )
 
 
 class Tag(Base):
@@ -48,11 +59,6 @@ class Tag(Base):
         String(30), unique=True, nullable=False, index=True
     )
 
-    # * Post is imported for typing only: it imports this module for
-    # * post_tags, so importing it back would be a cycle. The name is not
-    # * defined at runtime and that is fine — since Python 3.14
-    # * annotations are not evaluated when the class body runs (PEP 649),
-    # * and SQLAlchemy resolves the name through its own registry.
-    # * Verified with a standalone probe: no quotes, no runtime import,
-    # * configure_mappers() passes.
-    posts: Mapped[list[Post]] = relationship(secondary=post_tags, back_populates="tags")
+    posts: Mapped[list[Post]] = relationship(
+        secondary="post_tags", back_populates="tags"
+    )

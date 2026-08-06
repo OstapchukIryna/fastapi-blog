@@ -7,7 +7,7 @@ from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from blog.infrastructure.database import Base
-from blog.infrastructure.models.tag import Tag, post_tags
+from blog.infrastructure.models.tag import Tag
 from blog.infrastructure.models.user import User
 
 WORDS_PER_MINUTE = 200
@@ -66,7 +66,9 @@ class Post(Base):
     likes: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     author: Mapped[User] = relationship(back_populates="posts")
-    tags: Mapped[list[Tag]] = relationship(secondary=post_tags, back_populates="posts")
+    tags: Mapped[list[Tag]] = relationship(
+        secondary="post_tags", back_populates="posts"
+    )
 
     @property
     def outline(self) -> list[str]:
