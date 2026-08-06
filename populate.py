@@ -38,7 +38,7 @@ from PIL import Image, ImageDraw, ImageFont
 from sqlalchemy import delete, select, update
 
 from blog.infrastructure import models
-from blog.infrastructure.database import AsyncSessionLocal, Base, engine
+from blog.infrastructure.database import AsyncSessionLocal, engine
 from blog.infrastructure.images import PROFILE_PICS_DIR
 from blog.main import app
 
@@ -1052,9 +1052,9 @@ async def main() -> None:
         print("to confirm: uv run python populate.py --yes")
         return
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
+    # ! No create_all: `alembic upgrade head` owns the schema now, and a
+    # ! second builder of it is how a drifted migration stays invisible.
+    # ! This script still empties the tables, which is its own job.
     await clear_everything()
     print("cleared")
 

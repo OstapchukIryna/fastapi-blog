@@ -15,7 +15,7 @@ from sqlalchemy.orm import DeclarativeBase
 
 from blog.core.config import settings
 
-engine = create_async_engine(settings.DATABASE_URL)
+engine = create_async_engine(settings.database_url)
 
 AsyncSessionLocal = async_sessionmaker(
     engine,
