@@ -47,8 +47,6 @@ class User(Base):
 
     posts: Mapped[list[Post]] = relationship(
         back_populates="author",
-        # delete-orphan as well as delete: detaching a post from its
-        # author would otherwise leave a row with a dangling user_id.
         cascade="all, delete-orphan",
     )
 
