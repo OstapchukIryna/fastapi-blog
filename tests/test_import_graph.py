@@ -301,10 +301,15 @@ def test_the_application_imports(monkeypatch):
 
     Args:
         monkeypatch: pytest's environment patcher; the settings refuse to
-            load without a secret, and the database must not be a file.
+            load without a secret, and DATABASE_URL has no default.
     """
     monkeypatch.setenv("SECRET_KEY", "import-graph-test-secret-long-enough-32")
-    monkeypatch.setenv("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+    # Never connected to — create_async_engine only parses the URL — but it
+    # has to name a driver that is installed, and it must not be the real
+    # database in case anything here ever does open a connection.
+    monkeypatch.setenv(
+        "DATABASE_URL", "postgresql+psycopg://import:graph@127.0.0.1:1/none"
+    )
 
     from blog.main import app
 

@@ -3,10 +3,26 @@ Fixtures for the browser tests.
 
 The application is started as a real process against a throwaway
 database, because Playwright drives a real browser and a browser needs
-an address. Nothing here touches blog.db.
+an address.
+
+The database is PostgreSQL, the same engine the application runs on.
+It used to be SQLite, and that was a quiet lie: the tests passed against
+an engine nobody deploys, so anything the two disagree about — timezone
+handling on a timestamp, what a unique index does with case — was
+untested by construction. The token expiry check is the example that
+already exists: `PasswordResetToken.expired` compares an aware datetime,
+which works on Postgres and raises TypeError on SQLite.
+
+! The schema comes from `alembic upgrade head`, not from
+! `Base.metadata.create_all`. That is the whole point of the change.
+! create_all builds the schema a second way, so a migration that has
+! drifted from the models still gives green tests and fails on deploy.
+! Here the tests run the same migrations production runs, from an empty
+! database, every session.
 """
 
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -26,6 +42,66 @@ SECRET_KEY = "browser-tests-only-secret-at-least-32-bytes-long"
 
 PASSWORD = "correct-horse-battery"
 
+# Run in a child process rather than here, so the test session never opens
+# a connection of its own to the database it is about to drop the schema
+# of — an open session would make DROP SCHEMA wait on its own lock.
+RESET_SCHEMA = """
+import os
+import psycopg
+
+url = os.environ["DATABASE_URL"].replace("postgresql+psycopg://", "postgresql://")
+with psycopg.connect(url, autocommit=True) as connection:
+    connection.execute("DROP SCHEMA public CASCADE")
+    connection.execute("CREATE SCHEMA public")
+"""
+
+
+def throwaway_database_url() -> str:
+    """Work out which database the tests may destroy.
+
+    Not named `test_…`: pytest does not collect from conftest, so nothing
+    would have broken, but the prefix reads as "this is a test case" to
+    every human who meets it.
+
+    Derived from the application's own DATABASE_URL by suffixing the
+    database name, rather than configured separately: one connection
+    string to keep right, and the test database always lives beside the
+    development one on the same host and credentials. TEST_DATABASE_URL
+    overrides it when the two cannot be neighbours — a managed instance,
+    say.
+
+    ! Read through `settings`, not `os.getenv`. The application takes
+    ! DATABASE_URL from .env via pydantic-settings, and .env is not in the
+    ! process environment — reading the environment directly found
+    ! nothing locally while the application ran perfectly, which is a
+    ! confusing way to discover that the tests and the code they test
+    ! disagreed about where configuration lives.
+
+    Returns:
+        str: the connection string for the test database.
+
+    Raises:
+        RuntimeError: when the result would be the development database.
+            Every session drops the schema, so this guard is the
+            difference between a test run and losing your posts.
+    """
+    from blog.core.config import settings
+
+    development = settings.database_url
+    override = os.getenv("TEST_DATABASE_URL")
+    url = override or re.sub(r"/([^/?]+)(\?|$)", r"/\1_test\2", development)
+
+    if url == development:
+        raise RuntimeError(
+            f"The test database must not be the development one: {url}. "
+            "Every session drops its schema."
+        )
+    if not url.startswith("postgresql"):
+        raise RuntimeError(
+            f"The tests need PostgreSQL, the engine the application runs on. Got: {url}"
+        )
+    return url
+
 
 def free_port() -> int:
     """
@@ -40,19 +116,50 @@ def free_port() -> int:
         return sock.getsockname()[1]
 
 
+def run(command: list[str], env: dict[str, str], what: str) -> None:
+    """Run a setup step, and fail loudly with its output if it did not work.
+
+    `check=True` alone raises a CalledProcessError that prints the exit
+    code and nothing else, which for a failed migration is the least
+    useful half of what happened.
+
+    Args:
+        command (list[str]): argv to run from the repository root.
+        env (dict[str, str]): environment for the child process.
+        what (str): what the step was doing, for the error message.
+
+    Raises:
+        RuntimeError: the step exited non-zero, with its output attached.
+    """
+    done = subprocess.run(
+        command, cwd=ROOT, env=env, capture_output=True, text=True, check=False
+    )
+    if done.returncode != 0:
+        raise RuntimeError(f"{what} failed:\n{done.stdout}\n{done.stderr}")
+
+
 @pytest.fixture(scope="session")
-def live_server(tmp_path_factory) -> Iterator[str]:
-    """Seed a temporary database, serve it, and hand back the address."""
-    work = tmp_path_factory.mktemp("browser")
+def live_server() -> Iterator[str]:
+    """Migrate a throwaway database, seed it, serve it, hand back the address."""
     env = {
         **os.environ,
         "SECRET_KEY": SECRET_KEY,
-        "DATABASE_URL": f"sqlite+aiosqlite:///{work / 'test.db'}",
+        "DATABASE_URL": throwaway_database_url(),
     }
 
-    subprocess.run(
-        [sys.executable, "seed.py"], cwd=ROOT, env=env, check=True, capture_output=True
-    )
+    # * Dropped and recreated rather than emptied. `alembic downgrade base`
+    # * would be the tidier-looking reset, but it only works when the
+    # * database is already under Alembic's control — a database left over
+    # * from the create_all days has tables and no alembic_version, and
+    # * downgrade would no-op and then upgrade would fail on tables that
+    # * already exist. Dropping the schema makes the starting state the
+    # * same every time regardless of what was there before.
+    #
+    # ! Scoped to the test database by throwaway_database_url(), which refuses
+    # ! to return the development one.
+    run([sys.executable, "-c", RESET_SCHEMA], env, "resetting the test schema")
+    run([sys.executable, "-m", "alembic", "upgrade", "head"], env, "alembic upgrade")
+    run([sys.executable, "seed.py"], env, "seeding")
 
     port = free_port()
     base_url = f"http://127.0.0.1:{port}"

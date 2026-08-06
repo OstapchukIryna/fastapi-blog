@@ -2,10 +2,14 @@
 #
 # Runs the Postman collection against a throwaway copy of the app.
 #
-# blog.db is committed, so the run gets its own database in a temp
-# directory: an automated pass over a write API must not leave a diff in
-# the working tree. The database is seeded first, because several
-# requests lean on the seeded author existing.
+# The run gets its own PostgreSQL database — the development one with
+# `_test` on the end, the same one the browser tests use — because an
+# automated pass over a write API must not touch the posts you are
+# writing. Its schema is dropped and rebuilt by `alembic upgrade head`,
+# then seeded, because several requests lean on the seeded author.
+#
+# Needs DATABASE_URL set (a `_test` neighbour of it must exist), or
+# TEST_DATABASE_URL to name the throwaway database outright.
 #
 #   ./scripts/api-tests.sh              # start a server, run, tear down
 #   ./scripts/api-tests.sh --url URL    # run against something already up
@@ -47,10 +51,29 @@ trap cleanup EXIT
 
 if [[ -z "$BASE_URL" ]]; then
     WORK_DIR="$(mktemp -d)"
-    export DATABASE_URL="sqlite+aiosqlite:///${WORK_DIR}/api-tests.db"
     BASE_URL="http://127.0.0.1:${PORT}"
 
-    echo "==> seeding ${WORK_DIR}/api-tests.db"
+    # The same rule the pytest fixtures use, kept in one place: derive the
+    # throwaway database from DATABASE_URL, and refuse to run if the two
+    # turn out to be the same, because the next line drops the schema.
+    export DATABASE_URL="$(uv run python -c '
+import sys
+sys.path.insert(0, "tests")
+from conftest import throwaway_database_url
+print(throwaway_database_url())
+')"
+    echo "==> resetting $(echo "$DATABASE_URL" | sed 's/:[^:@]*@/:***@/')"
+    uv run python -c '
+import os, psycopg
+url = os.environ["DATABASE_URL"].replace("postgresql+psycopg://", "postgresql://")
+conn = psycopg.connect(url, autocommit=True)
+conn.execute("DROP SCHEMA public CASCADE")
+conn.execute("CREATE SCHEMA public")
+'
+    echo "==> migrating"
+    uv run alembic upgrade head >/dev/null
+
+    echo "==> seeding"
     uv run python seed.py >/dev/null
 
     echo "==> starting the app on ${BASE_URL}"

@@ -1,17 +1,18 @@
 """Seed the database with the real posts this blog started from.
 
-    uv run python seed.py
-    uv run python seed.py --reset    # drop the tables and rebuild them
+    uv run alembic upgrade head    # the schema
+    uv run python seed.py          # the content
 
 Idempotent: running it twice adds nothing the second time, which is what
 lets the test harness call it before every run without thinking about it.
+
+The schema is not this script's business any more — see main() below.
 
 Five real posts is enough for the tests and not enough to see pagination.
 Volume is populate.py's job, and that script is destructive.
 """
 
 import asyncio
-import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import NotRequired, TypedDict
@@ -21,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from blog.core.security import hash_password
 from blog.infrastructure import models
-from blog.infrastructure.database import AsyncSessionLocal, Base, engine
+from blog.infrastructure.database import AsyncSessionLocal, engine
 from blog.services import tags as tag_service
 
 CONTENT_DIR = Path(__file__).parent / "content"
@@ -198,13 +199,18 @@ async def seed() -> None:
 
 
 async def main() -> None:
-    """Create the tables, optionally dropping them first, then seed."""
-    async with engine.begin() as conn:
-        if "--reset" in sys.argv:
-            await conn.run_sync(Base.metadata.drop_all)
-            print("tables dropped")
-        await conn.run_sync(Base.metadata.create_all)
+    """Put the demo content into a database that already has its schema.
 
+    ! No create_all any more, and no --reset. The schema has exactly one
+    ! owner now, and it is `alembic upgrade head`. Building it here as
+    ! well would mean a migration could drift from the models while
+    ! seeding and the tests carried on working — which is the failure the
+    ! move to Postgres was meant to close, not to relocate.
+
+    Run migrations first:
+
+        uv run alembic upgrade head && uv run python seed.py
+    """
     await seed()
     await engine.dispose()
 
