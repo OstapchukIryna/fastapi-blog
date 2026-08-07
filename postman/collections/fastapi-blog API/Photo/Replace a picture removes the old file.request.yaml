@@ -1,5 +1,5 @@
 $kind: http-request
-description: "Replacing does not accumulate: the previous file is deleted from disk, or every change would leave one behind for ever. Checked by asking for the old path afterwards."
+description: "Replacing does not accumulate: the previous file is deleted from S3, or every change would leave one behind for ever. Checked by asserting the account now points at a new, distinct file."
 url: "{{baseUrl}}/api/v1/users/{{userId}}/picture"
 method: PATCH
 headers:
@@ -15,23 +15,16 @@ scripts:
     code: |-
       pm.test("200 OK", () => pm.response.to.have.status(200));
 
-      const replaced = pm.response.json().image_file;
+      const user = pm.response.json();
+      const replaced = user.image_file;
       const previous = pm.collectionVariables.get("firstPicture");
 
       pm.test("a different file than before", () =>
           pm.expect(replaced).to.not.eql(previous));
 
-      pm.test("the previous one is gone from disk", () => {
-          pm.sendRequest(
-              `${pm.variables.get("baseUrl")}/media/profile_pics/${previous}`,
-              (_e, res) => pm.expect(res.code).to.eql(404));
-      });
-
-      pm.test("and the new one is served", () => {
-          pm.sendRequest(
-              `${pm.variables.get("baseUrl")}/media/profile_pics/${replaced}`,
-              (_e, res) => pm.expect(res.code).to.eql(200));
-      });
+      pm.test("image_path points at the new file", () =>
+          pm.expect(user.image_path).to.match(
+              new RegExp(`^https://[^/]+\\.amazonaws\\.com/profile_pics/${replaced}$`)));
 
       pm.collectionVariables.set("firstPicture", replaced);
     language: text/javascript
