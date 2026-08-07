@@ -1,6 +1,6 @@
 $kind: http-request
 description: "The same rule on the other router: users.check_current_user. Its message differs from the posts one, which is worth pinning — the two are separate functions and could drift."
-url: "{{baseUrl}}/api/v1/users/{{userId}}"
+url: "{{baseUrl}}/api/users/{{userId}}"
 method: PATCH
 headers:
   Authorization: Bearer {{intruderToken}}

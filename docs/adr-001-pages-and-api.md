@@ -149,3 +149,13 @@ The lesson for the next «to revisit» clause: a line count is easy to write dow
 and is not what goes wrong. Count responsibilities.
 
 See [architecture.md](architecture.md) for the layout as it stands.
+
+### The version prefix, dropped
+
+`/api/v1/*` above was the address for the whole life of this ADR so far.
+As of 7 Aug 2026 it is `/api/*` — the version segment bought nothing (no
+outside client depended on the address) and cost a few characters on every
+request. `API_PREFIX` in `presentation/api/__init__.py` still exists for
+exactly this reason: adding a version back, if one is ever actually needed,
+costs one import path per module rather than a rewrite. See
+[architecture.md](architecture.md#two-front-doors) for the current paths.

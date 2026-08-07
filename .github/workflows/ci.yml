@@ -122,25 +122,8 @@ jobs:
           uv run alembic upgrade head
           uv run alembic check
 
-      # Only chromium: the browser tests check the pages' logic, not how
-      # engines differ. --with-deps brings the system libraries a headless
-      # browser needs on a bare runner.
-      - name: Install browser
-        run: uv run playwright install --with-deps chromium
-
       - name: pytest
         run: uv run pytest
-
-      # A failed browser test is far easier to read as a screenshot and a
-      # trace than as a stack trace.
-      - name: Keep the evidence
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-results
-          path: test-results/
-          if-no-files-found: ignore
-          retention-days: 7
 
   api:
     name: API contract

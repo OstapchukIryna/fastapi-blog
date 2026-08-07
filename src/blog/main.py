@@ -1,8 +1,9 @@
 """The application object: what exists, where it is mounted, what it serves.
 
-Nothing is decided here beyond assembly. Startup creates the tables,
-shutdown releases the pool, and the rest of the file is a list of what is
-mounted where — which is the whole point of keeping it short.
+Nothing is decided here beyond assembly. Shutdown releases the pool — the
+schema itself comes from Alembic, not from anything run here — and the
+rest of the file is a list of what is mounted where, which is the whole
+point of keeping it short.
 """
 
 from collections.abc import AsyncGenerator
@@ -18,15 +19,13 @@ from blog.presentation.errors import register_error_handlers
 from blog.presentation.static import RevalidatedStaticFiles
 from blog.presentation.web import pages
 
-# * `models` is imported for its side effect. create_all builds exactly
-# * the tables whose classes are registered by the time it runs; the
-# * routers would drag them in anyway, but then the set of tables would
-# * depend on what somebody happened to import.
+# `models` is imported for its side effect — see that module's docstring
+# for why (mapper registration), rather than for anything used here directly.
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
-    """Create the schema on the way up, release the pool on the way down."""
+    """Release the pool on shutdown; nothing runs on startup."""
     yield
 
     await engine.dispose()

@@ -1,6 +1,6 @@
 $kind: http-request
 description: "/me is the private view: unlike a public read of the same user it carries the email, because the token proves who is asking."
-url: "{{baseUrl}}/api/v1/users/me"
+url: "{{baseUrl}}/api/users/me"
 method: GET
 headers:
   Authorization: Bearer {{accessToken}}

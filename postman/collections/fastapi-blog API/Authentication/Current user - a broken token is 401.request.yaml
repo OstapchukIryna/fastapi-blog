@@ -1,6 +1,6 @@
 $kind: http-request
 description: A token that is not a JWT at all must be refused rather than raising out of the decoder as a 500.
-url: "{{baseUrl}}/api/v1/users/me"
+url: "{{baseUrl}}/api/users/me"
 method: GET
 headers:
   Authorization: Bearer not.a.real.token

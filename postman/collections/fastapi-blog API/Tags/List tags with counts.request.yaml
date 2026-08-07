@@ -1,6 +1,6 @@
 $kind: http-request
 description: Ordered by count descending, then by name, so the ordering is defined even when counts tie.
-url: "{{baseUrl}}/api/v1/tags"
+url: "{{baseUrl}}/api/tags"
 method: GET
 scripts:
   - type: afterResponse

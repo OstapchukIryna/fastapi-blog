@@ -1,6 +1,6 @@
 $kind: http-request
 description: Deleting a user cascades to their posts, so the run leaves the database as it found it.
-url: "{{baseUrl}}/api/v1/users/{{userId}}"
+url: "{{baseUrl}}/api/users/{{userId}}"
 method: DELETE
 headers:
   Authorization: Bearer {{accessToken}}

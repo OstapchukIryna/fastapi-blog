@@ -1,21 +1,21 @@
 $kind: http-request
 description: "limit has a ceiling on purpose: without it one request pulls the whole table."
-url: "{{baseUrl}}/api/v1/posts?limit=101"
+url: "{{baseUrl}}/api/posts?limit=101"
 method: GET
 scripts:
   - type: afterResponse
     code: |-
       pm.test("over the ceiling is 422", () => pm.response.to.have.status(422));
 
-      pm.sendRequest(`${pm.variables.get("baseUrl")}/api/v1/posts?limit=0`,
+      pm.sendRequest(`${pm.variables.get("baseUrl")}/api/posts?limit=0`,
           (err, res) => pm.test("a limit of zero is 422", () =>
               pm.expect(res.code).to.eql(422)));
 
-      pm.sendRequest(`${pm.variables.get("baseUrl")}/api/v1/posts?skip=-1`,
+      pm.sendRequest(`${pm.variables.get("baseUrl")}/api/posts?skip=-1`,
           (err, res) => pm.test("a negative skip is 422", () =>
               pm.expect(res.code).to.eql(422)));
 
-      pm.sendRequest(`${pm.variables.get("baseUrl")}/api/v1/posts?skip=100000`,
+      pm.sendRequest(`${pm.variables.get("baseUrl")}/api/posts?skip=100000`,
           (err, res) => pm.test("past the end is an empty page, not an error", () => {
               pm.expect(res.code).to.eql(200);
               pm.expect(res.json().items).to.eql([]);

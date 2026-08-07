@@ -1,6 +1,6 @@
 $kind: http-request
 description: "Sets the scene for the folder: a post that belongs to this run's account, and a second account with a token of its own. Made here rather than borrowed from the Posts folder, which deletes its post on the way out."
-url: "{{baseUrl}}/api/v1/posts"
+url: "{{baseUrl}}/api/posts"
 method: POST
 headers:
   Authorization: Bearer {{accessToken}}
@@ -28,7 +28,7 @@ scripts:
       const password = "correct-horse-battery";
 
       pm.sendRequest({
-          url: `${base}/api/v1/users`,
+          url: `${base}/api/users`,
           method: "POST",
           header: { "Content-Type": "application/json" },
           body: {
@@ -39,7 +39,7 @@ scripts:
           pm.collectionVariables.set("intruderId", registered.json().id);
 
           pm.sendRequest({
-              url: `${base}/api/v1/users/token`,
+              url: `${base}/api/users/token`,
               method: "POST",
               header: { "Content-Type": "application/x-www-form-urlencoded" },
               body: {

@@ -1,6 +1,6 @@
 $kind: http-request
 description: "The shape of a JWT is public and anyone can build one. This is a correct HS256 token over honest claims, signed with a secret that is not the server's - the single thing standing between a stranger and any account."
-url: "{{baseUrl}}/api/v1/users/me"
+url: "{{baseUrl}}/api/users/me"
 method: GET
 headers:
   Authorization: Bearer {{mintedToken}}

@@ -190,11 +190,11 @@ graph LR
         p3["<b>shells.py</b><br/>/about · /login · /register<br/>/profile · /forgot-password<br/>/reset-password"]
     end
 
-    subgraph api_r["presentation/api/*.py — 13 paths under /api/v1"]
-        a1["/api/v1/posts · /api/v1/posts/{id}"]
-        a2["/api/v1/users · /api/v1/users/{id}<br/>/api/v1/users/{id}/picture<br/>/api/v1/users/{id}/posts"]
-        a3["/api/v1/users/token · /api/v1/users/me<br/>/api/v1/users/forgot-password<br/>/api/v1/users/reset-password<br/>/api/v1/users/me/password"]
-        a4["/api/v1/tags · /api/v1/tags/{tag}/posts"]
+    subgraph api_r["presentation/api/*.py — 13 paths under /api"]
+        a1["/api/posts · /api/posts/{id}"]
+        a2["/api/users · /api/users/{id}<br/>/api/users/{id}/picture<br/>/api/users/{id}/posts"]
+        a3["/api/users/token · /api/users/me<br/>/api/users/forgot-password<br/>/api/users/reset-password<br/>/api/users/me/password"]
+        a4["/api/tags · /api/tags/{tag}/posts"]
     end
 
     pages_r --> jinja[Jinja templates]
@@ -202,12 +202,13 @@ graph LR
     p3 -. "the page is a shell;<br/>its script calls the API" .-> api_r
 ```
 
-**The version is in the path, not in the package.** Routers live in
-`presentation/api/`, and `API_PREFIX = "/api/v1"` in that package's `__init__`
-is the only line that knows the number. Splitting into `api/v1/` and `api/v2/`
-is what to do when a second version actually starts — doing it now would build
-a shape for something that may never arrive, and the prefix constant means the
-move costs one import path per module when it does.
+**No version in the path.** Routers live in `presentation/api/`, and
+`API_PREFIX = "/api"` in that package's `__init__` is the only line that
+knows the root. A version segment (`/api/v1/`) was tried and dropped —
+nothing outside this repository depends on the address yet, so the extra
+segment bought nothing and had to be typed in every request. The constant
+means adding one back, if a real second version ever starts, still costs
+one import path per module rather than a rewrite.
 
 The dotted arrow is the thing to hold on to. **Sign-in, registration and the
 profile render as empty shells and fill themselves from the API**, because the
@@ -263,7 +264,7 @@ Three things the columns do not say:
   something else wrote them.
 - **Deleting a user cascades to their posts** and to their uploaded file.
   Tags are left behind even when nothing references them any more — they
-  become invisible in `/api/v1/tags`, which counts through posts, but they do
+  become invisible in `/api/tags`, which counts through posts, but they do
   accumulate.
 
 ---
@@ -309,20 +310,18 @@ marked `data-author-only`.
 | Layer | Tool | Count | What it can see |
 |---|---|---|---|
 | API contract | Postman / Newman | 101 requests, 375 assertions | Every documented path, every refusal, ownership |
-| Live pages | Playwright | 3 journeys | What the scripts do with real answers |
+| Services and routes | pytest + `httpx.AsyncClient` | in progress | The application in-process, against a real Postgres test database, no browser involved |
 | Pure JS functions | — | none yet | `currentUserId` parsing, error wording |
 | Routes and templates | — | none yet | That a page renders at all |
 
 ```bash
 ./scripts/api-tests.sh   # throwaway database, throwaway server, no trace left
-uv run pytest            # the three browser journeys
+uv run pytest            # in-process, against a throwaway Postgres database
 ```
 
 The two empty rows are the cheap ones, and they are empty because the
 expensive layers were written first — the API tests because the API is the
-contract, and the browser tests because a dialog that leaves the page
-scroll-locked cannot be seen from anywhere else. `node --test` needs no
-dependency at all for the first of them.
+contract. `node --test` needs no dependency at all for the first of them.
 
 Both run in CI on every pull request (`.github/workflows/ci.yml`), alongside
 ruff, djlint, pyrefly, a strict docs build and an Alembic-drift check. Running

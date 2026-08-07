@@ -1,6 +1,6 @@
 $kind: http-request
 description: OAuth2PasswordBearer refuses the request before the route runs.
-url: "{{baseUrl}}/api/v1/users/me"
+url: "{{baseUrl}}/api/users/me"
 method: GET
 scripts:
   - type: afterResponse

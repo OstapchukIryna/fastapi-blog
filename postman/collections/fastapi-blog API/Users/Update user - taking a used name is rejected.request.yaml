@@ -1,6 +1,6 @@
 $kind: http-request
 description: The uniqueness check runs against the other rows, so claiming a name that belongs to somebody else is a 400 and not an IntegrityError.
-url: "{{baseUrl}}/api/v1/users/{{userId}}"
+url: "{{baseUrl}}/api/users/{{userId}}"
 method: PATCH
 headers:
   Authorization: Bearer {{accessToken}}

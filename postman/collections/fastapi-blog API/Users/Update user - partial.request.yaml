@@ -1,6 +1,6 @@
 $kind: http-request
 description: "PATCH applies only the fields that arrived; an omitted one is left alone rather than nulled. The picture is no longer among them — a filename is not something a client gets to choose, so it moved to its own endpoint that takes the file itself."
-url: "{{baseUrl}}/api/v1/users/{{userId}}"
+url: "{{baseUrl}}/api/users/{{userId}}"
 method: PATCH
 headers:
   Authorization: Bearer {{accessToken}}
@@ -30,7 +30,7 @@ scripts:
 
       pm.test("leaves the address alone", () => {
           pm.sendRequest({
-              url: `${pm.variables.get("baseUrl")}/api/v1/users/me`,
+              url: `${pm.variables.get("baseUrl")}/api/users/me`,
               method: "GET",
               header: { Authorization: `Bearer ${pm.collectionVariables.get("accessToken")}` },
           }, (_e, res) =>
