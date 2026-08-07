@@ -28,7 +28,8 @@ scripts:
       });
 
       pm.test("image_path points at the stored file", () =>
-          pm.expect(user.image_path).to.eql(`/media/profile_pics/${user.image_file}`));
+          pm.expect(user.image_path).to.match(
+              new RegExp(`^https://[^/]+\\.amazonaws\\.com/profile_pics/${user.image_file}$`)));
 
       pm.collectionVariables.set("firstPicture", user.image_file);
     language: text/javascript

@@ -24,12 +24,6 @@ scripts:
           pm.expect(user).to.not.have.property("password_hash");
       });
 
-      pm.test("the file is gone from disk", () => {
-          pm.sendRequest(
-              `${pm.variables.get("baseUrl")}/media/profile_pics/${pm.collectionVariables.get("firstPicture")}`,
-              (_e, res) => pm.expect(res.code).to.eql(404));
-      });
-
       pm.collectionVariables.unset("firstPicture");
     language: text/javascript
 order: 5000
