@@ -23,21 +23,12 @@ from blog.presentation.web.templating import templates
 # ! to clients that asked for JSON.
 API_PATH_ROOT = "/api/"
 
-GENERIC_FAILURE = "An error occurred. Please check your request and try again."
-INVALID_REQUEST = "Invalid request. Please check your input and try again."
+GENERIC_FAILURE = "An error occurred. Please try again."
+INVALID_REQUEST = "Invalid request. Please try again."
 
 
 def error_page(request: Request, status_code: int, message: str) -> Response:
-    """Render the shared error page.
-
-    Args:
-        request (Request): needed by Jinja and by url_for.
-        status_code (int): the status to answer with.
-        message (str): a sentence a reader can act on.
-
-    Returns:
-        Response: the rendered page.
-    """
+    """Render the shared error page."""
     return templates.TemplateResponse(
         request,
         "error.html",
@@ -46,8 +37,6 @@ def error_page(request: Request, status_code: int, message: str) -> Response:
             "title": f"Error {status_code}",
             "message": message,
         },
-        # ! The original status, not a 200. An error page served as 200
-        # ! is a lie that caches, crawlers and monitoring all believe.
         status_code=status_code,
     )
 
@@ -84,7 +73,6 @@ def register_error_handlers(app: FastAPI) -> None:
         if request.url.path.startswith(API_PATH_ROOT):
             return await http_exception_handler(request, exception)
 
-        # `detail` is optional in Starlette; a page needs a sentence.
         return error_page(
             request, exception.status_code, exception.detail or GENERIC_FAILURE
         )

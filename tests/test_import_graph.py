@@ -128,10 +128,6 @@ ALLOWED_SIDEWAYS = {
         "blog.services.users",
         "blog.services.auth",
     ): "ownership is a question about the current user",
-    (
-        "blog.services.users",
-        "blog.services.avatars",
-    ): "deleting an account removes the picture it had",
 }
 
 

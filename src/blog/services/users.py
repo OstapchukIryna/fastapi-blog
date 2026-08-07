@@ -19,9 +19,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from blog.core.security import hash_password
 from blog.infrastructure import models
 from blog.infrastructure.database import DbSession
+from blog.infrastructure.images import AWSAvatars
 from blog.schemas import UserCreate, UserUpdate
 from blog.services.auth import CurrentUser
-from blog.services.avatars import AvatarStorage
 
 
 class AlreadyRegistered(HTTPException):
@@ -205,19 +205,19 @@ async def update(
     return user
 
 
-async def delete(db: AsyncSession, user: models.User, storage: AvatarStorage) -> None:
+async def delete(db: AsyncSession, user: models.User, storage: AWSAvatars) -> None:
     """Delete an account, its posts, and the picture it had.
 
     The posts go by cascade, which the schema handles. The file does not:
     nothing in the database knows that a string in `image_file` names
-    something on a disk, so the account service has to say so — and say it
+    something on S3, so the account service has to say so — and say it
     after the commit, so a failed transaction cannot leave a live row
     pointing at a file that has been removed.
 
     Args:
         db (AsyncSession): session to write through.
         user (models.User): the account to remove.
-        storage (AvatarStorage): where its picture is kept. Taken as an
+        storage (AWSAvatars): where its picture is kept. Taken as an
             argument rather than imported: this module has an opinion about
             *when* the file goes, and none about where it lives.
     """
@@ -225,4 +225,4 @@ async def delete(db: AsyncSession, user: models.User, storage: AvatarStorage) ->
     await db.delete(user)
     await db.commit()
 
-    storage.delete(old_filename)
+    await storage.delete_profile_picture(old_filename)
