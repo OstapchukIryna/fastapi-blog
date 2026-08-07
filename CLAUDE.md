@@ -73,13 +73,20 @@ users. Ask the same question before adding a new same-layer import: *if
 neither module existed, would the other still make sense?* If yes, push it
 down a layer; if no, it's a real dependency — declare it.
 
-Two protocols invert the direction of `infrastructure`/`api` depending on
-`services`: `AvatarStorage` (declared in `services/avatars.py`, satisfied by
-`infrastructure/images.py`) and `ResetMailer` (declared in
-`services/passwords.py`, satisfied by `presentation/api/mail.py`). Structural
-typing (`Protocol`, not `ABC`) is what lets the implementation avoid importing
-the interface — an `ABC` would need inheritance, which would need the import,
-which the layering test forbids.
+One protocol inverts the direction of `api` depending on `services`:
+`ResetMailer` (declared in `services/passwords.py`, satisfied by
+`presentation/api/mail.py`) — needed because the implementation lives in a
+layer *above* the module that uses it. Structural typing (`Protocol`, not
+`ABC`) is what lets the implementation avoid importing the interface — an
+`ABC` would need inheritance, which would need the import, which the
+layering test forbids.
+
+Avatar storage does not need this: `AWSAvatars` (`infrastructure/images.py`)
+is a layer *below* `services/avatars.py`, so services importing it directly
+is the ordinary direction and no protocol is required. S3 is also the only
+avatar storage this application uses or has planned — a second reason a
+protocol earlier stood here (to abstract over more than one implementation)
+never applied.
 
 Two front doors onto the same services: `presentation/web/pages/` (18 routes,
 `include_in_schema=False`, so `/openapi.json` — and the Postman contract test

@@ -39,7 +39,7 @@ from sqlalchemy import delete, select, update
 
 from blog.infrastructure import models
 from blog.infrastructure.database import AsyncSessionLocal, engine
-from blog.infrastructure.images import PROFILE_PICS_DIR
+from blog.infrastructure.images import AWSAvatars
 from blog.main import app
 
 
@@ -902,17 +902,11 @@ def draw_avatar(letter: str, colour: tuple[int, int, int]) -> bytes:
 
 async def clear_everything() -> None:
     """Remove everything this script is about to create again."""
-    # ! post_tags is emptied explicitly. The cascade is in the schema,
-    # ! but SQLite only enforces foreign keys with PRAGMA foreign_keys =
-    # ! ON, which SQLAlchemy does not set. A bulk delete of posts would
-    # ! leave the link rows behind, and the next join would return posts
-    # ! that no longer exist.
-    for file in PROFILE_PICS_DIR.glob("*"):
-        if file.is_file() and file.name != ".gitkeep":
-            file.unlink()
+    await AWSAvatars().clear_profile_pictures()
 
     async with AsyncSessionLocal() as db:
-        await db.execute(models.post_tags.delete())
+        # * post_tags carries ON DELETE CASCADE on both foreign keys, so
+        # * deleting posts and tags takes the link rows with them.
         await db.execute(delete(models.Post))
         await db.execute(delete(models.Tag))
         await db.execute(delete(models.User))

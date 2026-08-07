@@ -10,8 +10,8 @@ from blog.infrastructure.database import Base
 if TYPE_CHECKING:
     from blog.infrastructure.models.post import Post
 
-# Association table for the many-to-many relationship between posts and tags
-# Also can make it a model class if you want to add extra fields
+# Association class for the many-to-many relationship between posts and tags
+# Also can make it a table if you don't nesseccerarily need extra fields
 
 
 class PostTag(Base):
@@ -23,7 +23,6 @@ class PostTag(Base):
     """
 
     __tablename__ = "post_tags"
-    id: Mapped[int] = mapped_column(primary_key=True)
 
     post_id: Mapped[int] = mapped_column(
         ForeignKey("posts.id", ondelete="CASCADE"), primary_key=True

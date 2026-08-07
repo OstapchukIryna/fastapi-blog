@@ -1,56 +1,90 @@
-"""Profile pictures on disk: turn an upload into a file, and remove it later.
+"""Profile pictures on S3: turn an upload into a stored object, and remove
+it later.
 
 Uploads are normalised rather than stored as they arrive. Everything that
-reaches the disk is a square JPEG of a known size, so the pages never
+reaches the bucket is a square JPEG of a known size, so the pages never
 have to cope with a 12-megapixel portrait or a transparent PNG.
 
-The two operations are methods on an object rather than two module
-functions, for one reason: the directory becomes a field. Production
-takes the default, a test points it at tmp_path, and the service that
-saves pictures is handed the object instead of importing it.
+The three steps are separate methods, not one, because two of them are
+about the bytes (decode, resize, encode — CPU-bound, no network) and one
+is about the network (upload to S3 — no CPU work of its own). Keeping
+them apart is what lets `services/avatars.py` run the first in a worker
+thread and await the second directly, instead of blocking the event loop
+for a request that is mostly waiting on S3.
 
-What that object has to look like is written down one layer up, as
-`AvatarStorage` in services/avatars.py — next to the code that needs it.
-Nothing here imports that protocol, and nothing here has to: a Protocol
-is satisfied by shape. That is what keeps this file at the bottom of the
-graph while the decision about what storage *means* stays with its user.
+This is the only storage the application uses, and no other is planned,
+so `AWSAvatars` is used directly by `services/avatars.py` — no protocol
+standing between them.
 """
 
 import uuid
 from dataclasses import dataclass
 from io import BytesIO
-from pathlib import Path
 
+import boto3
 from PIL import Image, ImageOps
+from starlette.concurrency import run_in_threadpool
 
-from blog.core.config import MEDIA_DIR
-
-PROFILE_PICS_DIR: Path = MEDIA_DIR / "profile_pics"
+from blog.core.config import settings
 
 AVATAR_SIZE = (300, 300)
 JPEG_QUALITY = 85
 
 
+# AWS helper functions
+def _get_s3_client():
+    return boto3.client(
+        "s3",
+        region_name=settings.s3_region,
+        aws_access_key_id=(
+            settings.s3_access_key_id.get_secret_value()
+            if settings.s3_access_key_id
+            else None
+        ),
+        aws_secret_access_key=(
+            settings.s3_secret_access_key.get_secret_value()
+            if settings.s3_secret_access_key
+            else None
+        ),
+        endpoint_url=settings.s3_endpoint_url,
+    )
+
+
+def _upload_to_s3(file_bytes: bytes, key: str) -> None:
+    s3 = _get_s3_client()
+    s3.upload_fileobj(
+        BytesIO(file_bytes),
+        settings.s3_bucket_name,
+        key,
+        ExtraArgs={"ContentType": "image/jpeg"},
+    )
+
+
+def _delete_from_s3(key: str) -> None:
+    s3 = _get_s3_client()
+    s3.delete_object(Bucket=settings.s3_bucket_name, Key=key)
+
+
+def _clear_s3_prefix(prefix: str) -> None:
+    s3 = _get_s3_client()
+    paginator = s3.get_paginator("list_objects_v2")
+    for page in paginator.paginate(Bucket=settings.s3_bucket_name, Prefix=prefix):
+        keys = [{"Key": obj["Key"]} for obj in page.get("Contents", [])]
+        if keys:
+            s3.delete_objects(Bucket=settings.s3_bucket_name, Delete={"Objects": keys})
+
+
 @dataclass(frozen=True, slots=True)
-class DiskAvatars:
-    """Avatars kept as JPEG files in one directory.
+class AWSAvatars:
+    """Avatars kept as JPEG objects in one S3 bucket.
 
-    Frozen, and holding nothing but the directory: two instances pointing
-    at the same place are interchangeable, there is no state to fall out
-    of step between requests, and building a fresh one per request costs
-    nothing.
-
-    Attributes:
-        directory (Path): where the files go. Defaults to the directory
-            /media is served from, so the application needs no argument;
-            a test points it somewhere temporary and leaves no litter in
-            the repository.
+    Holds no state of its own — the bucket and credentials come from
+    `settings` — so every instance is interchangeable and building a
+    fresh one per request costs nothing.
     """
 
-    directory: Path = PROFILE_PICS_DIR
-
-    def save(self, content: bytes) -> str:
-        """Store an uploaded image as a square avatar and return its filename.
+    def process_profile_image(self, content: bytes) -> tuple[bytes, str]:
+        """Turn an upload into a square JPEG and a name to store it under.
 
         Blocking work: decoding and resampling are CPU-bound and Pillow is
         synchronous, so callers run this in a worker thread rather than on
@@ -61,59 +95,63 @@ class DiskAvatars:
                 The size ceiling is applied before this is called.
 
         Returns:
-            str: the generated filename, to be stored on the user row. Only
-                the name, not the path — where the directory lives is this
-                object's business, not the database's.
+            tuple[bytes, str]: the encoded JPEG, ready for
+                `upload_profile_image`, and the filename generated for it —
+                only the name, not a path, since where it ends up living is
+                this object's business, not the database's.
 
         Raises:
             PIL.UnidentifiedImageError: the bytes are not an image Pillow
                 recognises. The caller turns this into a 400.
         """
         with Image.open(BytesIO(content)) as original:
-            # * Phone cameras record orientation as a flag rather than
-            # * rotating the pixels. Without this, portraits arrive sideways.
             image = ImageOps.exif_transpose(original)
 
-            # * fit() crops to the aspect ratio before scaling, so faces stay
-            # * proportioned. resize() alone would squash a tall photo.
+            # fit() crops to the aspect ratio before scaling
             image = ImageOps.fit(image, AVATAR_SIZE, method=Image.Resampling.LANCZOS)
 
-            # ! JPEG has no alpha channel; saving a transparent image as one
-            # ! raises rather than flattening it.
             if image.mode in ("RGBA", "LA", "P"):
                 image = image.convert("RGB")
 
-            # * A fresh random name per upload. Naming the file after the user
-            # * would leave browsers and CDNs serving the previous picture from
-            # * cache after a change, and a name taken from the upload could
-            # * collide or contain path separators.
             filename = f"{uuid.uuid4().hex}.jpg"
+            output = BytesIO()
 
-            # media/ is not in the repository, so on a fresh clone the
-            # directory may not exist yet.
-            self.directory.mkdir(parents=True, exist_ok=True)
-            image.save(
-                self.directory / filename, "JPEG", quality=JPEG_QUALITY, optimize=True
-            )
+            image.save(output, "JPEG", quality=JPEG_QUALITY, optimize=True)
+            output.seek(0)
 
-        return filename
+        return output.read(), filename
 
-    def delete(self, filename: str | None) -> None:
-        """Remove a stored avatar, if there is one.
-
-        Accepts None and a name that no longer exists on disk, so callers
-        can say "drop whatever this user had" without first checking
-        whether they had anything. Deleting a picture is always the last
-        step after a successful commit: if the transaction fails, the old
-        file must still be there.
+    async def upload_profile_image(self, file_bytes: bytes, filename: str) -> None:
+        """Put the encoded JPEG from `process_profile_image` into the bucket.
 
         Args:
-            filename (str | None): the stored filename, or None when the
-                user never uploaded one.
+            file_bytes (bytes): the encoded JPEG.
+            filename (str): the name generated for it.
+        """
+        key = f"profile_pics/{filename}"
+        await run_in_threadpool(_upload_to_s3, file_bytes, key)
+
+    async def delete_profile_picture(self, filename: str | None) -> None:
+        """Remove a stored avatar, if there is one.
+
+        Accepts None and a name that is no longer there, so a caller can
+        say "drop whatever this user had" without asking first.
+
+        Args:
+            filename (str | None): the stored name, or None when there
+                never was a picture.
         """
         if filename is None:
             return
+        key = f"profile_pics/{filename}"
+        await run_in_threadpool(_delete_from_s3, key)
 
-        filepath = self.directory / filename
-        if filepath.exists():
-            filepath.unlink()
+    async def clear_profile_pictures(self) -> None:
+        """Remove every stored avatar, known to the database or not.
+
+        For populate.py's reset, which empties the database and
+        repopulates it from nothing — a per-user delete would leave
+        behind any avatar the database has since forgotten about (a
+        previous run's upload that was never cleanly replaced).
+        """
+        await run_in_threadpool(_clear_s3_prefix, "profile_pics/")
