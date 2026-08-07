@@ -173,7 +173,7 @@ jobs:
 
       # Newman is a Node tool; the collection itself is built from the
       # YAML tree under postman/ by a Python script.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
 
