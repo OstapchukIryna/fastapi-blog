@@ -11,13 +11,17 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from blog.core.config import STATIC_DIR
+from blog.core.config import STATIC_DIR, settings
+from blog.core.logging import configure_logging
 from blog.infrastructure import models  # noqa: F401
 from blog.infrastructure.database import engine
 from blog.presentation.api import API_PREFIX, posts, tags, users
 from blog.presentation.errors import register_error_handlers
+from blog.presentation.middleware import request_id_middleware
 from blog.presentation.static import RevalidatedStaticFiles
 from blog.presentation.web import pages
+
+configure_logging(settings)
 
 # `models` is imported for its side effect — see that module's docstring
 # for why (mapper registration), rather than for anything used here directly.
@@ -32,6 +36,7 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
 
 
 app = FastAPI(lifespan=lifespan)
+app.middleware("http")(request_id_middleware)
 
 
 app.mount("/static", RevalidatedStaticFiles(directory=STATIC_DIR), name="static")

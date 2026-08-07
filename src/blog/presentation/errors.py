@@ -6,6 +6,8 @@ decided by the path, because that is the only thing available at the
 moment a handler runs that reliably says who is asking.
 """
 
+import logging
+
 from fastapi import FastAPI, Request, Response, status
 from fastapi.exception_handlers import (
     http_exception_handler,
@@ -15,6 +17,8 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from blog.presentation.web.templating import templates
+
+logger = logging.getLogger(__name__)
 
 # ! Written out rather than built from blog.presentation.api's API_PREFIX —
 # ! this only needs to ask "is the caller a script or a browser", and every
@@ -68,6 +72,13 @@ def register_error_handlers(app: FastAPI) -> None:
         Returns:
             Response: JSON under /api/, an HTML page everywhere else.
         """
+        # * 5xx only: a 4xx is an ordinary, expected refusal (wrong
+        # * password, somebody else's post) and logging every one would
+        # * bury the rare case — a dependency failing partway through a
+        # * request — that a client cannot explain to us on its own.
+        if exception.status_code >= status.HTTP_500_INTERNAL_SERVER_ERROR:
+            logger.exception("Unhandled server-side refusal: %s", exception.detail)
+
         if request.url.path.startswith(API_PATH_ROOT):
             return await http_exception_handler(request, exception)
 

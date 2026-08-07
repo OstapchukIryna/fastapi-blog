@@ -44,6 +44,12 @@ jobs:
       - name: Install
         run: uv sync --locked
 
+      # Checks the locked dependencies against OSV, not the code — a
+      # separate question from "does uv.lock match pyproject.toml" above.
+      # Still marked experimental by uv itself.
+      - name: Audit dependencies
+        run: uv audit --preview-features audit-command
+
       - name: Ruff
         run: |
           uv run ruff check .
