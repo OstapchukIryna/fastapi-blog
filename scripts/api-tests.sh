@@ -123,6 +123,7 @@ echo "==> building the collection from postman/collections"
 uv run python scripts/build_postman_collection.py "$COLLECTION"
 
 echo "==> running the collection against ${BASE_URL}"
+set +e
 npx --yes newman@6 run "$COLLECTION" \
     --working-dir "$WORK_DIR" \
     --env-var "baseUrl=${BASE_URL}" \
@@ -132,3 +133,16 @@ npx --yes newman@6 run "$COLLECTION" \
     --reporters cli \
     --color auto \
     "$@"
+NEWMAN_EXIT=$?
+set -e
+
+# A failing request only says "500" — the traceback that explains it went
+# to the server's own log, not Newman's. Surfaced here rather than left
+# for someone to reproduce locally, since the log this app started
+# writing to no longer exists once the temp directory is cleaned up.
+if [[ $NEWMAN_EXIT -ne 0 && -f "${WORK_DIR}/server.log" ]]; then
+    echo "==> the collection failed; here is the tail of the server log" >&2
+    tail -n 100 "${WORK_DIR}/server.log" >&2
+fi
+
+exit $NEWMAN_EXIT
