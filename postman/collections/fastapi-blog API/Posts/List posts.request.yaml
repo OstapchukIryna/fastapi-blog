@@ -1,6 +1,6 @@
 $kind: http-request
 description: "A page of PostResponse, not PostDetail: the list deliberately carries no body text."
-url: "{{baseUrl}}/api/v1/posts"
+url: "{{baseUrl}}/api/posts"
 method: GET
 scripts:
   - type: afterResponse

@@ -31,9 +31,9 @@ uv run pyrefly check src/blog seed.py populate.py tests scripts
 uv run mkdocs build --strict            # docs must build clean too
 
 # Tests
-uv run pytest                                    # all three browser journeys
-uv run pytest tests/test_browser.py::test_name   # a single test
-uv run pytest tests/test_import_graph.py         # layering/cycle rules only, no browser needed
+uv run pytest                                    # in-process, against a throwaway Postgres DB
+uv run pytest tests/test_posts.py::test_name     # a single test
+uv run pytest tests/test_import_graph.py         # layering/cycle rules only, no DB needed
 ./scripts/api-tests.sh                           # Postman collection, throwaway DB
 uv sync --locked                                 # fails if uv.lock drifted from pyproject.toml
 
@@ -42,11 +42,12 @@ uv run alembic revision --autogenerate -m "..."
 uv run alembic check                             # fails if a model edit has no migration
 ```
 
-Tests need PostgreSQL, not SQLite — `conftest.py` derives a throwaway database
-by suffixing `_test` onto `DATABASE_URL` (or reads `TEST_DATABASE_URL`), drops
-and recreates its schema every session via `alembic upgrade head`, then runs
-`seed.py`. `blog.db` / your dev database are never touched. First run on a
-machine also needs `uv run playwright install chromium`.
+Tests need PostgreSQL, not SQLite — `conftest.py` points `DATABASE_URL` at a
+dedicated `test_blog` database before any `blog.*` import (settings are read
+at import time, so the order matters), creates the schema once per session
+with `Base.metadata.create_all`, and rolls each test back to a savepoint
+afterward. `blog.db` / your dev database are never touched. AWS S3 is mocked
+with `moto`, not hit for real.
 
 ## Architecture
 
@@ -61,7 +62,7 @@ core            settings, JWT/password crypto — imports nothing of ours
 infrastructure  engine, ORM models, disk/email
 schemas         Pydantic shapes at the boundary (incl. shared Pagination/Page[T])
 services        what can be done and under what conditions (CurrentUser, OwnedPost, ...)
-presentation    api/ (JSON, /api/v1/...) and web/ (Jinja pages) — siblings, neither imports the other
+presentation    api/ (JSON, /api/...) and web/ (Jinja pages) — siblings, neither imports the other
 ```
 
 `presentation/web` and `presentation/api` both depend on `services`, never on
@@ -91,7 +92,7 @@ never applied.
 Two front doors onto the same services: `presentation/web/pages/` (18 routes,
 `include_in_schema=False`, so `/openapi.json` — and the Postman contract test
 built from it — describes only the 13 JSON paths) and `presentation/api/`
-under `API_PREFIX = "/api/v1"`. Sign-in, registration and the profile page
+under `API_PREFIX = "/api"`. Sign-in, registration and the profile page
 render as empty shells whose own JS calls the JSON API, because the token
 lives in `localStorage`, which Jinja cannot see; every other page is rendered
 server-side, whole.

@@ -20,42 +20,36 @@ not hypotheses, and they are the rows to write first.
 | Suite | Covers | Count |
 |---|---|---|
 | `tests/test_import_graph.py` | layering: no cycles, no upward arrows, every sideways arrow declared, the app imports for real | 4 tests |
-| `tests/test_browser.py` | register → sign in → publish, expiry noticed on the profile, edit offered to the author only | 3 tests |
 | `postman/` via `scripts/api-tests.sh` | the JSON surface end to end | 375 assertions |
 
-What that leaves uncovered is a shape, not a list: **the layer where the rules
-live has nothing pointed at it directly.** Postman reaches `services/` through
-HTTP, so a rule is exercised only in the combinations some endpoint happens to
-produce, and a failure names the endpoint rather than the rule. Boundaries —
-`has_more` at exactly the last row, `normalise_tags` on `["", " "]` — are
-awkward to reach that way and trivial to reach directly.
+The service-level suite this document plans for is what `test_posts.py`,
+`test_tags.py`, `test_users.py` and `test_mail.py` are for — created, still
+empty, waiting for the rows below. What that leaves uncovered is a shape, not
+a list: **the layer where the rules live has nothing pointed at it directly.**
+Postman reaches `services/` through HTTP, so a rule is exercised only in the
+combinations some endpoint happens to produce, and a failure names the
+endpoint rather than the rule. Boundaries — `has_more` at exactly the last
+row, `normalise_tags` on `["", " "]` — are awkward to reach that way and
+trivial to reach directly.
 
-## Fixtures to build first
+## Fixtures still to build
 
-These block most of the plan, and none of them exist yet. `conftest.py` today
-has `live_server` (a subprocess against a seeded throwaway database), `api`,
-`make_account`, `sign_in` and `expired_token` — all of them shaped for driving
-a real browser.
+`conftest.py` already has what the rest of this plan needs most: `client`
+(`httpx.AsyncClient` over `ASGITransport(app=app)`, in-process, so
+`dependency_overrides` works), `db_session` (a real connection against a
+throwaway Postgres database, rolled back to a savepoint after each test —
+not the in-memory SQLite this plan originally sketched), and `mocked_aws`
+(S3 via `moto` — avatar storage moved to `AWSAvatars`/S3, so there is no
+`DiskAvatars` to wire in any more). What is still missing:
 
 | Fixture | What it gives | Notes |
 |---|---|---|
-| `session` | an `AsyncSession` against `sqlite+aiosqlite:///:memory:`, schema created, rolled back after each test | unlocks every `db`-level row below. Needs `pytest-asyncio` (or `anyio`), which is not a dependency yet |
-| `client` | `httpx.AsyncClient` over `ASGITransport(app=app)`, no subprocess | in-process, so `dependency_overrides` works and a test can assert on a service call |
-| `avatars` | `DiskAvatars(directory=tmp_path)` wired in through `app.dependency_overrides[get_avatar_storage]` | this is what `AvatarStorage` was extracted for; keeps images off the repository |
 | `mailer` | a recording `ResetMailer` — appends `(to_email, username, token)` instead of sending | makes the reset token readable without SMTP or a background task |
 | `author` | a user with N posts, one pinned, known tags | most `db` rows below need a fixed corpus, and `seed.py` is too coarse |
 
-`settings` is read at import time, so a test that needs different settings must
-set the environment before `blog.core.config` is imported. That is why
-`live_server` spawns a subprocess. An in-process `client` fixture works for
-everything that does not need to *change* settings.
-
-!!! note "Coverage"
-
-    `pytest-cov` is not a dependency yet. When it is added, protocol and
-    exception-class bodies are already docstrings rather than `...`, so they
-    will not show up as permanently missed lines — see
-    [Protocols, not abstract base classes](conventions.md#protocols-not-abstract-base-classes).
+`settings` is read at import time, so `conftest.py` sets `DATABASE_URL` and
+the S3 environment variables before importing anything from `blog` — order
+matters for the same reason.
 
 ---
 
@@ -222,7 +216,8 @@ Structural, and cheap because the type checker already agrees.
 1. **Section 5, then the `unit` rows of 1 and 6.** No fixtures, no database,
    no event loop. This is a couple of evenings and it covers every boundary
    that is currently checked by nobody.
-2. **The `session` and `client` fixtures.** They block everything else.
+2. **The `mailer` and `author` fixtures**, above — the rest already have
+   `client`/`db_session`/`mocked_aws` to build on.
 3. **The rows marked *already happened*.** Seven of them, spread across
    sections. Each is a bug that reached `master` once; a test that fails on it
    is worth more than any number of new ones.
@@ -240,9 +235,9 @@ Structural, and cheap because the type checker already agrees.
   JSON surface; duplicating them in pytest buys nothing. Reach for `api`-level
   tests where the assertion is awkward in Postman — identical bodies, header
   presence, an overridden dependency.
-- **The templates' markup.** The browser tests check that the right things are
-  visible to the right person; asserting on class names makes a restyle a test
-  failure.
+- **The templates' markup.** Asserting on class names or HTML structure makes
+  a restyle a test failure; what matters is the data a page is handed and the
+  status code it answers with.
 - **Anything a `# *` marker does not defend.** If no comment explains why the
   code is the way it is, the behaviour is probably incidental, and a test would
   freeze an accident into a requirement.

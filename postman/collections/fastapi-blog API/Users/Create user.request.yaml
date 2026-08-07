@@ -1,6 +1,6 @@
 $kind: http-request
 description: Creates the user the rest of the run hangs off. The name carries a timestamp so the collection can be run repeatedly against the same database.
-url: "{{baseUrl}}/api/v1/users"
+url: "{{baseUrl}}/api/users"
 method: POST
 headers:
   Content-Type: application/json

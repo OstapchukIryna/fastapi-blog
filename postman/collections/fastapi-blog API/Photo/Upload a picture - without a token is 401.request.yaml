@@ -1,6 +1,6 @@
 $kind: http-request
 description: Writing a file to the server is the last place to leave open.
-url: "{{baseUrl}}/api/v1/users/{{userId}}/picture"
+url: "{{baseUrl}}/api/users/{{userId}}/picture"
 method: PATCH
 body:
   type: formdata

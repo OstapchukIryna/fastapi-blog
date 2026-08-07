@@ -14,7 +14,7 @@ than one applies.
 
 ## Signing in
 
-`POST /api/v1/users/token` is the only endpoint that takes a form body
+`POST /api/users/token` is the only endpoint that takes a form body
 rather than JSON: `OAuth2PasswordRequestForm` reads `username` and
 `password` as form fields. The field is called `username` because OAuth2
 says so; this API looks the account up by email, and the sign-in page
@@ -24,7 +24,7 @@ labels it honestly.
 sequenceDiagram
     autonumber
     participant B as Browser
-    participant API as POST /api/v1/users/token
+    participant API as POST /api/users/token
     participant DB as PostgreSQL
     participant JWT as create_access_token
 
@@ -73,7 +73,7 @@ sequenceDiagram
     participant OP as owned_post
     participant R as route body
 
-    B->>LP: PATCH /api/v1/posts/7 + Authorization: Bearer …
+    B->>LP: PATCH /api/posts/7 + Authorization: Bearer …
     opt no post 7
         LP-->>B: 404 "Post not found"
         Note over LP,B: Reached before authentication:<br/>a missing id is answered even to<br/>a caller carrying no token

@@ -1,6 +1,6 @@
 $kind: http-request
 description: "Deleting is the one that cannot be undone, so it is worth asserting separately from the two that only overwrite."
-url: "{{baseUrl}}/api/v1/posts/{{guardedPostId}}"
+url: "{{baseUrl}}/api/posts/{{guardedPostId}}"
 method: DELETE
 headers:
   Authorization: Bearer {{intruderToken}}

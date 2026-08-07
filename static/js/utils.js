@@ -8,7 +8,7 @@
  * than a search. The "load more" feed does not use it — its address comes
  * from url_for on the server, which is better still.
  */
-export const API = "/api/v1";
+export const API = "/api";
 
 const NETWORK_ERROR =
   "Network error. Please check your connection and try again.";

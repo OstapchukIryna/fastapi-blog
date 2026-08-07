@@ -1,6 +1,6 @@
 $kind: http-request
 description: An address nobody registered is refused with the same wording as a wrong password, and must not reach the hasher and raise.
-url: "{{baseUrl}}/api/v1/users/token"
+url: "{{baseUrl}}/api/users/token"
 method: POST
 headers:
   Content-Type: application/x-www-form-urlencoded

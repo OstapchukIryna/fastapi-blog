@@ -9,7 +9,7 @@ description: |-
 
   Run it from the repository root with `./scripts/api-tests.sh`, which starts the app against a throwaway database first. Against an already-running server, point the `baseUrl` environment variable at it.
 
-  Known contract wart: `date_posted` comes back with a `Z` suffix from POST /api/v1/posts and without one everywhere else, because on create the value is still the timezone-aware object in memory while every other route reads it back from SQLite, which stores it naive. The tests assert only that it parses, so they stay green either way.
+  Known contract wart: `date_posted` comes back with a `Z` suffix from POST /api/posts and without one everywhere else, because on create the value is still the timezone-aware object in memory while every other route reads it back from SQLite, which stores it naive. The tests assert only that it parses, so they stay green either way.
 variables:
   baseUrl: http://127.0.0.1:8000
   seededUsername: called_mad

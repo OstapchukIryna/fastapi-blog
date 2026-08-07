@@ -79,7 +79,7 @@ async def set_picture(
     try:
         await storage.upload_profile_image(file_bytes, new_filename)
     except ClientError as err:
-        raise FailedUpload from err
+        raise FailedUpload() from err
 
     old_filename = user.image_file
     user.image_file = new_filename

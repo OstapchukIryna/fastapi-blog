@@ -23,9 +23,7 @@ wheels/
 .postman/
 postman/collection.json
 
-# Загруженные аватары — пользовательские данные, а не исходник:
-# заглушка по умолчанию лежит в static/. .gitkeep оставлен, потому что
-# StaticFiles монтирует каталог при старте и падает, если его нет.
+
 media/profile_pics/*
 !media/profile_pics/.gitkeep
 
@@ -41,7 +39,11 @@ media/profile_pics/*
 .github/hooks/
 
 Icon
-
-# Playwright: снимки и трассы упавших прогонов
+.pytest_cache
 test-results/
 site/
+
+# Coverage.py output, regenerated locally for the Coverage Gutters extension
+.coverage
+coverage.xml
+htmlcov/

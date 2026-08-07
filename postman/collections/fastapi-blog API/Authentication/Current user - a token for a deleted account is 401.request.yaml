@@ -1,6 +1,6 @@
 $kind: http-request
 description: "Nothing revokes a token when the account behind it goes, so the signature stays valid for the rest of its thirty minutes. What stops it is the lookup finding nobody - a different reason from every other refusal here, and the only one that needs the database. Uses a throwaway account that deletes itself."
-url: "{{baseUrl}}/api/v1/users/me"
+url: "{{baseUrl}}/api/users/me"
 method: GET
 headers:
   Authorization: Bearer {{orphanToken}}
@@ -15,7 +15,7 @@ scripts:
       const password = "correct-horse-battery";
 
       pm.sendRequest({
-          url: `${base}/api/v1/users`,
+          url: `${base}/api/users`,
           method: "POST",
           header: { "Content-Type": "application/json" },
           body: {
@@ -26,7 +26,7 @@ scripts:
           const id = registered.json().id;
 
           pm.sendRequest({
-              url: `${base}/api/v1/users/token`,
+              url: `${base}/api/users/token`,
               method: "POST",
               header: { "Content-Type": "application/x-www-form-urlencoded" },
               body: {
@@ -43,7 +43,7 @@ scripts:
               // They remove themselves, which the API allows, and the
               // token outlives them.
               pm.sendRequest({
-                  url: `${base}/api/v1/users/${id}`,
+                  url: `${base}/api/users/${id}`,
                   method: "DELETE",
                   header: { Authorization: `Bearer ${token}` },
               }, () => {});

@@ -1,6 +1,6 @@
 $kind: http-request
 description: Asking twice is a 400 rather than a silent success, the same way a second DELETE of a post is a 404 — the effect is the same either way, the report is honest.
-url: "{{baseUrl}}/api/v1/users/{{userId}}/picture"
+url: "{{baseUrl}}/api/users/{{userId}}/picture"
 method: DELETE
 headers:
   Authorization: Bearer {{accessToken}}

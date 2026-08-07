@@ -81,7 +81,7 @@ conn.execute("CREATE SCHEMA public")
     SERVER_PID=$!
 
     for _ in $(seq 1 60); do
-        if curl -sf -o /dev/null "${BASE_URL}/api/v1/posts"; then break; fi
+        if curl -sf -o /dev/null "${BASE_URL}/api/posts"; then break; fi
         if ! kill -0 "$SERVER_PID" 2>/dev/null; then
             echo "the app exited before it answered:" >&2
             cat "${WORK_DIR}/server.log" >&2
@@ -90,7 +90,7 @@ conn.execute("CREATE SCHEMA public")
         sleep 0.5
     done
 
-    if ! curl -sf -o /dev/null "${BASE_URL}/api/v1/posts"; then
+    if ! curl -sf -o /dev/null "${BASE_URL}/api/posts"; then
         echo "the app never answered on ${BASE_URL}:" >&2
         cat "${WORK_DIR}/server.log" >&2
         exit 1

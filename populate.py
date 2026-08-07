@@ -927,7 +927,7 @@ async def create_users(client: httpx.AsyncClient) -> list[str]:
 
     for demo_user in USERS:
         created = await client.post(
-            "/api/v1/users",
+            "/api/users",
             json={
                 "username": demo_user["username"],
                 "email": demo_user["email"],
@@ -938,7 +938,7 @@ async def create_users(client: httpx.AsyncClient) -> list[str]:
         user_id = created.json()["id"]
 
         issued = await client.post(
-            "/api/v1/users/token",
+            "/api/users/token",
             data={
                 "username": demo_user["email"],
                 "password": demo_user["password"],
@@ -950,7 +950,7 @@ async def create_users(client: httpx.AsyncClient) -> list[str]:
 
         if colour := demo_user.get("colour"):
             uploaded = await client.patch(
-                f"/api/v1/users/{user_id}/picture",
+                f"/api/users/{user_id}/picture",
                 files={
                     "file": (
                         "avatar.png",
@@ -978,7 +978,7 @@ async def create_posts(client: httpx.AsyncClient, tokens: list[str]) -> None:
     for demo_post in POSTS:
         token = tokens[demo_post.get("author", 0)]
         response = await client.post(
-            "/api/v1/posts",
+            "/api/posts",
             json={
                 "title": demo_post["title"],
                 "summary": demo_post["summary"],

@@ -1,6 +1,6 @@
 $kind: http-request
 description: "The other half of the same rule, and the one a security change is likely to break by accident: reading this blog must not need an account. Locking down a router is a one-line mistake away from locking down its reads too."
-url: "{{baseUrl}}/api/v1/posts"
+url: "{{baseUrl}}/api/posts"
 method: GET
 scripts:
   - type: beforeRequest
@@ -10,11 +10,11 @@ scripts:
       const user = pm.collectionVariables.get("userId");
 
       const open = [
-          { name: "GET /api/v1/posts", url: `${base}/api/v1/posts` },
-          { name: "GET /api/v1/posts/{id}", url: `${base}/api/v1/posts/${post}` },
-          { name: "GET /api/v1/tags", url: `${base}/api/v1/tags` },
-          { name: "GET /api/v1/users/{id}", url: `${base}/api/v1/users/${user}` },
-          { name: "GET /api/v1/users/{id}/posts", url: `${base}/api/v1/users/${user}/posts` },
+          { name: "GET /api/posts", url: `${base}/api/posts` },
+          { name: "GET /api/posts/{id}", url: `${base}/api/posts/${post}` },
+          { name: "GET /api/tags", url: `${base}/api/tags` },
+          { name: "GET /api/users/{id}", url: `${base}/api/users/${user}` },
+          { name: "GET /api/users/{id}/posts", url: `${base}/api/users/${user}/posts` },
       ];
 
       const seen = [];

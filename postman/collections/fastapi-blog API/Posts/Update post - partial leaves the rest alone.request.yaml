@@ -1,5 +1,5 @@
 $kind: http-request
-url: "{{baseUrl}}/api/v1/posts/{{postId}}"
+url: "{{baseUrl}}/api/posts/{{postId}}"
 method: PATCH
 headers:
   Authorization: Bearer {{accessToken}}

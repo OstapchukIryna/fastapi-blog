@@ -36,7 +36,7 @@ def profile(request: Request) -> Response:
 
     Deliberately empty of data: the token lives in localStorage, so the
     server cannot know whose profile this is. The page's own script
-    fetches /api/v1/users/me and fills it in.
+    fetches /api/users/me and fills it in.
 
     Args:
         request (Request): needed by the template.

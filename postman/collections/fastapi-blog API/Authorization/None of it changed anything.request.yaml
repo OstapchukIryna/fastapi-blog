@@ -1,6 +1,6 @@
 $kind: http-request
 description: "The refusals above return 403, but a status code only says what the API answered — not what it did before answering. This reads the post back and checks the password still works, because a rejected write that quietly landed would look exactly the same from the outside."
-url: "{{baseUrl}}/api/v1/posts/{{guardedPostId}}"
+url: "{{baseUrl}}/api/posts/{{guardedPostId}}"
 method: GET
 scripts:
   - type: beforeRequest
@@ -9,7 +9,7 @@ scripts:
       // attempt above tried to set it to something else, and a 403 that
       // still wrote would show up here as a refused sign-in.
       pm.sendRequest({
-          url: `${pm.variables.get("baseUrl")}/api/v1/users/token`,
+          url: `${pm.variables.get("baseUrl")}/api/users/token`,
           method: "POST",
           header: { "Content-Type": "application/x-www-form-urlencoded" },
           body: {

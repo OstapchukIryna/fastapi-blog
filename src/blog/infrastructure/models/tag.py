@@ -10,9 +10,6 @@ from blog.infrastructure.database import Base
 if TYPE_CHECKING:
     from blog.infrastructure.models.post import Post
 
-# Association class for the many-to-many relationship between posts and tags
-# Also can make it a table if you don't nesseccerarily need extra fields
-
 
 class PostTag(Base):
     """Association table for the many-to-many relationship between posts and tags.

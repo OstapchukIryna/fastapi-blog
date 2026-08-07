@@ -16,11 +16,9 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from blog.presentation.web.templating import templates
 
-# ! Deliberately the unversioned root, not blog.presentation.api's
-# ! API_PREFIX. This asks "is the caller a script or a browser", and the
-# ! answer is the same for /api/v1 and for whatever comes after it.
-# ! Matching one version would leave the next one rendering HTML errors
-# ! to clients that asked for JSON.
+# ! Written out rather than built from blog.presentation.api's API_PREFIX —
+# ! this only needs to ask "is the caller a script or a browser", and every
+# ! JSON route answers under this root regardless of what else changes there.
 API_PATH_ROOT = "/api/"
 
 GENERIC_FAILURE = "An error occurred. Please try again."

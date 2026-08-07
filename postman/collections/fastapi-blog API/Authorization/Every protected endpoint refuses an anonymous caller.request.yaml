@@ -1,6 +1,6 @@
 $kind: http-request
 description: "One request per endpoint would say the same thing seven times, so the sweep is done in the setup and asserted here. Its value is not any single 401 but the list itself: an endpoint added later without a token check shows up as a gap the moment someone adds it to this list — and forgetting to add it is caught by the Contract folder instead."
-url: "{{baseUrl}}/api/v1/posts"
+url: "{{baseUrl}}/api/posts"
 method: GET
 scripts:
   - type: beforeRequest
@@ -12,13 +12,13 @@ scripts:
       const user = pm.collectionVariables.get("userId");
 
       const guarded = [
-          { name: "POST /api/v1/posts", method: "POST", url: `${base}/api/v1/posts` },
-          { name: "PUT /api/v1/posts/{id}", method: "PUT", url: `${base}/api/v1/posts/${post}` },
-          { name: "PATCH /api/v1/posts/{id}", method: "PATCH", url: `${base}/api/v1/posts/${post}` },
-          { name: "DELETE /api/v1/posts/{id}", method: "DELETE", url: `${base}/api/v1/posts/${post}` },
-          { name: "GET /api/v1/users/me", method: "GET", url: `${base}/api/v1/users/me` },
-          { name: "PATCH /api/v1/users/{id}", method: "PATCH", url: `${base}/api/v1/users/${user}` },
-          { name: "DELETE /api/v1/users/{id}", method: "DELETE", url: `${base}/api/v1/users/${user}` },
+          { name: "POST /api/posts", method: "POST", url: `${base}/api/posts` },
+          { name: "PUT /api/posts/{id}", method: "PUT", url: `${base}/api/posts/${post}` },
+          { name: "PATCH /api/posts/{id}", method: "PATCH", url: `${base}/api/posts/${post}` },
+          { name: "DELETE /api/posts/{id}", method: "DELETE", url: `${base}/api/posts/${post}` },
+          { name: "GET /api/users/me", method: "GET", url: `${base}/api/users/me` },
+          { name: "PATCH /api/users/{id}", method: "PATCH", url: `${base}/api/users/${user}` },
+          { name: "DELETE /api/users/{id}", method: "DELETE", url: `${base}/api/users/${user}` },
       ];
 
       const seen = [];

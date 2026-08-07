@@ -39,17 +39,17 @@ waiting for the answer.
 
 ```bash
 uv run ruff check . && uv run pyrefly check src/blog seed.py populate.py tests scripts
-uv run pytest                # browser tests, plus the import-graph rules
+uv run pytest                # in-process, against Postgres, plus the import-graph rules
 ./scripts/api-tests.sh       # the Postman collection against a throwaway database
 uv run mkdocs serve          # this site, with live reload
 uv sync --locked             # fails if uv.lock has drifted from pyproject
 ```
 
 The pipeline is three parallel jobs: **static** (ruff, djlint, pyrefly,
-a strict docs build and the lockfile check), **tests** (pytest with
-Chromium, keeping the traces of anything that failed), and **API
-contract** (the Postman collection against a throwaway database). On
-master, a fourth workflow publishes this site.
+a strict docs build and the lockfile check), **tests** (pytest against a
+throwaway Postgres database), and **API contract** (the Postman collection
+against a throwaway database). On master, a fourth workflow publishes this
+site.
 
 ## The shape of it in one paragraph
 

@@ -1,6 +1,6 @@
 $kind: http-request
 description: exclude_unset means an absent field is not a change. An empty body is a legitimate no-op, not an error.
-url: "{{baseUrl}}/api/v1/posts/{{postId}}"
+url: "{{baseUrl}}/api/posts/{{postId}}"
 method: PATCH
 headers:
   Authorization: Bearer {{accessToken}}
