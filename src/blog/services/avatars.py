@@ -8,20 +8,24 @@ Storage in AWS S3 only.
 from typing import Annotated
 
 from botocore.exceptions import ClientError
-from fastapi import Depends, HTTPException, UploadFile, status
+from fastapi import Depends, UploadFile, status
 from PIL import UnidentifiedImageError
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
 from blog.core.config import settings
+from blog.core.errors import AppHTTPError
 from blog.infrastructure import models
 from blog.infrastructure.images import AWSAvatars
 
 AvatarStore = Annotated[AWSAvatars, Depends(AWSAvatars)]
 
 
-class UploadTooLarge(HTTPException):
+class UploadTooLarge(AppHTTPError):
+    """The 400 for an upload past the configured size ceiling."""
+
     def __init__(self) -> None:
+        """Build the refusal, with the actual ceiling in the message."""
         megabytes = settings.max_upload_size_bytes // (1024 * 1024)
         super().__init__(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -29,8 +33,11 @@ class UploadTooLarge(HTTPException):
         )
 
 
-class NotAnImage(HTTPException):
+class NotAnImage(AppHTTPError):
+    """The 400 for an upload Pillow could not identify as an image."""
+
     def __init__(self) -> None:
+        """Build the refusal."""
         super().__init__(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
@@ -40,16 +47,22 @@ class NotAnImage(HTTPException):
         )
 
 
-class NoPicture(HTTPException):
+class NoPicture(AppHTTPError):
+    """The 400 for removing a picture the account does not have."""
+
     def __init__(self) -> None:
+        """Build the refusal."""
         super().__init__(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No picture to delete.",
         )
 
 
-class FailedUpload(HTTPException):
+class FailedUpload(AppHTTPError):
+    """The 500 for a storage failure partway through an upload."""
+
     def __init__(self) -> None:
+        """Build the refusal."""
         super().__init__(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to upload an image. Please try again",

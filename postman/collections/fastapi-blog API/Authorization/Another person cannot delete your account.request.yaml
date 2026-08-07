@@ -10,6 +10,6 @@ scripts:
       pm.test("403 Forbidden, not 401", () => pm.response.to.have.status(403));
 
       pm.test("refused for permission, not identity", () =>
-          pm.expect(pm.response.json().detail).to.eql("Not authorize to change profile"));
+          pm.expect(pm.response.json().detail).to.eql("Not authorized to change profile"));
     language: text/javascript
 order: 6000

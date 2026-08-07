@@ -11,11 +11,12 @@ caller's live here too, beside the row they load.
 
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from blog.core.errors import AppHTTPError, Forbidden, NotFound
 from blog.core.security import hash_password
 from blog.infrastructure import models
 from blog.infrastructure.database import DbSession
@@ -24,7 +25,7 @@ from blog.schemas import UserCreate, UserUpdate
 from blog.services.auth import CurrentUser
 
 
-class AlreadyRegistered(HTTPException):
+class AlreadyRegistered(AppHTTPError):
     """
     The 400 for a username or email somebody already holds.
 
@@ -49,9 +50,7 @@ async def load_user(user_id: int, db: DbSession) -> models.User:
     """Returns user by id, otherwise 404."""
     user = await db.get(models.User, user_id)
     if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
+        raise NotFound("User")
     return user
 
 
@@ -67,17 +66,14 @@ def own_account(user: UserDep, current_user: CurrentUser) -> models.User:
         current_user (CurrentUser): whoever the token belongs to.
 
     Raises:
-        HTTPException: 403 when it is somebody else's account.
+        Forbidden: 403 when it is somebody else's account.
 
     Returns:
         models.User: the same account, now known to be theirs.
 
     """
     if user.id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorize to change profile",
-        )
+        raise Forbidden("Not authorized to change profile")
     return user
 
 
@@ -176,8 +172,8 @@ async def update(
         changes (UserUpdate): the fields to change, already validated.
 
     Raises:
-        HTTPException: 400 when the requested username or email already
-            belongs to somebody else.
+        AlreadyRegistered: 400 when the requested username or email
+            already belongs to somebody else.
 
     Returns:
         models.User: the user as stored after the change.

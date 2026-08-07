@@ -21,11 +21,12 @@ decide.
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
-from fastapi import HTTPException, status
+from fastapi import status
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from blog.core.config import settings
+from blog.core.errors import AppHTTPError
 from blog.core.security import (
     generate_reset_token,
     hash_password,
@@ -69,7 +70,7 @@ class ResetMailer(Protocol):
         """
 
 
-class InvalidResetToken(HTTPException):
+class InvalidResetToken(AppHTTPError):
     """The 400 for a reset token that cannot be used.
 
     One class, one message, for four different situations: no such token,
@@ -89,7 +90,7 @@ class InvalidResetToken(HTTPException):
         )
 
 
-class WrongPassword(HTTPException):
+class WrongPassword(AppHTTPError):
     """The 400 for a change-password request that failed its own check.
 
     Distinct from the reset refusal on purpose: here the caller is

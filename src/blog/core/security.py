@@ -11,10 +11,11 @@ import secrets
 from datetime import UTC, datetime, timedelta
 
 import jwt
-from fastapi import HTTPException, status
+from fastapi import status
 from pwdlib import PasswordHash
 
 from blog.core.config import settings
+from blog.core.errors import AppHTTPError
 
 # * Argon2 only, chosen for us by pwdlib's "recommended" preset. Worth
 # * knowing: this hasher does not recognise a bcrypt hash and raises on
@@ -23,7 +24,7 @@ from blog.core.config import settings
 password_hash = PasswordHash.recommended()
 
 
-class Unauthorized(HTTPException):
+class Unauthorized(AppHTTPError):
     """A 401 that carries the authentication challenge with it.
 
     A class rather than a function returning an exception: the old

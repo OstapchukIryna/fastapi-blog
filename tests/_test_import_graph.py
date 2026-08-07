@@ -56,6 +56,14 @@ TOP = 5  # blog.main, and anything not inside a layer package
 ALLOWED_SIDEWAYS = {
     ("blog.core.security", "blog.core.config"): "signing needs the secret",
     (
+        "blog.core.security",
+        "blog.core.errors",
+    ): "Unauthorized is a refusal, not a crypto primitive",
+    (
+        "blog.core.logging",
+        "blog.core.config",
+    ): "configure_logging reads environment and log_level off Settings",
+    (
         "blog.infrastructure.models.post",
         "blog.infrastructure.database",
     ): "Base is declared there",

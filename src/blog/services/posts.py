@@ -20,12 +20,13 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends
 from sqlalchemy import Select, func, select
 from sqlalchemy import update as update_statement
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
+from blog.core.errors import Forbidden, NotFound
 from blog.infrastructure import models
 from blog.infrastructure.database import DbSession
 from blog.schemas import PostForm, PostUpdate
@@ -160,7 +161,7 @@ async def with_tag(
     One slice of the posts carrying a tag.
 
     Raises:
-        HTTPException: 404 when nothing anywhere carries this tag. Not
+        NotFound: 404 when nothing anywhere carries this tag. Not
             when the slice is empty — page four of a tag with thirty
             posts is empty and perfectly found.
 
@@ -169,9 +170,7 @@ async def with_tag(
         db, base_query().join(models.Post.tags).where(models.Tag.name == tag), page
     )
     if total == 0:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found"
-        )
+        raise NotFound("Tag")
     return items, total
 
 
@@ -265,14 +264,12 @@ async def load_post(post_id: int, db: DbSession) -> models.Post:
         models.Post: the post, with tags and author already attached.
 
     Raises:
-        HTTPException: 404 when no post has that id.
+        NotFound: 404 when no post has that id.
     """
     result = await db.execute(base_query().where(models.Post.id == post_id))
     post = result.scalars().first()
     if post is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Post not found"
-        )
+        raise NotFound("Post")
     return post
 
 
@@ -292,17 +289,14 @@ def owned_post(post: PostDep, current_user: CurrentUser) -> models.Post:
         current_user (CurrentUser): whoever the token belongs to.
 
     Raises:
-        HTTPException: 403 when the post belongs to somebody else. Not
+        Forbidden: 403 when the post belongs to somebody else. Not
             401 — the caller is known, they are simply not the author.
 
     Returns:
         models.Post: the same post, now known to be theirs.
     """
     if post.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorize to change this post",
-        )
+        raise Forbidden("Not authorized to change this post")
     return post
 
 
