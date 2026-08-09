@@ -6,8 +6,8 @@
 # (bloguser@localhost/test_blog) — one fixed name for every automated
 # check in this project, not derived from whatever DATABASE_URL a
 # developer's shell happens to have set. Its schema is dropped and
-# rebuilt by `alembic upgrade head`, then seeded, because several
-# requests lean on the seeded author.
+# rebuilt by `alembic upgrade head` — the collection creates whatever
+# data it needs itself, so nothing seeds it beforehand.
 #
 # ! Do not run this alongside pytest: both point at the same database,
 # ! and this script drops its schema outright.
@@ -65,9 +65,6 @@ conn.execute("CREATE SCHEMA public")
 '
     echo "==> migrating"
     uv run alembic upgrade head >/dev/null
-
-    echo "==> seeding"
-    uv run python seed.py >/dev/null
 
     echo "==> starting the app on ${BASE_URL}"
     uv run uvicorn blog.main:app --port "$PORT" --log-level warning >"${WORK_DIR}/server.log" 2>&1 &

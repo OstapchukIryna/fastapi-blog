@@ -9,9 +9,34 @@ body:
   type: json
   content: |-
     {
-      "username": "{{seededUsername}}"
+      "username": "{{takenUsername}}"
     }
 scripts:
+  - type: beforeRequest
+    code: |-
+      // A second, throwaway account exists just so this run's user can try
+      // (and fail) to take its name — self-contained, not seeded ahead of
+      // time.
+      const base = pm.variables.get("baseUrl");
+      const stamp = Date.now();
+      const username = `pm_taken_${stamp}`;
+
+      pm.sendRequest({
+          url: `${base}/api/users`,
+          method: "POST",
+          header: { "Content-Type": "application/json" },
+          body: {
+              mode: "raw",
+              raw: JSON.stringify({
+                  username,
+                  email: `pm_taken_${stamp}@example.com`,
+                  password: "correct-horse-battery",
+              }),
+          },
+      }, () => {
+          pm.collectionVariables.set("takenUsername", username);
+      });
+    language: text/javascript
   - type: afterResponse
     code: |-
       pm.test("400 Bad Request", () => pm.response.to.have.status(400));

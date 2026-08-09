@@ -20,16 +20,15 @@ permissions:
   contents: read
 
 env:
-  # The application refuses to start without a secret, and the docs build
-  # imports it to read the docstrings. Generated per run rather than kept
-  # in the repository's secrets: nothing here signs a token anybody will
-  # ever present again, and a stored value invites reuse somewhere it
-  # would matter.
+  # The application refuses to start without a secret. Generated per run
+  # rather than kept in the repository's secrets: nothing here signs a
+  # token anybody will ever present again, and a stored value invites
+  # reuse somewhere it would matter.
   SECRET_KEY: ci-run-only-${{ github.run_id }}-${{ github.run_attempt }}
 
 jobs:
   static:
-    name: Lint, types, docs
+    name: Lint, types
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -53,20 +52,13 @@ jobs:
       - name: Ruff
         run: |
           uv run ruff check .
-          uv run ruff format --check src seed.py populate.py tests scripts
+          uv run ruff format --check src tests scripts
 
       - name: djlint
         run: uv run djlint templates/ --check
 
       - name: Types
-        run: uv run pyrefly check src/blog seed.py populate.py tests scripts
-
-      # --strict turns a broken link or an unreferenced page into a
-      # failure. The docs are built here even though publishing happens
-      # elsewhere, so a pull request cannot merge documentation that does
-      # not build.
-      - name: Docs
-        run: uv run mkdocs build --strict
+        run: uv run pyrefly check src/blog tests scripts
 
   tests:
     name: Tests

@@ -1,7 +1,7 @@
 $kind: collection
 name: fastapi-blog API
 description: |-
-  The JSON API behind called_mad.
+  The JSON API for the blog.
 
   Every request asserts the behaviour the routers document, not just the status code: PATCH leaves absent fields alone, PUT replaces everything, tags are normalised and replaced wholesale, a second DELETE is a 404, and a duplicate username is a 400 rather than a 500.
 
@@ -12,7 +12,6 @@ description: |-
   Known contract wart: `date_posted` comes back with a `Z` suffix from POST /api/posts and without one everywhere else, because on create the value is still the timezone-aware object in memory while every other route reads it back from SQLite, which stores it naive. The tests assert only that it parses, so they stay green either way.
 variables:
   baseUrl: http://127.0.0.1:8000
-  seededUsername: called_mad
   newUsername: ""
   newEmail: ""
   userId: ""

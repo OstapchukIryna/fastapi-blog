@@ -14,8 +14,10 @@ wheels/
 .venv
 .env
 
-# Local Claude settings
+# Personal tooling: for working on this project locally, not part of it.
 .claude/
+CLAUDE.md
+.pre-commit-config.yaml
 
 # Machine state of the Postman extension: workspace links and auth.
 # The collection itself lives under postman/ and is committed — CI builds
@@ -27,14 +29,12 @@ postman/collection.json
 media/profile_pics/*
 !media/profile_pics/.gitkeep
 
-# Database files. blog.db is still tracked from before this rule; see
-# `git ls-files blog.db`. Ignoring a tracked file does not untrack it.
+# Database files.
 *.sqlite3
 *.db
 
-# Machine state of Impeccable; config.json, design.json are commited
-.impeccable/live/sessions/
-.impeccable/hook.cache.json
+# Impeccable design-skill sidecar: local tooling state, not project content.
+.impeccable/
 
 .github/hooks/
 

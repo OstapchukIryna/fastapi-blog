@@ -147,8 +147,7 @@ class AWSAvatars:
     async def clear_profile_pictures(self) -> None:
         """Remove every stored avatar, known to the database or not.
 
-        For populate.py's reset, which empties the database and
-        repopulates it from nothing — a per-user delete would leave
+        For resetting the bucket wholesale: a per-user delete would leave
         behind any avatar the database has since forgotten about (a
         previous run's upload that was never cleanly replaced).
         """

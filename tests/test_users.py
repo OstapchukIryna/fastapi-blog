@@ -5,6 +5,7 @@ from unittest.mock import ANY, AsyncMock, patch
 
 import jwt
 import pytest
+from botocore.exceptions import ClientError
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -12,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from blog.core.config import settings
 from blog.infrastructure import models
+from blog.infrastructure.images import AWSAvatars
 from blog.schemas import UserCreate, UserUpdate
 from blog.services import users
 from tests.conftest import (
@@ -954,6 +956,32 @@ async def test_upload_profile_picture_not_an_image_error(client: AsyncClient, mo
 
     s3_object = mocked_aws.list_objects_v2(Bucket=S3_BUCKET_NAME)
     assert "Contents" not in s3_object
+
+
+@pytest.mark.anyio
+async def test_upload_profile_picture_storage_failure_error(client: AsyncClient, mocked_aws):
+    user = await create_test_user(client)
+    token = await login_user(client)
+
+    test_image_path = Path(__file__).parent / "test_image.jpg"
+
+    with patch.object(
+        AWSAvatars,
+        "upload_profile_image",
+        AsyncMock(
+            side_effect=ClientError(
+                {"Error": {"Code": "InternalError", "Message": "boom"}}, "PutObject"
+            )
+        ),
+    ):
+        response = await client.patch(
+            f"/api/users/{user['id']}/picture",
+            files={"file": ("profile.jpg", BytesIO(test_image_path.read_bytes()), "image/jpeg")},
+            headers=auth_header(token),
+        )
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Failed to upload an image. Please try again"
 
 
 # * --- DELETE /api/users/{user_id}/picture: remove avatar ---------------------

@@ -15,7 +15,7 @@ scripts:
       });
 
       const documented = Object.keys(spec.paths).sort();
-      const covered = ["/api/users", "/api/users/token", "/api/users/me", "/api/users/{user_id}", "/api/users/{user_id}/picture", "/api/users/{user_id}/posts", "/api/users/forgot-password", "/api/users/reset-password", "/api/users/me/password", "/api/posts", "/api/posts/{post_id}", "/api/tags", "/api/tags/{tag}/posts"].sort();
+      const covered = ["/api/users", "/api/users/token", "/api/users/me", "/api/users/{user_id}", "/api/users/{user_id}/picture", "/api/users/{user_id}/posts", "/api/users/forgot-password", "/api/users/reset-password", "/api/users/me/password", "/api/posts", "/api/posts/{post_id}", "/api/tags", "/api/tags/{tag}/posts", "/api/health"].sort();
 
       pm.test("every documented endpoint is covered by this collection", () => {
           pm.expect(documented, "undocumented drift - add requests for the new paths")

@@ -3,7 +3,95 @@ from httpx import AsyncClient
 
 from tests.conftest import auth_header, create_test_post, create_test_user, login_user
 
-# --- GET /api/tags: tags.with_counts (not covered yet) --------------------
+
+# --- GET /api/tags: tags.with_counts ----------------------------------------
+@pytest.mark.anyio
+async def test_get_tags_empty(client: AsyncClient):
+    response = await client.get("/api/tags")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["items"] == []
+    assert data["total"] == 0
+
+
+@pytest.mark.anyio
+async def test_get_tags_most_used_first(client: AsyncClient):
+    await create_test_user(client)
+    token = await login_user(client)
+    headers = auth_header(token)
+
+    await create_test_post(client, headers, tags=["python"])
+    await create_test_post(client, headers, tags=["python", "sql"])
+    await create_test_post(client, headers, tags=["python", "sql", "rust"])
+
+    response = await client.get("/api/tags")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 3
+    assert data["items"] == [
+        {"name": "python", "count": 3},
+        {"name": "sql", "count": 2},
+        {"name": "rust", "count": 1},
+    ]
+
+
+@pytest.mark.anyio
+async def test_get_tags_ties_broken_by_name(client: AsyncClient):
+    await create_test_user(client)
+    token = await login_user(client)
+    headers = auth_header(token)
+
+    await create_test_post(client, headers, tags=["rust"])
+    await create_test_post(client, headers, tags=["python"])
+
+    response = await client.get("/api/tags")
+
+    assert response.status_code == 200
+    data = response.json()
+    # same count (1) on both — alphabetical order breaks the tie
+    assert data["items"] == [
+        {"name": "python", "count": 1},
+        {"name": "rust", "count": 1},
+    ]
+
+
+@pytest.mark.anyio
+async def test_get_tags_orphaned_tag_is_invisible(client: AsyncClient):
+    await create_test_user(client)
+    token = await login_user(client)
+    headers = auth_header(token)
+    post = await create_test_post(client, headers, tags=["python"])
+
+    # the tag row survives, but nothing references it anymore
+    response = await client.patch(f"/api/posts/{post['id']}", json={"tags": []}, headers=headers)
+    assert response.status_code == 200
+    assert response.json()["tags"] == []
+
+    response = await client.get("/api/tags")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["items"] == []
+    assert data["total"] == 0
+
+
+@pytest.mark.anyio
+async def test_get_tags_respects_limit(client: AsyncClient):
+    await create_test_user(client)
+    token = await login_user(client)
+    headers = auth_header(token)
+
+    for tag in ["python", "sql", "rust"]:
+        await create_test_post(client, headers, tags=[tag])
+
+    response = await client.get("/api/tags?limit=2")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 3
+    assert len(data["items"]) == 2
 
 
 # --- GET /api/tags/{tag}/posts: posts.with_tag -----------------------------
