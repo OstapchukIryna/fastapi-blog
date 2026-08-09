@@ -36,16 +36,12 @@ class Pagination(BaseModel):
             size so the number lives in settings, not in four signatures.
     """
 
-    skip: int = Field(
-        default=0, ge=0, description="records to pass over; zero on a first visit"
-    )
-    # * The ceiling is not decoration. It prevents a single request with
-    # * limit=100000 from pulling the whole table, each row joined to its author.
+    skip: int = Field(default=0, ge=0, description="records to pass over")
     limit: int = Field(
         default=settings.posts_per_page,
         ge=1,
         le=MAX_PAGE_SIZE,
-        description="how many entries to return in one page; defaults to the configured page size so the number lives in settings.",
+        description="how many entries to return in one page",
     )
 
 

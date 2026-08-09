@@ -110,9 +110,7 @@ async def send_password_reset(to_email: str, username: str, token: str) -> None:
     )
 
     template = _environment.get_template("password_reset.html")
-    html_content = template.render(
-        reset_url=reset_url, username=username, minutes=minutes
-    )
+    html_content = template.render(reset_url=reset_url, username=username, minutes=minutes)
 
     # ! Failures are logged, not raised. This runs as a background task,
     # ! which Starlette awaits after the response body has gone out — an

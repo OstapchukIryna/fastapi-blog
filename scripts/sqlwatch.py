@@ -113,9 +113,7 @@ def watching(target: AsyncEngine) -> Iterator[list[Query]]:
         """Record the statement together with its elapsed time."""
         started = conn.info.pop("sqlwatch_started", None)
         elapsed = (perf_counter() - started) * 1000 if started else 0.0
-        collected.append(
-            Query(statement=statement, parameters=parameters, milliseconds=elapsed)
-        )
+        collected.append(Query(statement=statement, parameters=parameters, milliseconds=elapsed))
 
     event.listen(underlying, "before_cursor_execute", before)
     event.listen(underlying, "after_cursor_execute", after)

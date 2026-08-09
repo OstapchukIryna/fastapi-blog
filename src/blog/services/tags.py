@@ -17,9 +17,7 @@ from blog.infrastructure import models
 from blog.schemas.pagination import Pagination
 
 
-async def with_counts(
-    db: AsyncSession, page: Pagination
-) -> tuple[Sequence[tuple[str, int]], int]:
+async def with_counts(db: AsyncSession, page: Pagination) -> tuple[Sequence[tuple[str, int]], int]:
     """List tags with how many posts use each, most used first.
 
     Ties are broken by name so the order is fully determined. Without
@@ -48,9 +46,7 @@ async def with_counts(
     # * Counted the same way the rows are selected. Counting the tags
     # * table instead would include orphans and leave the "load more"
     # * button visible after the last real row.
-    total = await db.scalar(
-        select(func.count()).select_from(counted.order_by(None).subquery())
-    )
+    total = await db.scalar(select(func.count()).select_from(counted.order_by(None).subquery()))
     result = await db.execute(counted.offset(page.skip).limit(page.limit))
     return [(name, count) for name, count in result.all()], total or 0
 

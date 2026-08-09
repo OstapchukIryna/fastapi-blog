@@ -24,7 +24,7 @@ scripts:
       if (posts.length) {
           pm.test("shape is exactly PostResponse", () =>
               pm.expect(Object.keys(posts[0]).sort()).to.eql(
-                  ["author", "date_posted", "id", "is_pinned", "outline",
+                  ["author", "date_posted", "id", "is_pinned",
                    "reading_minutes", "summary", "tags", "title"]));
 
           pm.test("the list carries no content - that is PostDetail's job", () =>

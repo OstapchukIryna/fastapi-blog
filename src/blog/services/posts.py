@@ -11,7 +11,7 @@ second one.
 Listings return a pair — the records and the total — as ORM objects
 rather than as a response schema. The envelope is assembled by whoever
 asked: the JSON route wants Page[PostResponse], while a page wants the
-posts themselves, because it reads outline and reading_minutes off them.
+posts themselves, because it reads reading_minutes off them.
 A service that returns the response shape can only serve one of the two,
 and returning it is what broke the front page once.
 """
@@ -129,9 +129,7 @@ async def _slice(
     # * order_by(None) before counting: sorting a subquery that is about
     # * to be reduced to a number is wasted work, and some databases
     # * reject it outright.
-    total = await db.scalar(
-        select(func.count()).select_from(query.order_by(None).subquery())
-    )
+    total = await db.scalar(select(func.count()).select_from(query.order_by(None).subquery()))
     result = await db.execute(query.offset(page.skip).limit(page.limit))
     # * .unique() deduplicates in Python. Required rather than tidy:
     # * SQLAlchemy refuses a joined eager load against a collection
@@ -140,9 +138,7 @@ async def _slice(
     return result.scalars().unique().all(), total or 0
 
 
-async def list_all(
-    db: AsyncSession, page: Pagination
-) -> tuple[Sequence[models.Post], int]:
+async def list_all(db: AsyncSession, page: Pagination) -> tuple[Sequence[models.Post], int]:
     """One slice of every post, pinned first."""
     return await _slice(db, base_query(), page)
 
@@ -194,9 +190,7 @@ class Related:
     shared: list[str]
 
 
-async def find_related(
-    db: AsyncSession, post: models.Post, limit: int = 2
-) -> list[Related]:
+async def find_related(db: AsyncSession, post: models.Post, limit: int = 2) -> list[Related]:
     """Suggest a couple of posts to read after this one.
 
     Two strategies, in order of preference. Posts sharing at least one
@@ -236,14 +230,10 @@ async def find_related(
         if matches:
             # * Most tags in common wins; recency breaks the tie. reverse
             # * applies to both keys, which is what we want for each.
-            matches.sort(
-                key=lambda m: (len(m.shared), m.post.date_posted), reverse=True
-            )
+            matches.sort(key=lambda m: (len(m.shared), m.post.date_posted), reverse=True)
             return matches[:limit]
 
-    newest = await db.execute(
-        base_query().where(models.Post.id != post.id).limit(limit)
-    )
+    newest = await db.execute(base_query().where(models.Post.id != post.id).limit(limit))
     return [Related(post=other, shared=[]) for other in newest.scalars().unique().all()]
 
 
@@ -296,7 +286,7 @@ def owned_post(post: PostDep, current_user: CurrentUser) -> models.Post:
         models.Post: the same post, now known to be theirs.
     """
     if post.user_id != current_user.id:
-        raise Forbidden("Not authorized to change this post")
+        raise Forbidden("Not authorized to edit this post")
     return post
 
 
@@ -361,9 +351,7 @@ async def replace(db: AsyncSession, post: models.Post, form: PostForm) -> models
     return post
 
 
-async def update(
-    db: AsyncSession, post: models.Post, changes: PostUpdate
-) -> models.Post:
+async def update(db: AsyncSession, post: models.Post, changes: PostUpdate) -> models.Post:
     """Change some fields of a post, leaving the rest alone.
 
     Which fields to touch comes from exclude_unset, so an omitted field

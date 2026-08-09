@@ -121,9 +121,7 @@ async def _clear_tokens(db: AsyncSession, user_id: int) -> None:
         user_id (int): whose tokens to remove.
     """
     await db.execute(
-        delete(models.PasswordResetToken).where(
-            models.PasswordResetToken.user_id == user_id
-        )
+        delete(models.PasswordResetToken).where(models.PasswordResetToken.user_id == user_id)
     )
 
 
@@ -189,8 +187,7 @@ async def _issue_token(db: AsyncSession, email: str) -> tuple[models.User, str] 
         models.PasswordResetToken(
             user_id=user.id,
             token_hash=hash_reset_token(token),
-            expires_at=datetime.now(UTC)
-            + timedelta(minutes=settings.reset_token_expire_minutes),
+            expires_at=datetime.now(UTC) + timedelta(minutes=settings.reset_token_expire_minutes),
         )
     )
     await db.commit()

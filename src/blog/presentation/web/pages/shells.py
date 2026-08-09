@@ -92,9 +92,7 @@ async def forgot_password_page(request: Request) -> Response:
             same whether or not the address is known and the server has
             no session in which to remember which was asked.
     """
-    return templates.TemplateResponse(
-        request, "forgot_password.html", {"title": "Forgot password"}
-    )
+    return templates.TemplateResponse(request, "forgot_password.html", {"title": "Forgot password"})
 
 
 @router.get("/reset-password", include_in_schema=False, name="reset_password_page")

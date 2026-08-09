@@ -20,9 +20,6 @@ from blog.presentation.web.templating import templates
 
 logger = logging.getLogger(__name__)
 
-# ! Written out rather than built from blog.presentation.api's API_PREFIX —
-# ! this only needs to ask "is the caller a script or a browser", and every
-# ! JSON route answers under this root regardless of what else changes there.
 API_PATH_ROOT = "/api/"
 
 GENERIC_FAILURE = "An error occurred. Please try again."
@@ -30,7 +27,7 @@ INVALID_REQUEST = "Invalid request. Please try again."
 
 
 def error_page(request: Request, status_code: int, message: str) -> Response:
-    """Render the shared error page."""
+    """Render generic error page."""
     return templates.TemplateResponse(
         request,
         "error.html",
@@ -44,20 +41,7 @@ def error_page(request: Request, status_code: int, message: str) -> Response:
 
 
 def register_error_handlers(app: FastAPI) -> None:
-    """Attach the handlers to an application.
-
-    Registered through a function rather than at import time, so this
-    module never has to import `main` and no cycle appears.
-
-    The handlers are declared with decorators rather than passed to
-    `add_exception_handler`, because that method is typed as accepting
-    `Callable[[Request, Exception], Response]`, and a strict checker
-    rejects a handler that narrows the second argument to the exception
-    it actually handles.
-
-    Args:
-        app (FastAPI): the application to attach to.
-    """
+    """Attach the handlers to an application."""
 
     @app.exception_handler(StarletteHTTPException)
     async def general_http_exception_handler(
@@ -72,39 +56,25 @@ def register_error_handlers(app: FastAPI) -> None:
         Returns:
             Response: JSON under /api/, an HTML page everywhere else.
         """
-        # * 5xx only: a 4xx is an ordinary, expected refusal (wrong
-        # * password, somebody else's post) and logging every one would
-        # * bury the rare case — a dependency failing partway through a
-        # * request — that a client cannot explain to us on its own.
         if exception.status_code >= status.HTTP_500_INTERNAL_SERVER_ERROR:
             logger.exception("Unhandled server-side refusal: %s", exception.detail)
 
         if request.url.path.startswith(API_PATH_ROOT):
             return await http_exception_handler(request, exception)
 
-        return error_page(
-            request, exception.status_code, exception.detail or GENERIC_FAILURE
-        )
+        return error_page(request, exception.status_code, exception.detail or GENERIC_FAILURE)
 
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(
         request: Request, exception: RequestValidationError
     ) -> Response:
-        """Answer a request whose shape was wrong.
+        """Answer a request what kind of validation error it is.
 
         Args:
             request (Request): the request that failed.
-            exception (RequestValidationError): what Pydantic rejected.
-
-        Returns:
-            Response: for the API, the framework's own detailed body,
-                because a client can act on the field list. For a page,
-                one sentence: the field-by-field breakdown belongs beside
-                the inputs, and the form already does that itself.
+            exception (RequestValidationError): what Pydantic rejected..
         """
         if request.url.path.startswith(API_PATH_ROOT):
             return await request_validation_exception_handler(request, exception)
 
-        return error_page(
-            request, status.HTTP_422_UNPROCESSABLE_CONTENT, INVALID_REQUEST
-        )
+        return error_page(request, status.HTTP_422_UNPROCESSABLE_CONTENT, INVALID_REQUEST)

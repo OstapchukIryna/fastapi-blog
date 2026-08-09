@@ -73,9 +73,7 @@ async def tags_index(request: Request, db: DbSession, page: PageParams) -> Respo
 
 
 @router.get("/tags/{tag}", name="get_tag")
-async def get_tag(
-    request: Request, tag: str, db: DbSession, page: PageParams
-) -> Response:
+async def get_tag(request: Request, tag: str, db: DbSession, page: PageParams) -> Response:
     """Render the posts filed under one tag.
 
     Reuses home.html rather than having a template of its own: the two
@@ -130,8 +128,6 @@ async def user_posts_page(
             "posts": items,
             "user": user,
             "title": f"{user.username}'s posts",
-            "feed": Feed.after(
-                request, "get_user_posts", page, items, total, user_id=user.id
-            ),
+            "feed": Feed.after(request, "get_user_posts", page, items, total, user_id=user.id),
         },
     )

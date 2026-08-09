@@ -333,8 +333,7 @@ POSTS: list[DemoPost] = [
     {
         "title": "Never say which half of the credentials was wrong",
         "summary": (
-            "*Unknown email* and *wrong password* answer a question the "
-            "caller had no right to ask."
+            "*Unknown email* and *wrong password* answer a question the caller had no right to ask."
         ),
         "content": (
             "Between them they confirm whether an address is registered "
@@ -448,8 +447,7 @@ POSTS: list[DemoPost] = [
     {
         "title": "A validator that forgets to return sets the field to None",
         "summary": (
-            "It does not fail loudly. It succeeds quietly, with your data "
-            "replaced by nothing."
+            "It does not fail loudly. It succeeds quietly, with your data replaced by nothing."
         ),
         "content": (
             "Pydantic takes whatever the validator returns as the new "
@@ -513,8 +511,7 @@ POSTS: list[DemoPost] = [
     {
         "title": "Normalising tags in one place is not premature",
         "summary": (
-            "Strip, lowercase, de-duplicate. Do it in two schemas and "
-            "they drift within a month."
+            "Strip, lowercase, de-duplicate. Do it in two schemas and they drift within a month."
         ),
         "content": (
             "Create and update both accept tags, and both have to agree "
@@ -564,8 +561,7 @@ POSTS: list[DemoPost] = [
     {
         "title": "Threads didn't make it faster. Processes did.",
         "summary": (
-            "The same tool, two halves of one script, two opposite "
-            "results. The GIL explains both."
+            "The same tool, two halves of one script, two opposite results. The GIL explains both."
         ),
         "content": (
             "Resizing twelve images is CPU work, and threads take turns "
@@ -581,8 +577,7 @@ POSTS: list[DemoPost] = [
     {
         "title": "Pillow is synchronous and it does not care about your loop",
         "summary": (
-            "A 300×300 resize is not free, and it blocks every other "
-            "request while it runs."
+            "A 300×300 resize is not free, and it blocks every other request while it runs."
         ),
         "content": (
             "`run_in_threadpool` is the whole fix: the resize goes to a "
@@ -631,8 +626,7 @@ POSTS: list[DemoPost] = [
     {
         "title": "greenlet is why SQLAlchemy's async works at all",
         "summary": (
-            "An extra dependency you did not ask for, doing the thing "
-            "that makes the API possible."
+            "An extra dependency you did not ask for, doing the thing that makes the API possible."
         ),
         "content": (
             "The ORM's internals are deeply synchronous. Rewriting them "
@@ -679,8 +673,7 @@ POSTS: list[DemoPost] = [
     {
         "title": "Path parameters identify, query parameters modify",
         "summary": (
-            "`/posts/12` is a thing. `?page=2&per_page=10` is a question "
-            "about how you want it."
+            "`/posts/12` is a thing. `?page=2&per_page=10` is a question about how you want it."
         ),
         "content": (
             "The rule falls out of what a URL means: the path names a "
@@ -1011,10 +1004,7 @@ async def backdate_posts() -> None:
             await db.execute(
                 update(models.Post)
                 .where(models.Post.id == post.id)
-                .values(
-                    date_posted=now
-                    - timedelta(days=index * 1.5, hours=(index * 7) % 24)
-                )
+                .values(date_posted=now - timedelta(days=index * 1.5, hours=(index * 7) % 24))
             )
 
         await db.commit()
@@ -1026,9 +1016,7 @@ async def pin_featured() -> None:
 
     async with AsyncSessionLocal() as db:
         await db.execute(
-            update(models.Post)
-            .where(models.Post.title.in_(titles))
-            .values(is_pinned=True)
+            update(models.Post).where(models.Post.title.in_(titles)).values(is_pinned=True)
         )
         await db.commit()
 
@@ -1053,9 +1041,7 @@ async def main() -> None:
     print("cleared")
 
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(
-        transport=transport, base_url="http://populate"
-    ) as client:
+    async with httpx.AsyncClient(transport=transport, base_url="http://populate") as client:
         print(f"\n{len(USERS)} users:")
         tokens = await create_users(client)
 

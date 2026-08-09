@@ -34,9 +34,7 @@ class ResetPasswordRequest(BaseModel):
     """
 
     token: str
-    new_password: str = Field(
-        min_length=MIN_PASSWORD_LENGTH, max_length=MAX_PASSWORD_LENGTH
-    )
+    new_password: str = Field(min_length=MIN_PASSWORD_LENGTH, max_length=MAX_PASSWORD_LENGTH)
 
 
 class ChangePasswordRequest(BaseModel):
@@ -51,9 +49,7 @@ class ChangePasswordRequest(BaseModel):
     """
 
     current_password: str
-    new_password: str = Field(
-        min_length=MIN_PASSWORD_LENGTH, max_length=MAX_PASSWORD_LENGTH
-    )
+    new_password: str = Field(min_length=MIN_PASSWORD_LENGTH, max_length=MAX_PASSWORD_LENGTH)
 
 
 class Message(BaseModel):

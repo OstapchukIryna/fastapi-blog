@@ -73,7 +73,7 @@ def own_account(user: UserDep, current_user: CurrentUser) -> models.User:
 
     """
     if user.id != current_user.id:
-        raise Forbidden("Not authorized to change profile")
+        raise Forbidden("Not authorized to edit profile")
     return user
 
 
@@ -113,9 +113,7 @@ async def register(db: AsyncSession, registration: UserCreate) -> models.User:
     return user
 
 
-async def _already_taken(
-    db: AsyncSession, user: models.User, wanted: dict[str, object]
-) -> bool:
+async def _already_taken(db: AsyncSession, user: models.User, wanted: dict[str, object]) -> bool:
     """Report whether another account already holds the requested name or email.
 
     Only the two unique columns are worth asking about, and only when
@@ -148,9 +146,7 @@ async def _already_taken(
     return clash.scalars().first() is not None
 
 
-async def update(
-    db: AsyncSession, user: models.User, changes: UserUpdate
-) -> models.User:
+async def update(db: AsyncSession, user: models.User, changes: UserUpdate) -> models.User:
     """
     Change some fields of a user, leaving the rest alone.
 
@@ -179,15 +175,15 @@ async def update(
         models.User: the user as stored after the change.
 
     """
-    wanted = changes.model_dump(exclude_unset=True, exclude_none=True)
+    wanted_changes = changes.model_dump(exclude_unset=True, exclude_none=True)
 
-    if await _already_taken(db, user, wanted):
+    if await _already_taken(db, user, wanted_changes):
         raise AlreadyRegistered()
 
-    if "password" in wanted:
-        user.password_hash = hash_password(wanted.pop("password"))
+    if "password" in wanted_changes:
+        user.password_hash = hash_password(wanted_changes.pop("password"))
 
-    for name, value in wanted.items():
+    for name, value in wanted_changes.items():
         setattr(user, name, value.lower() if name == "email" else value)
 
     try:

@@ -37,9 +37,7 @@ def _get_s3_client():
         "s3",
         region_name=settings.s3_region,
         aws_access_key_id=(
-            settings.s3_access_key_id.get_secret_value()
-            if settings.s3_access_key_id
-            else None
+            settings.s3_access_key_id.get_secret_value() if settings.s3_access_key_id else None
         ),
         aws_secret_access_key=(
             settings.s3_secret_access_key.get_secret_value()

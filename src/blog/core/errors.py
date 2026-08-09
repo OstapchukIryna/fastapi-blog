@@ -28,9 +28,7 @@ class NotFound(AppHTTPError):
             resource (str): what was being looked up, capitalised as it
                 should read to a caller — becomes "`{resource}` not found".
         """
-        super().__init__(
-            status_code=status.HTTP_404_NOT_FOUND, detail=f"{resource} not found"
-        )
+        super().__init__(status_code=status.HTTP_404_NOT_FOUND, detail=f"{resource} not found")
 
 
 class Forbidden(AppHTTPError):

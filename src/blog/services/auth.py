@@ -22,6 +22,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from blog.core.config import settings
+from blog.core.logging import user_id_var
 from blog.core.security import (
     Unauthorized,
     create_access_token,
@@ -62,13 +63,17 @@ async def get_current_user(token: TokenDep, db: DbSession) -> models.User:
     try:
         # pyrefly: ignore [bad-argument-type]
         user_id = int(verify_access_token(token))
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         raise Unauthorized("Invalid or expired token") from None
 
     user = await db.get(models.User, user_id)
     if not user:
         # Signed correctly, but the account has since been deleted.
         raise Unauthorized("User not found")
+
+    # * Set once the account is known, not before — an anonymous or a
+    # * rejected request should never appear to belong to somebody.
+    user_id_var.set(user.id)
     return user
 
 

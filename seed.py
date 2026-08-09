@@ -142,9 +142,7 @@ async def get_or_create_author(db: AsyncSession) -> models.User:
     Returns:
         models.User: the author, whether just made or already there.
     """
-    result = await db.execute(
-        select(models.User).where(models.User.username == AUTHOR["username"])
-    )
+    result = await db.execute(select(models.User).where(models.User.username == AUTHOR["username"]))
     user = result.scalars().first()
 
     if user is not None:
@@ -174,9 +172,7 @@ async def seed() -> None:
         for item in POSTS:
             # * Idempotency keyed on the title: the model has no slug
             # * column, and the titles in this file are unique.
-            result = await db.execute(
-                select(models.Post).where(models.Post.title == item["title"])
-            )
+            result = await db.execute(select(models.Post).where(models.Post.title == item["title"]))
             exists = result.scalars().first()
             if exists is not None:
                 continue

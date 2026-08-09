@@ -109,9 +109,7 @@ def edit_post_form(request: Request, post: PostDep) -> Response:
         Response: the form page populated from the post.
 
     """
-    return render_post_form(
-        request, PostFormView(values=post_to_input(post), post=post)
-    )
+    return render_post_form(request, PostFormView(values=post_to_input(post), post=post))
 
 
 @router.post("/posts/{post_id}/edit", name="update_post")

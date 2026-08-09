@@ -189,9 +189,7 @@ def graph() -> dict[str, set[str]]:
     for name, path in modules.items():
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in runtime_imports(tree):
-            if isinstance(node, ast.ImportFrom) and (node.module or "").startswith(
-                "blog"
-            ):
+            if isinstance(node, ast.ImportFrom) and (node.module or "").startswith("blog"):
                 # `node.module` is Optional on the AST, but a relative
                 # import (`from . import x`) never starts with "blog", so
                 # the branch above has already excluded None.
@@ -239,9 +237,7 @@ def test_no_import_cycles(graph):
     for module in sorted(graph):
         walk(module)
 
-    assert not cycles, "import cycle:\n" + "\n".join(
-        "  " + " -> ".join(cycle) for cycle in cycles
-    )
+    assert not cycles, "import cycle:\n" + "\n".join("  " + " -> ".join(cycle) for cycle in cycles)
 
 
 def test_no_upward_imports(graph):
@@ -311,9 +307,7 @@ def test_the_application_imports(monkeypatch):
     # Never connected to — create_async_engine only parses the URL — but it
     # has to name a driver that is installed, and it must not be the real
     # database in case anything here ever does open a connection.
-    monkeypatch.setenv(
-        "DATABASE_URL", "postgresql+psycopg://import:graph@127.0.0.1:1/none"
-    )
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://import:graph@127.0.0.1:1/none")
 
     from blog.main import app
 

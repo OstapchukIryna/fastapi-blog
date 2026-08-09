@@ -11,7 +11,6 @@ from blog.infrastructure.models.tag import Tag
 from blog.infrastructure.models.user import User
 
 WORDS_PER_MINUTE = 200
-HEADING_PREFIX = "## "
 
 
 class Post(Base):
@@ -66,39 +65,23 @@ class Post(Base):
     likes: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     author: Mapped[User] = relationship(back_populates="posts")
-    tags: Mapped[list[Tag]] = relationship(
-        secondary="post_tags", back_populates="posts"
-    )
-
-    @property
-    def outline(self) -> list[str]:
-        """The second-level headings in the body, in order.
-
-        Used by listings to show what an article covers when its summary
-        would be less informative than its structure. Computed on read
-        rather than stored: it is a view of the content, and storing it
-        would create a second copy to keep in step with every edit.
-
-        Returns:
-            list[str]: heading texts without their Markdown prefix. Empty
-                when the post has no headings, which is how the template
-                decides to show the summary instead.
-        """
-        return [
-            line.removeprefix(HEADING_PREFIX).strip()
-            for line in self.content.splitlines()
-            if line.startswith(HEADING_PREFIX)
-        ]
+    tags: Mapped[list[Tag]] = relationship(secondary="post_tags", back_populates="posts")
 
     @property
     def reading_minutes(self) -> int:
         """Rough reading time, never less than one minute.
 
-        A word count over an assumed reading speed. Deliberately crude:
-        the number is a hint about length, and a more precise estimate
-        would not change any reader's decision.
+        A word count over an assumed reading speed. The number gives a
+        hint about length. A more precise estimate would not change what
+        a reader decides.
 
         Returns:
             int: minutes, rounded up.
+
+        Examples:
+            >>> Post(content="one two three").reading_minutes
+            1
+            >>> Post(content=" ".join(["word"] * 250)).reading_minutes
+            2
         """
         return max(1, ceil(len(self.content.split()) / WORDS_PER_MINUTE))

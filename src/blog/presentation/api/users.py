@@ -103,9 +103,7 @@ async def get_current_user(current_user: CurrentUser) -> models.User:
     return current_user
 
 
-@router.post(
-    "/forgot-password", response_model=Message, status_code=status.HTTP_202_ACCEPTED
-)
+@router.post("/forgot-password", response_model=Message, status_code=status.HTTP_202_ACCEPTED)
 async def forgot_password(
     request_data: ForgotPasswordRequest,
     background_tasks: BackgroundTasks,
@@ -131,9 +129,7 @@ async def forgot_password(
             the route no longer learns which case it was in — the service
             takes the address and returns nothing.
     """
-    await passwords.request_reset(
-        db, request_data.email, BackgroundMail(background_tasks)
-    )
+    await passwords.request_reset(db, request_data.email, BackgroundMail(background_tasks))
     return Message(message=RESET_REQUESTED)
 
 
@@ -194,9 +190,7 @@ def get_user(user: UserDep) -> models.User:
 
 
 @router.get("/{user_id}/posts", response_model=Page[PostResponse])
-async def get_user_posts(
-    user: UserDep, db: DbSession, page: PageParams
-) -> Page[PostResponse]:
+async def get_user_posts(user: UserDep, db: DbSession, page: PageParams) -> Page[PostResponse]:
     """Return one page of what this person wrote.
 
     Args:
@@ -213,9 +207,7 @@ async def get_user_posts(
 
 
 @router.patch("/{user_id}", response_model=UserPublic)
-async def update_user_fields(
-    user: OwnAccount, changes: UserUpdate, db: DbSession
-) -> models.User:
+async def update_user_fields(user: OwnAccount, changes: UserUpdate, db: DbSession) -> models.User:
     """Change some fields of the caller's own account.
 
     Args:

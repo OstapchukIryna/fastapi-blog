@@ -1,15 +1,6 @@
-"""Configuring the standard library's logging, once, for the whole process.
+"""Configuring the standard library's logging.
 
-Every logger in the process — ours and uvicorn's — ends up on the same
-handler with the same formatter, so a log aggregator sees one shape
-instead of two interleaved ones. Development gets a console line matched
-to uvicorn's own; production gets one JSON object per line, because that
-is what everything downstream of a container actually parses.
-
-! Called once, at the top of main.py, before any other blog module might
-! log something. Safe to call again — dictConfig is declarative, not
-! additive, so a second call (uvicorn re-imports main.py per --reload
-! child) just replaces the same state with itself.
+Called once, at the top of main.py before any other blog module might log something.
 """
 
 import json
@@ -21,17 +12,27 @@ from typing import Any
 from blog.core.config import Settings
 
 request_id_var: ContextVar[str | None] = ContextVar("request_id", default=None)
+user_id_var: ContextVar[int | None] = ContextVar("user_id", default=None)
+
+# What a fresh LogRecord already carries, plus the two fields Formatter.format
+# adds along the way — the boundary between "a field of the record itself"
+# and "something a caller passed via extra=" and therefore worth surfacing
+# as its own key in the JSON line.
+_BUILTIN_RECORD_ATTRS = frozenset(vars(logging.LogRecord("", 0, "", 0, "", (), None))) | {
+    "message",
+    "asctime",
+}
 
 
-class RequestIDFilter(logging.Filter):
-    """Stamps every record with the id of the request that caused it.
+class ContextFilter(logging.Filter):
+    """Stamps every record with who and what caused it.
 
     "-" outside of a request — startup, shutdown, a script — so the
     format string never has to special-case an absent field.
     """
 
     def filter(self, record: logging.LogRecord) -> bool:
-        """Attach the current request id, or its absence, to the record.
+        """Attach the current request id and user id to the record.
 
         Args:
             record (logging.LogRecord): the record about to be emitted.
@@ -40,15 +41,21 @@ class RequestIDFilter(logging.Filter):
             bool: always True — this filter only annotates, never drops.
         """
         record.request_id = request_id_var.get() or "-"
+        record.user_id = user_id_var.get() or "-"
         return True
 
 
 class JSONFormatter(logging.Formatter):
     """One JSON object per line — what a log aggregator actually reads.
 
-    Hand-written rather than a dependency: the shape needed is five
-    fields, and a third-party formatter would cost more to configure than
-    this costs to write.
+    Hand-written rather than a dependency: the shape needed is a handful
+    of fields plus whatever a caller adds, and a third-party formatter
+    would cost more to configure than this costs to write.
+
+    Anything passed as `extra={...}` to a log call — a canonical log
+    line's method/path/status/duration, say — becomes its own top-level
+    key rather than text buried in `message`, which is the whole point of
+    a field being searchable.
     """
 
     def format(self, record: logging.LogRecord) -> str:
@@ -65,11 +72,16 @@ class JSONFormatter(logging.Formatter):
             "level": record.levelname,
             "logger": record.name,
             "request_id": getattr(record, "request_id", "-"),
+            "user_id": getattr(record, "user_id", "-"),
             "message": record.getMessage(),
         }
+        for key, value in record.__dict__.items():
+            if key not in _BUILTIN_RECORD_ATTRS and key not in payload:
+                payload[key] = value
+
         if record.exc_info:
             payload["exception"] = self.formatException(record.exc_info)
-        return json.dumps(payload)
+        return json.dumps(payload, default=str)
 
 
 def configure_logging(settings: Settings) -> None:
@@ -85,12 +97,13 @@ def configure_logging(settings: Settings) -> None:
             "version": 1,
             "disable_existing_loggers": False,
             "filters": {
-                "request_id": {"()": "blog.core.logging.RequestIDFilter"},
+                "context": {"()": "blog.core.logging.ContextFilter"},
             },
             "formatters": {
                 "console": {
                     "()": "uvicorn.logging.DefaultFormatter",
-                    "fmt": "%(levelprefix)s [%(request_id)s] %(name)s: %(message)s",
+                    "fmt": "%(levelprefix)s [req=%(request_id)s user=%(user_id)s]"
+                    " %(name)s: %(message)s",
                 },
                 "json": {"()": "blog.core.logging.JSONFormatter"},
             },
@@ -98,7 +111,7 @@ def configure_logging(settings: Settings) -> None:
                 "default": {
                     "class": "logging.StreamHandler",
                     "formatter": formatter,
-                    "filters": ["request_id"],
+                    "filters": ["context"],
                 },
             },
             "root": {"handlers": ["default"], "level": settings.log_level},

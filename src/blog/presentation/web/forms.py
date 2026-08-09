@@ -75,9 +75,7 @@ class PostFormView:
         Returns:
             int: 422 when the view carries errors, 200 otherwise.
         """
-        return (
-            status.HTTP_422_UNPROCESSABLE_CONTENT if self.errors else status.HTTP_200_OK
-        )
+        return status.HTTP_422_UNPROCESSABLE_CONTENT if self.errors else status.HTTP_200_OK
 
 
 def post_to_input(post: models.Post) -> PostFormInput:

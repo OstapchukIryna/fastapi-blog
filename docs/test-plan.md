@@ -136,7 +136,6 @@ with the best ratio of confidence to effort.
 | `PostFormInput.validated()` splits on commas, drops empties, delegates the rest to `PostForm` | the two surfaces accepting different things | `unit` |
 | `post_to_input` re-joins tags with `", "` — the inverse of the above | an edit round-trip mangling tags. Property test: `validated(post_to_input(p)).tags == [t.name for t in p.tags]` | `unit` |
 | `PostResponse.flatten_tags` accepts `Tag` rows *and* plain strings | breaking either the ORM path or the direct-construction path | `unit` |
-| `Post.outline` returns `## ` headings, prefix stripped, in order; `[]` when none | the template's "show the summary instead" branch never firing | `unit` |
 | `Post.reading_minutes` is `ceil(words/200)`, never below 1 | "0 min read" on a short post | `unit` |
 | `User.image_path` is `/media/...` when set and `DEFAULT_AVATAR` when `None`, and has no setter | a second place the avatar lives, and two ways for them to disagree | `unit` |
 | `PasswordResetToken.expired` labels a naive datetime from SQLite as UTC | SQLite has no tz-aware column, so comparing what comes back to an aware `now` raises instead of answering | `unit` |

@@ -24,9 +24,7 @@ class PostTag(Base):
     post_id: Mapped[int] = mapped_column(
         ForeignKey("posts.id", ondelete="CASCADE"), primary_key=True
     )
-    tag_id: Mapped[int] = mapped_column(
-        ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True
-    )
+    tag_id: Mapped[int] = mapped_column(ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True)
 
 
 class Tag(Base):
@@ -51,10 +49,6 @@ class Tag(Base):
     __tablename__ = "tags"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(
-        String(30), unique=True, nullable=False, index=True
-    )
+    name: Mapped[str] = mapped_column(String(30), unique=True, nullable=False, index=True)
 
-    posts: Mapped[list[Post]] = relationship(
-        secondary="post_tags", back_populates="tags"
-    )
+    posts: Mapped[list["Post"]] = relationship(secondary="post_tags", back_populates="tags")

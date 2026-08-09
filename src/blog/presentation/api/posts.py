@@ -58,9 +58,7 @@ def get_post(post: PostDep) -> models.Post:
 
 
 @router.post("", response_model=PostDetail, status_code=status.HTTP_201_CREATED)
-async def create_post(
-    form: PostCreate, current_user: CurrentUser, db: DbSession
-) -> models.Post:
+async def create_post(form: PostCreate, current_user: CurrentUser, db: DbSession) -> models.Post:
     """Publish a new post under the caller's name.
 
     Args:
@@ -77,9 +75,7 @@ async def create_post(
 
 
 @router.put("/{post_id}", response_model=PostDetail)
-async def update_all_post_fields(
-    post: OwnedPost, form: PostCreate, db: DbSession
-) -> models.Post:
+async def update_all_post_fields(post: OwnedPost, form: PostCreate, db: DbSession) -> models.Post:
     """Replace every editable field of a post.
 
     Args:
@@ -96,9 +92,7 @@ async def update_all_post_fields(
 
 
 @router.patch("/{post_id}", response_model=PostDetail)
-async def update_post_fields(
-    post: OwnedPost, changes: PostUpdate, db: DbSession
-) -> models.Post:
+async def update_post_fields(post: OwnedPost, changes: PostUpdate, db: DbSession) -> models.Post:
     """Change some fields of a post and leave the rest alone.
 
     Args:

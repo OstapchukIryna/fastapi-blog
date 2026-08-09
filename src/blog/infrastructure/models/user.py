@@ -46,7 +46,7 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     image_file: Mapped[str | None] = mapped_column(String(200), default=None)
 
-    posts: Mapped[list[Post]] = relationship(
+    posts: Mapped[list["Post"]] = relationship(
         back_populates="author",
         cascade="all, delete-orphan",
     )
@@ -54,7 +54,7 @@ class User(Base):
     # Plural: a row per outstanding request. In practice there is at
     # most one, because issuing a new token clears the old ones — but
     # that is a rule the service keeps, not one the schema enforces.
-    reset_tokens: Mapped[list[PasswordResetToken]] = relationship(
+    reset_tokens: Mapped[list["PasswordResetToken"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
     )

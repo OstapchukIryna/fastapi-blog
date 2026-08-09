@@ -41,8 +41,7 @@ class NotAnImage(AppHTTPError):
         super().__init__(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                "Invalid image file. Please upload a valid file format "
-                "(JPEG, PNG, GIF, WebP)."
+                "Invalid image file. Please upload a valid file format (JPEG, PNG, GIF, WebP)."
             ),
         )
 
@@ -82,9 +81,7 @@ async def set_picture(
         raise UploadTooLarge()
 
     try:
-        file_bytes, new_filename = await run_in_threadpool(
-            storage.process_profile_image, content
-        )
+        file_bytes, new_filename = await run_in_threadpool(storage.process_profile_image, content)
     except UnidentifiedImageError as err:
         raise NotAnImage() from err
 
@@ -103,9 +100,7 @@ async def set_picture(
     return user
 
 
-async def remove_picture(
-    db: AsyncSession, user: models.User, storage: AWSAvatars
-) -> models.User:
+async def remove_picture(db: AsyncSession, user: models.User, storage: AWSAvatars) -> models.User:
     """Set default picture and delete the previous one."""
     old_filename = user.image_file
     if old_filename is None:

@@ -21,15 +21,11 @@ async def list_tags(db: DbSession, page: PageParams) -> Page[TagCount]:
         Page[TagCount]: the batch of tags and the total.
     """
     rows, total = await tags.with_counts(db, page)
-    return Page[TagCount].of(
-        ({"name": name, "count": count} for name, count in rows), total, page
-    )
+    return Page[TagCount].of(({"name": name, "count": count} for name, count in rows), total, page)
 
 
 @router.get("/{tag}/posts", response_model=Page[PostResponse])
-async def get_tag_posts(
-    tag: str, db: DbSession, page: PageParams
-) -> Page[PostResponse]:
+async def get_tag_posts(tag: str, db: DbSession, page: PageParams) -> Page[PostResponse]:
     """Return one page of the posts carrying a tag.
 
     Args:

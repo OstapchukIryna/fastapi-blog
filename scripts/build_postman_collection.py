@@ -150,9 +150,7 @@ def build(source: Path) -> dict[str, Any]:
             build_folder(f)
             for f in ordered(folders, lambda d: d / ".resources" / "definition.yaml")
         ],
-        "variable": [
-            {"key": k, "value": v} for k, v in (spec.get("variables") or {}).items()
-        ],
+        "variable": [{"key": k, "value": v} for k, v in (spec.get("variables") or {}).items()],
     }
     if evs := events(spec):
         collection["event"] = evs
@@ -175,9 +173,7 @@ def main() -> int:
         return 1
 
     collection = build(sources[0])
-    out = (
-        Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "postman" / "collection.json"
-    )
+    out = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "postman" / "collection.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(collection, indent=2, ensure_ascii=False) + "\n")
 

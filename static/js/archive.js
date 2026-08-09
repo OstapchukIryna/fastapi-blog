@@ -36,14 +36,7 @@ function tagLinks(tags) {
   return `<div class="card-tags mono-label">${links}</div>`;
 }
 
-// The outline when there is one, the summary otherwise — as the macro does.
 function cardBody(post) {
-  if (post.outline?.length) {
-    const items = post.outline
-      .map((heading) => `<li>${escapeHtml(heading)}</li>`)
-      .join("");
-    return `<ol class="post-outline mono-label">${items}</ol>`;
-  }
   return `<p class="post-excerpt">${escapeHtml(post.summary)}</p>`;
 }
 
