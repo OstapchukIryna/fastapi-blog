@@ -2,14 +2,15 @@
 #
 # Runs the Postman collection against a throwaway copy of the app.
 #
-# The run gets its own PostgreSQL database — the development one with
-# `_test` on the end, the same one the browser tests use — because an
-# automated pass over a write API must not touch the posts you are
-# writing. Its schema is dropped and rebuilt by `alembic upgrade head`,
-# then seeded, because several requests lean on the seeded author.
+# Targets the same throwaway database tests/conftest.py points pytest at
+# (bloguser@localhost/test_blog) — one fixed name for every automated
+# check in this project, not derived from whatever DATABASE_URL a
+# developer's shell happens to have set. Its schema is dropped and
+# rebuilt by `alembic upgrade head`, then seeded, because several
+# requests lean on the seeded author.
 #
-# Needs DATABASE_URL set (a `_test` neighbour of it must exist), or
-# TEST_DATABASE_URL to name the throwaway database outright.
+# ! Do not run this alongside pytest: both point at the same database,
+# ! and this script drops its schema outright.
 #
 #   ./scripts/api-tests.sh              # start a server, run, tear down
 #   ./scripts/api-tests.sh --url URL    # run against something already up
@@ -33,7 +34,7 @@ export SECRET_KEY="${SECRET_KEY:-throwaway-secret-for-the-api-test-run}"
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --url) BASE_URL="$2"; shift 2 ;;
-        -h|--help) sed -n '3,12p' "$0" | sed 's/^# \?//'; exit 0 ;;
+        -h|--help) sed -n '3,16p' "$0" | sed -E 's/^#[[:space:]]?//'; exit 0 ;;
         *) echo "unknown argument: $1" >&2; exit 2 ;;
     esac
 done
@@ -53,15 +54,7 @@ if [[ -z "$BASE_URL" ]]; then
     WORK_DIR="$(mktemp -d)"
     BASE_URL="http://127.0.0.1:${PORT}"
 
-    # The same rule the pytest fixtures use, kept in one place: derive the
-    # throwaway database from DATABASE_URL, and refuse to run if the two
-    # turn out to be the same, because the next line drops the schema.
-    export DATABASE_URL="$(uv run python -c '
-import sys
-sys.path.insert(0, "tests")
-from conftest import throwaway_database_url
-print(throwaway_database_url())
-')"
+    export DATABASE_URL="postgresql+psycopg://bloguser:blogpassword@localhost/test_blog"
     echo "==> resetting $(echo "$DATABASE_URL" | sed 's/:[^:@]*@/:***@/')"
     uv run python -c '
 import os, psycopg

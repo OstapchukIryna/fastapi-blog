@@ -76,13 +76,17 @@ jobs:
     # to run on SQLite, which meant anything the two engines disagree
     # about was untested by construction — timezone handling on a
     # timestamp being the one that had already bitten.
+    #
+    # User, password and database name match tests/conftest.py exactly:
+    # it hardcodes this connection rather than reading DATABASE_URL, so
+    # the service has to meet it there instead of the other way round.
     services:
       postgres:
         image: postgres:17
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: blog
+          POSTGRES_USER: bloguser
+          POSTGRES_PASSWORD: blogpassword
+          POSTGRES_DB: test_blog
         ports:
           - 5432:5432
         # Without this the steps start racing the container: postgres
@@ -94,7 +98,10 @@ jobs:
           --health-retries 5
 
     env:
-      DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/blog
+      # Only the migration check below reads this — pytest ignores it and
+      # connects where tests/conftest.py says to, which is this same
+      # database under the same name.
+      DATABASE_URL: postgresql+psycopg://bloguser:blogpassword@localhost:5432/test_blog
       # Settings() refuses to build without a bucket name, and importing
       # blog.core.config is enough to trip that — nothing in this job
       # uploads anything, so a real bucket is not needed here, only a
@@ -110,13 +117,6 @@ jobs:
 
       - name: Install
         run: uv sync --locked
-
-      # The fixtures derive their database from DATABASE_URL by adding
-      # `_test`, so that one has to exist too. Separate rather than
-      # shared: every session drops its schema, and the migration check
-      # below needs a database nothing is dropping underneath it.
-      - name: Create the test database
-        run: psql "postgresql://postgres:postgres@localhost:5432/postgres" -c 'CREATE DATABASE blog_test'
 
       # The gate that catches the failure this whole change is about: a
       # migration that has drifted from the models. `check` autogenerates
@@ -137,14 +137,16 @@ jobs:
 
     # Same engine as the tests job, and for the same reason: the
     # collection writes through the real API, so it should write into the
-    # database the API actually runs on.
+    # database the API actually runs on. Same credentials and database
+    # name too — scripts/api-tests.sh hardcodes this exact connection,
+    # matching tests/conftest.py, rather than reading it from here.
     services:
       postgres:
         image: postgres:17
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: blog
+          POSTGRES_USER: bloguser
+          POSTGRES_PASSWORD: blogpassword
+          POSTGRES_DB: test_blog
         ports:
           - 5432:5432
         options: >-
@@ -154,7 +156,6 @@ jobs:
           --health-retries 5
 
     env:
-      DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/blog
       # Unlike the tests job, this one really does upload and delete a
       # file through the API — "Upload a picture" and friends exercise
       # AWSAvatars for real, so it needs real S3 credentials. Set these
@@ -179,11 +180,6 @@ jobs:
 
       - name: Install
         run: uv sync --locked
-
-      # api-tests.sh derives `blog_test` from DATABASE_URL the same way
-      # the pytest fixtures do, then drops and rebuilds its schema.
-      - name: Create the test database
-        run: psql "postgresql://postgres:postgres@localhost:5432/postgres" -c 'CREATE DATABASE blog_test'
 
       - name: Run the collection
         run: ./scripts/api-tests.sh
