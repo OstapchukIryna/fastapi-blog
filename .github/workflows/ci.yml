@@ -24,7 +24,12 @@ env:
   # rather than kept in the repository's secrets: nothing here signs a
   # token anybody will ever present again, and a stored value invites
   # reuse somewhere it would matter.
-  SECRET_KEY: ci-run-only-${{ github.run_id }}-${{ github.run_attempt }}
+  #
+  # The static prefix is padding, not decoration: Settings.secret_key
+  # requires 32 characters, and run_id alone (as short as single digits
+  # early in a repository's history) does not reliably clear that on its
+  # own.
+  SECRET_KEY: ci-run-only-not-a-real-secret-${{ github.run_id }}-${{ github.run_attempt }}
 
 jobs:
   static:
