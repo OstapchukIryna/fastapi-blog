@@ -31,8 +31,6 @@ scripts:
       pm.test("belongs to the user this run created", () =>
           pm.expect(post.author.id).to.eql(Number(pm.collectionVariables.get("userId"))));
 
-      pm.test("a new post is not pinned", () => pm.expect(post.is_pinned).to.be.false);
-
       pm.test("detail carries the body text", () =>
           pm.expect(post.content).to.include("Body text."));
 

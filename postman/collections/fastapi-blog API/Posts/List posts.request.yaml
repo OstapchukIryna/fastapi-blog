@@ -24,7 +24,7 @@ scripts:
       if (posts.length) {
           pm.test("shape is exactly PostResponse", () =>
               pm.expect(Object.keys(posts[0]).sort()).to.eql(
-                  ["author", "date_posted", "id", "is_pinned",
+                  ["author", "date_posted", "id",
                    "reading_minutes", "summary", "tags", "title"]));
 
           pm.test("the list carries no content - that is PostDetail's job", () =>
@@ -38,19 +38,8 @@ scripts:
           pm.test("author is embedded, not just an id", () =>
               pm.expect(posts[0].author).to.have.property("username"));
 
-          // Порядок: закреплённый первым, остальные по дате. Это одна
-          // сортировка на запрос, а не шаблонный трюк, — иначе
-          // закреплённый выпадал бы из второй порции.
-          pm.test("pinned before the rest", () => {
-              const lastPinned = posts.map((p) => p.is_pinned).lastIndexOf(true);
-              const firstPlain = posts.map((p) => p.is_pinned).indexOf(false);
-              if (lastPinned !== -1 && firstPlain !== -1)
-                  pm.expect(lastPinned).to.be.below(firstPlain);
-          });
-
-          pm.test("newest first among the unpinned", () => {
-              const dates = posts.filter((p) => !p.is_pinned)
-                                 .map((p) => Date.parse(p.date_posted));
+          pm.test("newest first", () => {
+              const dates = posts.map((p) => Date.parse(p.date_posted));
               pm.expect(dates).to.eql([...dates].sort((a, b) => b - a));
           });
       }

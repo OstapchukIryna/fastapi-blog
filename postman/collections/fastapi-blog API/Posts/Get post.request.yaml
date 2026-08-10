@@ -11,7 +11,7 @@ scripts:
       pm.test("detail adds content on top of the list shape", () => {
           pm.expect(post).to.have.property("content");
           pm.expect(Object.keys(post).sort()).to.eql(
-              ["author", "content", "date_posted", "id", "is_pinned",
+              ["author", "content", "date_posted", "id",
                "reading_minutes", "summary", "tags", "title"]);
       });
     language: text/javascript
