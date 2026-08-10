@@ -11,6 +11,7 @@ from typing import Annotated
 from fastapi import APIRouter, BackgroundTasks, Depends, Request, UploadFile, status
 from fastapi.security import OAuth2PasswordRequestForm
 
+from blog.core.config import settings
 from blog.core.rate_limit import limiter
 from blog.infrastructure import models
 from blog.infrastructure.database import DbSession
@@ -105,7 +106,7 @@ async def get_current_user(current_user: CurrentUser) -> models.User:
 
 
 @router.post("/forgot-password", response_model=Message, status_code=status.HTTP_202_ACCEPTED)
-@limiter.limit("5/minute")
+@limiter.limit(settings.forgot_password_rate_limit)
 async def forgot_password(
     request: Request,
     request_data: ForgotPasswordRequest,

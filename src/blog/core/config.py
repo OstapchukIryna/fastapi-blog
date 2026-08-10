@@ -68,6 +68,11 @@ class Settings(BaseSettings):
     # Settings for reset password via email
     reset_token_expire_minutes: int = 30
     reset_token_cooldown_seconds: int = 60
+    # * slowapi's own format ("N/period"), not just the count: the route
+    # * decorator takes this string directly, so changing the limit means
+    # * changing one value instead of keeping a string and a number in
+    # * step by hand.
+    forgot_password_rate_limit: str = "5/minute"
 
     mail_server: str = "localhost"
     mail_port: int = 587

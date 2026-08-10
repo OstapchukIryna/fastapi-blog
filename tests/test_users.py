@@ -497,20 +497,22 @@ async def test_forgot_password_unknown_email_no_email_sent(client: AsyncClient):
 async def test_forgot_password_rate_limited(client: AsyncClient):
     await create_test_user(client)
 
+    allowed = int(settings.forgot_password_rate_limit.split("/")[0])
+
     with patch("blog.infrastructure.email.send_password_reset", new_callable=AsyncMock):
         # the cooldown already blocks repeats of the same address, so vary
         # it - this is a caller hammering the endpoint, not one mailbox
-        for i in range(5):
+        for i in range(allowed):
             response = await client.post(
                 "/api/users/forgot-password", json={"email": f"flood{i}@example.com"}
             )
             assert response.status_code == 202
 
-        sixth = await client.post(
-            "/api/users/forgot-password", json={"email": "flood5@example.com"}
+        one_too_many = await client.post(
+            "/api/users/forgot-password", json={"email": f"flood{allowed}@example.com"}
         )
 
-    assert sixth.status_code == 429
+    assert one_too_many.status_code == 429
 
 
 @pytest.mark.anyio
