@@ -145,4 +145,4 @@ class PostResponse(BaseModel):
 class PostDetail(PostResponse):
     """A single post, with its body, the Markdown itself."""
 
-    content: str
+    content: Content
