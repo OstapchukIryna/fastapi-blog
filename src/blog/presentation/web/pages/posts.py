@@ -1,4 +1,4 @@
-"""One post: reading it, writing it, editing it, pinning it, deleting it.
+"""One post: reading it, writing it, editing it, deleting it.
 
 The routes that end in a redirect rather than a page, together with the
 article page itself. They are here and not with the listings because they
@@ -29,7 +29,7 @@ from blog.presentation.web.templating import templates
 from blog.schemas import PostFormInput
 from blog.services import posts
 from blog.services.auth import CurrentUser
-from blog.services.posts import PostDep
+from blog.services.posts import OwnedPost, PostDep
 
 router = APIRouter()
 
@@ -115,16 +115,22 @@ def edit_post_form(request: Request, post: PostDep) -> Response:
 @router.post("/posts/{post_id}/edit", name="update_post")
 async def update_post(
     request: Request,
-    post: PostDep,
+    post: OwnedPost,
     db: DbSession,
     submitted: Annotated[PostFormInput, Form()],
 ) -> Response:
     """
     Save an edit to a post.
 
+    Unreachable from a browser for the same reason create_post_page is:
+    a plain form POST carries no Authorization header, and OwnedPost
+    needs one. The page's own script sends the fields to /api/posts/{id}
+    instead - kept, not deleted, for when the token moves to a cookie.
+
     Args:
         request (Request): needed by the template and by url_for.
-        post (PostDep): the post being edited.
+        post (OwnedPost): the post being edited, established as the
+            caller's own.
         db (DbSession): current database session.
         submitted (PostFormInput): the fields as typed, unvalidated.
 
@@ -150,37 +156,16 @@ async def update_post(
     )
 
 
-# One separate action, not a form field
-@router.post("/posts/{post_id}/pin", name="toggle_pin")
-async def toggle_pin(request: Request, post: PostDep, db: DbSession) -> Response:
-    """Pin the post if it is not pinned, and unpin it if it is.
-
-    A route of its own rather than a field on the edit form: pinning is
-    one decision with one effect, and it should not require saving the
-    rest of the post to take hold.
-
-    Args:
-        request (Request): needed to build the redirect target.
-        post (PostDep): the post, or a 404.
-        db (DbSession): request-scoped session.
-
-    Returns:
-        Response: a 303 back to the edit page, so a refresh re-reads the
-            page rather than re-submitting the action.
-    """
-    await posts.set_pinned(db, post, pinned=not post.is_pinned)
-    return RedirectResponse(
-        request.url_for("edit_post", post_id=post.id),
-        status_code=status.HTTP_303_SEE_OTHER,
-    )
-
-
 @router.post("/posts/{post_id}/delete", name="delete_post")
-async def delete_post(post: PostDep, db: DbSession) -> Response:
+async def delete_post(post: OwnedPost, db: DbSession) -> Response:
     """Delete a post from the edit page and return to the front page.
 
+    Unreachable from a browser for the same reason update_post is: the
+    page's own script calls DELETE /api/posts/{id} instead. Kept here so
+    the route is not missing if the token ever moves to a cookie.
+
     Args:
-        post (PostDep): the post, or a 404.
+        post (OwnedPost): the post, established as the caller's own.
         db (DbSession): request-scoped session.
 
     Returns:

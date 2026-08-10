@@ -5,7 +5,7 @@ the post is yours — are dependencies rather than lines in a body, so each
 route reads as the single thing it is for.
 """
 
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, status
 
 from blog.infrastructure import models
 from blog.infrastructure.database import DbSession
@@ -26,7 +26,7 @@ router = APIRouter()
 
 @router.get("", response_model=Page[PostResponse])
 async def list_posts(db: DbSession, page: PageParams) -> Page[PostResponse]:
-    """Return one page of posts, pinned first and newest after.
+    """Return one page of posts, newest first.
 
     Args:
         db (DbSession): request-scoped session.
@@ -107,7 +107,7 @@ async def update_post_fields(post: OwnedPost, changes: PostUpdate, db: DbSession
 
 
 @router.delete("/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_post_api(post: OwnedPost, db: DbSession) -> Response:
+async def delete_post(post: OwnedPost, db: DbSession) -> None:
     """Delete a post.
 
     Args:
@@ -115,8 +115,9 @@ async def delete_post_api(post: OwnedPost, db: DbSession) -> Response:
         db (DbSession): request-scoped session.
 
     Returns:
-        Response: 204 with no body. Repeating the request gives 404,
-            because by then there is nothing at that id.
+        None: 204 with no body, from the decorator's status_code — there
+            is nothing left to say once the post is gone. Repeating the
+            request gives 404, because by then there is nothing at that
+            id either.
     """
     await posts.delete(db, post)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)

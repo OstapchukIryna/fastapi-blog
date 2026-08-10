@@ -22,7 +22,6 @@ from typing import Annotated
 
 from fastapi import Depends
 from sqlalchemy import Select, func, select
-from sqlalchemy import update as update_statement
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -49,8 +48,8 @@ def base_query() -> Select[tuple[models.Post]]:
     be loaded up front.
 
     Returns:
-        Select: posts ordered pinned first, then newest, with their tags
-            and authors attached.
+        Select: posts ordered newest first, with their tags and authors
+            attached.
     """
     # * Two strategies, because the two relations multiply differently.
     # * The author is many-to-one — one row per post — so joining costs
@@ -71,14 +70,9 @@ def base_query() -> Select[tuple[models.Post]]:
     # ? argument was wrong. What *does* break that way is an explicit
     # ? .join() — see the warning on _slice.
     #
-    # * Pinned-first is decided in the query, not in the template. A
-    # * template can only reorder what it was given, so on the second
-    # * batch the pinned post is simply not in the slice: the hero spot
-    # * would fall to whatever came first, and the pinned post would
-    # * reappear later in date order. Sorting by id last makes the order
-    # * total — without it, two posts sharing a second swap places
-    # * between requests, and one shows up twice while another never
-    # * shows up at all.
+    # * Sorting by id last makes the order total — without it, two posts
+    # * sharing a second swap places between requests, and one shows up
+    # * twice on consecutive pages while another never shows up at all.
     return (
         select(models.Post)
         .options(
@@ -86,7 +80,6 @@ def base_query() -> Select[tuple[models.Post]]:
             joinedload(models.Post.author),
         )
         .order_by(
-            models.Post.is_pinned.desc(),
             models.Post.date_posted.desc(),
             models.Post.id.desc(),
         )
@@ -215,23 +208,35 @@ async def find_related(db: AsyncSession, post: models.Post, limit: int = 2) -> l
     own_tags = {tag.name for tag in post.tags}
 
     if own_tags:
-        by_tag = await db.execute(
-            base_query()
+        # * The ranking happens in SQL, not in Python: with a wide tag
+        # * filter (in_ rather than with_tag's single ==) every post
+        # * sharing even one tag comes back, and on a blog with thousands
+        # * of posts under a popular tag that is thousands of fully
+        # * loaded rows to sort through for a top-two suggestion. GROUP BY
+        # * plus LIMIT means only the winners ever leave the database.
+        shared_count = func.count(models.Tag.id)
+        ranked = await db.execute(
+            select(models.Post.id, shared_count.label("shared_count"))
             .join(models.Post.tags)
             .where(models.Tag.name.in_(own_tags), models.Post.id != post.id)
+            .group_by(models.Post.id)
+            .order_by(shared_count.desc(), models.Post.date_posted.desc())
+            .limit(limit)
         )
-        matches = [
-            Related(
-                post=candidate,
-                shared=sorted(own_tags & {t.name for t in candidate.tags}),
-            )
-            for candidate in by_tag.scalars().unique().all()
-        ]
-        if matches:
-            # * Most tags in common wins; recency breaks the tie. reverse
-            # * applies to both keys, which is what we want for each.
-            matches.sort(key=lambda m: (len(m.shared), m.post.date_posted), reverse=True)
-            return matches[:limit]
+        ranked_ids = [row.id for row in ranked.all()]
+
+        if ranked_ids:
+            candidates = await db.execute(base_query().where(models.Post.id.in_(ranked_ids)))
+            by_id = {candidate.id: candidate for candidate in candidates.scalars().unique().all()}
+            # * IN does not promise to return rows in the order asked for;
+            # * the ranking above does, so that order is reapplied here.
+            return [
+                Related(
+                    post=by_id[post_id],
+                    shared=sorted(own_tags & {t.name for t in by_id[post_id].tags}),
+                )
+                for post_id in ranked_ids
+            ]
 
     newest = await db.execute(base_query().where(models.Post.id != post.id).limit(limit))
     return [Related(post=other, shared=[]) for other in newest.scalars().unique().all()]
@@ -341,6 +346,7 @@ async def replace(db: AsyncSession, post: models.Post, form: PostForm) -> models
     Returns:
         models.Post: the post as stored after the replacement.
     """
+    old_tags = list(post.tags)
     replacement = form.model_dump()
     post.tags = await tag_service.get_or_create(db, replacement.pop("tags"))
     for name, value in replacement.items():
@@ -348,6 +354,7 @@ async def replace(db: AsyncSession, post: models.Post, form: PostForm) -> models
 
     await db.commit()
     await db.refresh(post, attribute_names=["author"])
+    await tag_service.delete_if_orphaned(db, old_tags)
     return post
 
 
@@ -374,14 +381,23 @@ async def update(db: AsyncSession, post: models.Post, changes: PostUpdate) -> mo
     Returns:
         models.Post: the post as stored after the change.
     """
+    # ! exclude_none is safe only because no field here is nullable. The
+    # ! day one is added (a cover image, say) this line stops being able
+    # ! to clear it: {"cover_image": null} would drop out here exactly
+    # ! like an omitted field does, and PATCH would have no way left to
+    # ! ask for "remove it" rather than "leave it". A nullable field
+    # ! needs a sentinel to tell the two apart, not exclude_none.
     wanted = changes.model_dump(exclude_unset=True, exclude_none=True)
 
+    old_tags = list(post.tags) if "tags" in wanted else []
     if "tags" in wanted:
         post.tags = await tag_service.get_or_create(db, wanted.pop("tags"))
     for name, value in wanted.items():
         setattr(post, name, value)
 
     await db.commit()
+    if old_tags:
+        await tag_service.delete_if_orphaned(db, old_tags)
     return post
 
 
@@ -393,38 +409,14 @@ async def delete(db: AsyncSession, post: models.Post) -> None:
     answering "done" for an id that holds nothing would be a claim about
     the world that is false.
 
-    The rows in post_tags go with the post. The tags themselves stay,
-    even once nothing references them; they are invisible in /api/tags,
-    which counts through posts, but they do accumulate.
+    The rows in post_tags go with the post. A tag this was the last user
+    of goes too, checked after the post is actually gone.
 
     Args:
         db (AsyncSession): session to write through.
         post (models.Post): the post to remove.
     """
+    old_tags = list(post.tags)
     await db.delete(post)
     await db.commit()
-
-
-async def set_pinned(db: AsyncSession, post: models.Post, *, pinned: bool) -> None:
-    """Pin or unpin a post, keeping at most one pinned.
-
-    The single-winner rule is enforced here rather than by a constraint,
-    because clearing the previous winner and setting the new one has to
-    happen in one transaction — a constraint could only reject the
-    second write, not perform the first.
-
-    Args:
-        db (AsyncSession): session to write through.
-        post (models.Post): the post to pin or unpin.
-        pinned (bool): the state to leave it in. Keyword-only, so a call
-            site cannot read as set_pinned(db, post, True) and leave the
-            reader guessing what the boolean means.
-    """
-    if pinned:
-        await db.execute(
-            update_statement(models.Post)
-            .where(models.Post.id != post.id, models.Post.is_pinned.is_(True))
-            .values(is_pinned=False)
-        )
-    post.is_pinned = pinned
-    await db.commit()
+    await tag_service.delete_if_orphaned(db, old_tags)

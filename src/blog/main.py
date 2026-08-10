@@ -1,21 +1,25 @@
 """The application object: what exists, where it is mounted, what it serves.
 
-Nothing is decided here beyond assembly. Shutdown releases the pool — the
-schema itself comes from Alembic, not from anything run here — and the
-rest of the file is a list of what is mounted where, which is the whole
-point of keeping it short.
+Nothing is decided here beyond assembly. Startup opens the connection
+pool and shutdown releases it — the schema itself comes from Alembic, not
+from anything run here — and the rest of the file is a list of what is
+mounted where, which is the whole point of keeping it short.
 """
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, status
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy import text
 
 from blog.core.config import STATIC_DIR, settings
 from blog.core.logging import configure_logging
+from blog.core.rate_limit import limiter
 from blog.infrastructure import models  # noqa: F401
-from blog.infrastructure.database import DbSession, engine
+from blog.infrastructure.database import DbSession, setup_engine, teardown_engine
 from blog.presentation.api import API_PREFIX, posts, tags, users
 from blog.presentation.errors import register_error_handlers
 from blog.presentation.middleware import RequestContextMiddleware
@@ -30,13 +34,19 @@ configure_logging(settings)
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
-    """Release the pool on shutdown; nothing runs on startup."""
+    """Open the pool on startup, and release it on shutdown."""
+    setup_engine()
     yield
 
-    await engine.dispose()
+    await teardown_engine()
 
 
 app = FastAPI(lifespan=lifespan)
+app.state.limiter = limiter
+# pyrefly: ignore [bad-argument-type]  # slowapi's handler is typed for its
+# own exception, narrower than the Exception Starlette's signature wants.
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(RequestContextMiddleware)
 
 

@@ -36,8 +36,9 @@ async def with_counts(db: AsyncSession, page: Pagination) -> tuple[Sequence[tupl
     counted = (
         select(models.Tag.name, func.count(models.Post.id).label("posts"))
         # * The join is also the filter: a tag no post references drops
-        # * out here, which is why an orphaned tag is invisible without
-        # * anything having to delete it.
+        # * out here. delete_if_orphaned is what keeps that case rare, not
+        # * what makes it safe to skip filtering — a row can still sit
+        # * between "last post let go of it" and the call that notices.
         .join(models.Tag.posts)
         .group_by(models.Tag.id)
         .order_by(func.count(models.Post.id).desc(), models.Tag.name)
@@ -79,3 +80,31 @@ async def get_or_create(db: AsyncSession, names: list[str]) -> list[models.Tag]:
             by_name[name] = tag
 
     return [by_name[name] for name in names]
+
+
+async def delete_if_orphaned(db: AsyncSession, candidates: Sequence[models.Tag]) -> None:
+    """Delete any of these tags no post uses any more.
+
+    Called with a post's old tags after it stops using some of them — on
+    delete, on replace, on an edit that drops one — since that is the
+    only moment a tag can become orphaned. Checking here rather than
+    trusting the caller to know which ones were actually dropped: a tag
+    still in use is simply found still in use and left alone, which is
+    cheaper to write than working out the difference at every call site.
+
+    Args:
+        db (AsyncSession): session to query and delete through. The
+            caller's own commit (already done, for the post) covers
+            these deletes too if this runs before the next one — but
+            each check needs the association rows already gone, so this
+            must run after that commit, not before it.
+        candidates (Sequence[models.Tag]): tags that used to label a
+            post that no longer does, or still does — either is fine.
+    """
+    for tag in candidates:
+        still_used = await db.scalar(
+            select(models.Post.id).join(models.Post.tags).where(models.Tag.id == tag.id).limit(1)
+        )
+        if still_used is None:
+            await db.delete(tag)
+    await db.commit()

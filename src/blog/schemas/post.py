@@ -99,7 +99,6 @@ class PostResponse(BaseModel):
     title: str
     summary: str
     date_posted: datetime
-    is_pinned: bool
     tags: list[str]
 
     reading_minutes: int

@@ -1,6 +1,9 @@
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from blog.infrastructure import models
 from tests.conftest import auth_header, create_test_post, create_test_user, login_user
 
 
@@ -58,13 +61,13 @@ async def test_get_tags_ties_broken_by_name(client: AsyncClient):
 
 
 @pytest.mark.anyio
-async def test_get_tags_orphaned_tag_is_invisible(client: AsyncClient):
+async def test_get_tags_orphaned_tag_is_invisible(client: AsyncClient, db_session: AsyncSession):
     await create_test_user(client)
     token = await login_user(client)
     headers = auth_header(token)
     post = await create_test_post(client, headers, tags=["python"])
 
-    # the tag row survives, but nothing references it anymore
+    # letting go of the last post that used it deletes the row outright
     response = await client.patch(f"/api/posts/{post['id']}", json={"tags": []}, headers=headers)
     assert response.status_code == 200
     assert response.json()["tags"] == []
@@ -75,6 +78,59 @@ async def test_get_tags_orphaned_tag_is_invisible(client: AsyncClient):
     data = response.json()
     assert data["items"] == []
     assert data["total"] == 0
+
+    # independent check: the row is actually gone, not just uncounted
+    row = await db_session.scalar(select(models.Tag).where(models.Tag.name == "python"))
+    assert row is None
+
+
+@pytest.mark.anyio
+async def test_shared_tag_survives_while_another_post_still_uses_it(
+    client: AsyncClient, db_session: AsyncSession
+):
+    await create_test_user(client)
+    token = await login_user(client)
+    headers = auth_header(token)
+    post1 = await create_test_post(client, headers, tags=["python"])
+    await create_test_post(client, headers, tags=["python"])
+
+    response = await client.patch(f"/api/posts/{post1['id']}", json={"tags": []}, headers=headers)
+    assert response.status_code == 200
+
+    row = await db_session.scalar(select(models.Tag).where(models.Tag.name == "python"))
+    assert row is not None
+
+
+@pytest.mark.anyio
+async def test_delete_post_removes_its_orphaned_tag(client: AsyncClient, db_session: AsyncSession):
+    await create_test_user(client)
+    token = await login_user(client)
+    headers = auth_header(token)
+    post = await create_test_post(client, headers, tags=["python"])
+
+    response = await client.delete(f"/api/posts/{post['id']}", headers=headers)
+    assert response.status_code == 204
+
+    row = await db_session.scalar(select(models.Tag).where(models.Tag.name == "python"))
+    assert row is None
+
+
+@pytest.mark.anyio
+async def test_replace_post_removes_its_orphaned_tag(client: AsyncClient, db_session: AsyncSession):
+    await create_test_user(client)
+    token = await login_user(client)
+    headers = auth_header(token)
+    post = await create_test_post(client, headers, tags=["python"])
+
+    response = await client.put(
+        f"/api/posts/{post['id']}",
+        json={"title": "t", "summary": "s", "content": "c", "tags": ["rust"]},
+        headers=headers,
+    )
+    assert response.status_code == 200
+
+    row = await db_session.scalar(select(models.Tag).where(models.Tag.name == "python"))
+    assert row is None
 
 
 @pytest.mark.anyio

@@ -9,8 +9,10 @@ The dependencies that load an account and establish that it is the
 caller's live here too, beside the row they load.
 """
 
+import logging
 from typing import Annotated
 
+from botocore.exceptions import ClientError
 from fastapi import Depends, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
@@ -23,6 +25,8 @@ from blog.infrastructure.database import DbSession
 from blog.infrastructure.images import AWSAvatars
 from blog.schemas import UserCreate, UserUpdate
 from blog.services.auth import CurrentUser
+
+logger = logging.getLogger(__name__)
 
 
 class AlreadyRegistered(AppHTTPError):
@@ -137,10 +141,19 @@ async def _already_taken(db: AsyncSession, user: models.User, wanted: dict[str, 
     if not contested:
         return False
 
+    # * Case-insensitively, matching register(): "TestUser" is "testuser"
+    # * taken, not a free name. A raw == here would miss that clash - the
+    # * unique index is on the raw column, so nothing at the database
+    # * layer would catch it either, and the row would simply be written.
     clash = await db.execute(
         select(models.User).where(
             models.User.id != user.id,
-            or_(*[getattr(models.User, n) == v for n, v in contested.items()]),
+            or_(
+                *[
+                    func.lower(getattr(models.User, n)) == str(v).lower()
+                    for n, v in contested.items()
+                ]
+            ),
         )
     )
     return clash.scalars().first() is not None
@@ -160,8 +173,6 @@ async def update(db: AsyncSession, user: models.User, changes: UserUpdate) -> mo
     field already holds is not a clash with yourself and passes through
     as a no-op.
 
-    The password never reaches the model as-is.
-
     Args:
         db (AsyncSession): current database session.
         user (models.User): the user being changed.
@@ -175,13 +186,13 @@ async def update(db: AsyncSession, user: models.User, changes: UserUpdate) -> mo
         models.User: the user as stored after the change.
 
     """
+    # ! exclude_none is safe only while no field here is nullable — see
+    # ! the same note on services/posts.py's update for why a nullable
+    # ! field would need a sentinel instead.
     wanted_changes = changes.model_dump(exclude_unset=True, exclude_none=True)
 
     if await _already_taken(db, user, wanted_changes):
         raise AlreadyRegistered()
-
-    if "password" in wanted_changes:
-        user.password_hash = hash_password(wanted_changes.pop("password"))
 
     for name, value in wanted_changes.items():
         setattr(user, name, value.lower() if name == "email" else value)
@@ -206,6 +217,18 @@ async def delete(db: AsyncSession, user: models.User, storage: AWSAvatars) -> No
     after the commit, so a failed transaction cannot leave a live row
     pointing at a file that has been removed.
 
+    The accepted trade: if S3 is unreachable at this exact moment, the
+    row is already gone and the file is not, and nothing left in the
+    database still names it — the object is now orphaned in the bucket
+    for good, found again only by listing the bucket itself, not by
+    anything a query here could join against. That is deliberately
+    preferred over the other order, where a failed commit could leave a
+    live account pointing at a picture that has already been removed —
+    visibly broken for the one account it happens to, instead of quietly
+    wasteful in a bucket nobody is looking at. Logged rather than left
+    silent so the choice is at least visible after the fact; there is no
+    retry queue yet to actually hand the cleanup to.
+
     Args:
         db (AsyncSession): session to write through.
         user (models.User): the account to remove.
@@ -217,4 +240,11 @@ async def delete(db: AsyncSession, user: models.User, storage: AWSAvatars) -> No
     await db.delete(user)
     await db.commit()
 
-    await storage.delete_profile_picture(old_filename)
+    try:
+        await storage.delete_profile_picture(old_filename)
+    except ClientError:
+        logger.exception(
+            "orphaned avatar %r: account %s was deleted but its picture was not",
+            old_filename,
+            user.id,
+        )

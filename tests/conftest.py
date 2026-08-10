@@ -35,6 +35,7 @@ from moto import mock_aws
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
+from blog.core.rate_limit import limiter
 from blog.infrastructure.database import Base, get_db
 from blog.main import app
 
@@ -112,6 +113,10 @@ async def client(db_session: AsyncSession, mocked_aws) -> AsyncGenerator[AsyncCl
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
+    # The limiter's in-memory bucket is a module-level singleton and would
+    # otherwise carry counts over from whichever test ran before this one -
+    # every test starts under the same fake IP address.
+    limiter.reset()
     # Asynchronous Server Gateway Interface mocks real server invoke
     async with (
         AsyncClient(

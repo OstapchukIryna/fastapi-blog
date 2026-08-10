@@ -239,7 +239,6 @@ def test_post_response_flatten_tags_plain_strings():
         title="t",
         summary="s",
         date_posted=datetime.now(tz=UTC),
-        is_pinned=False,
         tags=["python", "sql"],
         reading_minutes=1,
     )
@@ -254,7 +253,6 @@ def test_post_response_flatten_tags_objects():
         title="t",
         summary="s",
         date_posted=datetime.now(tz=UTC),
-        is_pinned=False,
         tags=[Tag(name="python"), Tag(name="sql")],
         reading_minutes=1,
     )
@@ -269,7 +267,6 @@ def test_post_response_flatten_tags_empty_list():
         title="t",
         summary="s",
         date_posted=datetime.now(tz=UTC),
-        is_pinned=False,
         tags=[],
         reading_minutes=1,
     )

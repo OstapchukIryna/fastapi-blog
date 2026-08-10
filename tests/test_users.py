@@ -7,6 +7,7 @@ import jwt
 import pytest
 from botocore.exceptions import ClientError
 from httpx import AsyncClient
+from PIL import Image
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -232,6 +233,51 @@ async def test_login_validation_error(client: AsyncClient):
     assert missing_fields == {("body", "username"), ("body", "password")}
 
 
+@pytest.mark.anyio
+async def test_login_locks_out_after_repeated_failures(client: AsyncClient):
+    await create_test_user(client)
+
+    for _ in range(settings.login_lockout_threshold):
+        response = await client.post(
+            "/api/users/token",
+            data={"username": "test@example.com", "password": "wrong-password"},
+        )
+        assert response.status_code == 401
+
+    # locked now - even the correct password is refused, same message as
+    # any other failure so a lockout cannot be told apart from one
+    response = await client.post(
+        "/api/users/token",
+        data={"username": "test@example.com", "password": PASSWORD},
+    )
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Incorrect password or email"
+
+
+@pytest.mark.anyio
+async def test_login_success_resets_failed_attempts(client: AsyncClient, db_session: AsyncSession):
+    user = await create_test_user(client)
+
+    for _ in range(settings.login_lockout_threshold - 1):
+        await client.post(
+            "/api/users/token",
+            data={"username": "test@example.com", "password": "wrong-password"},
+        )
+
+    response = await client.post(
+        "/api/users/token",
+        data={"username": "test@example.com", "password": PASSWORD},
+    )
+    assert response.status_code == 200
+
+    # independent check: the counter is actually cleared in the database,
+    # not just invisible from the response
+    row = await db_session.get(models.User, user["id"])
+    assert row is not None
+    assert row.failed_login_attempts == 0
+    assert row.locked_until is None
+
+
 # * --- GET /api/users/me: current user -----------------------------------------
 
 
@@ -292,6 +338,25 @@ async def test_current_user_token_without_sub_error(client: AsyncClient):
 async def test_current_user_token_without_exp_error(client: AsyncClient):
     secret = settings.secret_key.get_secret_value()
     token = jwt.encode({"sub": "1"}, secret, algorithm=settings.algorithm)
+
+    response = await client.get("/api/users/me", headers=auth_header(token))
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid or expired token"
+
+
+@pytest.mark.anyio
+async def test_current_user_non_string_sub_error(client: AsyncClient):
+    # PyJWT itself already refuses to decode this (InvalidSubjectError),
+    # so this locks in a contract this module also states explicitly
+    # rather than one that lives only inside a dependency's behaviour
+    user = await create_test_user(client)
+    secret = settings.secret_key.get_secret_value()
+    token = jwt.encode(
+        {"sub": user["id"], "exp": datetime.now(UTC) + timedelta(minutes=5)},
+        secret,
+        algorithm=settings.algorithm,
+    )
 
     response = await client.get("/api/users/me", headers=auth_header(token))
 
@@ -385,6 +450,43 @@ async def test_forgot_password_unknown_email_no_email_sent(client: AsyncClient):
 
     # same 202 as a known address
     assert response.status_code == 202
+
+
+@pytest.mark.anyio
+async def test_forgot_password_rate_limited(client: AsyncClient):
+    await create_test_user(client)
+
+    with patch("blog.infrastructure.email.send_password_reset", new_callable=AsyncMock):
+        # the cooldown already blocks repeats of the same address, so vary
+        # it - this is a caller hammering the endpoint, not one mailbox
+        for i in range(5):
+            response = await client.post(
+                "/api/users/forgot-password", json={"email": f"flood{i}@example.com"}
+            )
+            assert response.status_code == 202
+
+        sixth = await client.post(
+            "/api/users/forgot-password", json={"email": "flood5@example.com"}
+        )
+
+    assert sixth.status_code == 429
+
+
+@pytest.mark.anyio
+async def test_forgot_password_cooldown_no_second_email(client: AsyncClient):
+    await create_test_user(client)
+
+    with patch(
+        "blog.infrastructure.email.send_password_reset",
+        new_callable=AsyncMock,
+    ) as mock_send:
+        first = await client.post("/api/users/forgot-password", json={"email": "test@example.com"})
+        second = await client.post("/api/users/forgot-password", json={"email": "test@example.com"})
+
+        # same 202 either way - a caller within the cooldown learns nothing
+        assert first.status_code == 202
+        assert second.status_code == 202
+        mock_send.assert_awaited_once()
 
 
 # * --- POST /api/users/reset-password -----------------------------------------
@@ -710,7 +812,11 @@ async def test_update_user_username_success(client: AsyncClient):
 
 
 @pytest.mark.anyio
-async def test_update_user_password_success(client: AsyncClient):
+async def test_update_user_ignores_password(client: AsyncClient):
+    # UserUpdate has no password field: a stolen access token must not be
+    # enough to take over an account this way. Changing a password has its
+    # own endpoint, and its own requirement - proving the current one -
+    # that a generic field update has no way to carry.
     await create_test_user(client)
     token = await login_user(client)
     me = await client.get("/api/users/me", headers=auth_header(token))
@@ -723,17 +829,17 @@ async def test_update_user_password_success(client: AsyncClient):
     )
     assert response.status_code == 200
 
-    # independent check: old password stops working
+    # independent check: the old password still works
     old_login = await client.post(
         "/api/users/token", data={"username": "test@example.com", "password": PASSWORD}
     )
-    assert old_login.status_code == 401
+    assert old_login.status_code == 200
 
     new_login = await client.post(
         "/api/users/token",
         data={"username": "test@example.com", "password": "newpassword123"},
     )
-    assert new_login.status_code == 200
+    assert new_login.status_code == 401
 
 
 @pytest.mark.anyio
@@ -760,6 +866,46 @@ async def test_update_user_duplicate_username_error(client: AsyncClient):
     response = await client.patch(
         f"/api/users/{user2['id']}",
         json={"username": "taken"},
+        headers=auth_header(token2),
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Username or email already registered"
+
+
+@pytest.mark.anyio
+async def test_update_user_duplicate_username_case_insensitive_error(client: AsyncClient):
+    # register() already rejects this case-swapped clash; update must
+    # refuse it the same way instead of storing a second, differently
+    # capitalised row that a case-insensitive lookup elsewhere cannot
+    # tell apart from the first.
+    await create_test_user(client, username="taken", email="taken@example.com")
+    user2 = await create_test_user(client, username="user2", email="user2@example.com")
+    token2 = await login_user(client, email="user2@example.com")
+
+    response = await client.patch(
+        f"/api/users/{user2['id']}",
+        json={"username": "Taken"},
+        headers=auth_header(token2),
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Username or email already registered"
+
+    # independent check: user2's username was never actually changed
+    unchanged = await client.get("/api/users/me", headers=auth_header(token2))
+    assert unchanged.json()["username"] == "user2"
+
+
+@pytest.mark.anyio
+async def test_update_user_duplicate_email_case_insensitive_error(client: AsyncClient):
+    await create_test_user(client, username="user1", email="taken@example.com")
+    user2 = await create_test_user(client, username="user2", email="user2@example.com")
+    token2 = await login_user(client, email="user2@example.com")
+
+    response = await client.patch(
+        f"/api/users/{user2['id']}",
+        json={"email": "Taken@Example.com"},
         headers=auth_header(token2),
     )
 
@@ -855,6 +1001,41 @@ async def test_delete_user_removes_avatar_from_storage(client: AsyncClient, mock
 
 
 @pytest.mark.anyio
+async def test_delete_user_storage_failure_is_logged_not_raised(
+    client: AsyncClient, mocked_aws, caplog
+):
+    user = await create_test_user(client)
+    token = await login_user(client)
+
+    test_image_path = Path(__file__).parent / "test_image.jpg"
+    await client.patch(
+        f"/api/users/{user['id']}/picture",
+        files={"file": ("profile.jpg", BytesIO(test_image_path.read_bytes()), "image/jpeg")},
+        headers=auth_header(token),
+    )
+
+    error = ClientError({"Error": {"Code": "500", "Message": "S3 is down"}}, "DeleteObject")
+    with patch(
+        "blog.infrastructure.images.AWSAvatars.delete_profile_picture",
+        new_callable=AsyncMock,
+        side_effect=error,
+    ):
+        # the account is already gone by the time storage fails - that
+        # must not turn into a 500 for something that already succeeded
+        response = await client.delete(f"/api/users/{user['id']}", headers=auth_header(token))
+
+    assert response.status_code == 204
+    assert "orphaned avatar" in caplog.text
+    assert str(user["id"]) in caplog.text
+
+    # independent check: the account really is gone despite the failure
+    again = await client.post(
+        "/api/users/token", data={"username": "test@example.com", "password": PASSWORD}
+    )
+    assert again.status_code == 401
+
+
+@pytest.mark.anyio
 async def test_delete_user_wrong_user_error(client: AsyncClient):
     user1 = await create_test_user(client, username="user1", email="user1@example.com")
     await create_test_user(client, username="user2", email="user2@example.com")
@@ -946,6 +1127,60 @@ async def test_upload_profile_picture_not_an_image_error(client: AsyncClient, mo
     response = await client.patch(
         f"/api/users/{user['id']}/picture",
         files={"file": ("notes.txt", BytesIO(b"this is plain text, not an image"), "text/plain")},
+        headers=auth_header(token),
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == (
+        "Invalid image file. Please upload a valid file format (JPEG, PNG, GIF, WebP)."
+    )
+
+    s3_object = mocked_aws.list_objects_v2(Bucket=S3_BUCKET_NAME)
+    assert "Contents" not in s3_object
+
+
+@pytest.mark.anyio
+async def test_upload_profile_picture_decompression_bomb_error(client: AsyncClient, mocked_aws):
+    user = await create_test_user(client)
+    token = await login_user(client)
+
+    # A small file that decodes to a huge pixel grid - Pillow's own bomb
+    # guard raises PIL.Image.DecompressionBombError for this, a different
+    # class from the UnidentifiedImageError a corrupt file raises.
+    buffer = BytesIO()
+    Image.new("RGB", (20_000, 20_000), color="red").save(buffer, "PNG")
+
+    response = await client.patch(
+        f"/api/users/{user['id']}/picture",
+        files={"file": ("bomb.png", BytesIO(buffer.getvalue()), "image/png")},
+        headers=auth_header(token),
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == (
+        "Invalid image file. Please upload a valid file format (JPEG, PNG, GIF, WebP)."
+    )
+
+    s3_object = mocked_aws.list_objects_v2(Bucket=S3_BUCKET_NAME)
+    assert "Contents" not in s3_object
+
+
+@pytest.mark.anyio
+async def test_upload_profile_picture_moderate_bomb_error(client: AsyncClient, mocked_aws):
+    # 100 megapixels - under Pillow's own default raise threshold
+    # (2x ~89 megapixels), so it used to only warn and then actually
+    # process, allocating the full bitmap for a 315 KB file. Lowering
+    # Image.MAX_IMAGE_PIXELS in infrastructure/images.py is what turns
+    # this size into a refusal too, not just the much larger one above.
+    user = await create_test_user(client)
+    token = await login_user(client)
+
+    buffer = BytesIO()
+    Image.new("RGB", (10_000, 10_000), color="red").save(buffer, "PNG")
+
+    response = await client.patch(
+        f"/api/users/{user['id']}/picture",
+        files={"file": ("bomb.png", BytesIO(buffer.getvalue()), "image/png")},
         headers=auth_header(token),
     )
 

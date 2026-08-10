@@ -85,22 +85,6 @@
         <section class="record-actions" aria-label="Post actions">
             <div class="record-action">
                 <div>
-                    <p class="record-action-name">{{ "Pinned to the top" if post.is_pinned else "Not pinned" }}</p>
-                    <p class="record-action-note">
-                        {% if post.is_pinned %}
-                            This post leads the front page.
-                        {% else %}
-                            Pinning this one unpins whichever post is pinned now.
-                        {% endif %}
-                    </p>
-                </div>
-                <form method="post" action="{{ url_for('toggle_pin', post_id=post.id) }}">
-                    <button class="btn record-btn{{ ' is-active' if post.is_pinned }}"
-                            type="submit">{{ "Unpin" if post.is_pinned else "Pin" }}</button>
-                </form>
-            </div>
-            <div class="record-action">
-                <div>
                     <p class="record-action-name">Delete this post</p>
                     <p class="record-action-note">This cannot be undone.</p>
                 </div>

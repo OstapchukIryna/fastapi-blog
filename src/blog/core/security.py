@@ -1,9 +1,9 @@
 """Passwords and the token protocols.
 
 There is no session and no request here. These functions turn a password
-into a hash, a user id into a token and back, and imlements a resets tokens.
-Whether that id belongs to anyone is a question for services/auth.py, one layer up, because
-answering it needs the database.
+into a hash, a user id into a token and back, and implement password
+reset tokens. Whether that id belongs to anyone is a question for
+services/auth.py, one layer up, because answering it needs the database.
 """
 
 import hashlib
@@ -43,7 +43,7 @@ class Unauthorized(AppHTTPError):
 
         Args:
             detail (str): what the caller is told. Kept vague on purpose
-                at the call sites — see services/users.authenticate.
+                at the call sites — see services/auth.authenticate.
         """
         super().__init__(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -79,34 +79,54 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 def generate_reset_token() -> str:
+    """Generate a one-time password-reset token.
+
+    Returns:
+        str: 32 random bytes, URL-safe encoded, for the caller to email
+            and to pass to hash_reset_token before it touches the database.
+    """
     return secrets.token_urlsafe(32)
 
 
-# Security issue when sending token via web.
-# Much faster than argon and already random so no need to prevent brutforce attacks
 def hash_reset_token(token: str) -> str:
+    """Hash a reset token for storage.
+
+    The token travels in the clear — it goes out by email, the one
+    channel this application does not control the security of — so the
+    database holds only this hash, the same reasoning as password_hash
+    above. sha256 rather than Argon2 here is not a shortcut: Argon2 is
+    slow on purpose, to make guessing a low-entropy human password
+    expensive, and this is 32 random bytes with nothing to guess. Fast
+    hashing costs nothing extra and answers requests sooner.
+
+    Args:
+        token (str): the token as generated, before it is emailed.
+
+    Returns:
+        str: the hash stored in place of the token itself.
+    """
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
+def create_access_token(data: dict[str, str], expires_delta: timedelta | None = None) -> str:
     """Sign a JWT carrying the given claims.
 
     Args:
-        data (dict): claims to encode. The caller supplies `sub`; the
-            expiry is added here so no caller can forget it.
+        data (dict[str, str]): claims to encode. The caller supplies
+            `sub`; the expiry is added here so no caller can forget it.
         expires_delta (timedelta | None): how long the token should last.
             Defaults to the configured lifetime.
 
     Returns:
         str: the encoded token.
     """
-    to_encode = data.copy()
+    to_encode: dict[str, str | datetime] = dict(data)
     if expires_delta:
         expire = datetime.now(UTC) + expires_delta
     else:
         expire = datetime.now(UTC) + timedelta(minutes=settings.access_token_expire_minutes)
 
-    to_encode.update({"exp": expire})
+    to_encode["exp"] = expire
     return jwt.encode(
         to_encode, settings.secret_key.get_secret_value(), algorithm=settings.algorithm
     )
@@ -126,8 +146,13 @@ def verify_access_token(token: str) -> str | None:
 
     Returns:
         str | None: the `sub` claim, or None if the token is not
-            acceptable. Still a string at this point: whether it names a
-            real user is the next layer's question.
+            acceptable. Still a string at this point, guaranteed twice
+            over: PyJWT itself raises InvalidSubjectError (a subclass of
+            InvalidTokenError, caught below) for a `sub` of any other
+            JSON type, and the isinstance check restates that as our own
+            contract rather than a behaviour borrowed silently from a
+            dependency we do not control the changelog of. Whether the
+            string names a real user is still the next layer's question.
     """
     try:
         payload = jwt.decode(
@@ -141,4 +166,5 @@ def verify_access_token(token: str) -> str | None:
     except jwt.InvalidTokenError:
         return None
     else:
-        return payload.get("sub")
+        sub = payload.get("sub")
+        return sub if isinstance(sub, str) else None

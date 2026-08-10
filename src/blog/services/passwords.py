@@ -167,7 +167,8 @@ async def _issue_token(db: AsyncSession, email: str) -> tuple[models.User, str] 
     Returns:
         tuple[models.User, str] | None: the account and the token in the
             clear, ready to be emailed — or None when nobody holds this
-            address. The token is returned rather than stored: the
+            address, or when a request for it arrived within the last
+            cooldown window. The token is returned rather than stored: the
             database only ever sees its hash.
     """
     found = await db.execute(
@@ -175,6 +176,18 @@ async def _issue_token(db: AsyncSession, email: str) -> tuple[models.User, str] 
     )
     user = found.scalars().first()
     if user is None:
+        return None
+
+    existing = await db.execute(
+        select(models.PasswordResetToken).where(models.PasswordResetToken.user_id == user.id)
+    )
+    live_token = existing.scalars().first()
+    cooldown_ends = datetime.now(UTC) - timedelta(seconds=settings.reset_token_cooldown_seconds)
+    if live_token is not None and live_token.created_at > cooldown_ends:
+        # * Somebody already has a live link on the way. Issuing a second
+        # * one this soon cannot be the account owner checking their inbox
+        # * again - it is either a slow mail server or somebody using this
+        # * form to flood an address that is not theirs.
         return None
 
     # * A new request invalidates the previous one. Two live links to the

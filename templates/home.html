@@ -29,10 +29,7 @@
         </header>
     {% endif %}
     {% if lead %}
-        <article class="lead-post{% if pinned %} is-pinned{% endif %}">
-            {% if pinned %}
-                <span class="pin-label mono-label">Pinned</span>
-            {% endif %}
+        <article class="lead-post">
             <p class="post-meta mono-label">
                 <span>{{ lead.date_posted.strftime("%d %b %Y") }}</span>
                 <span class="sep">/</span>
@@ -58,7 +55,7 @@
            as more can be fetched — otherwise the first batch from "load
            more" would arrive with no heading above it. #}
         {% if rest or feed.more %}
-            <p class="section-rule mono-label">{{ 'Latest' if pinned else 'Archive' }}</p>
+            <p class="section-rule mono-label">Archive</p>
             <div class="archive" data-feed-list>{% for post in rest %}{{ cards.archive_item(post) }}{% endfor %}</div>
         {% endif %}
         {{ cards.feed_more(feed) }}

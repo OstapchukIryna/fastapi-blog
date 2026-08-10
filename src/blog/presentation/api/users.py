@@ -8,9 +8,10 @@ who is calling.
 
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Request, UploadFile, status
 from fastapi.security import OAuth2PasswordRequestForm
 
+from blog.core.rate_limit import limiter
 from blog.infrastructure import models
 from blog.infrastructure.database import DbSession
 from blog.presentation.api.mail import BackgroundMail
@@ -104,7 +105,9 @@ async def get_current_user(current_user: CurrentUser) -> models.User:
 
 
 @router.post("/forgot-password", response_model=Message, status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit("5/minute")
 async def forgot_password(
+    request: Request,
     request_data: ForgotPasswordRequest,
     background_tasks: BackgroundTasks,
     db: DbSession,
@@ -115,7 +118,13 @@ async def forgot_password(
     returns is that the request was accepted. The email is still to be
     attempted.
 
+    A tighter limit than the app default: this is the one form that lets
+    a stranger point automated requests at somebody else's inbox, so it
+    is worth its own ceiling rather than sharing the general one.
+
     Args:
+        request (Request): needed only so the rate limiter can key on the
+            caller's address — the route itself does not read it.
         request_data (ForgotPasswordRequest): the address to reset.
         background_tasks (BackgroundTasks): this response's queue, wrapped
             in the adapter the service is handed. Delivery happens after

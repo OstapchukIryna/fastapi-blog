@@ -43,16 +43,17 @@ class UserUpdate(BaseModel):
     still apply to whatever is sent: only the requirement to send the
     field at all is lifted.
 
+    No password field: changing a password is not a special case of this,
+    it has its own endpoint and its own requirement — proving the current
+    one — that a generic field-by-field update has no way to carry.
+
     Attributes:
         username (str | None): new handle, if changing it.
         email (EmailStr | None): new address, if changing it.
-        password (str | None): new password, if changing it. Hashed
-            before it reaches the model — it is never stored as typed.
     """
 
     username: str | None = Field(default=None, min_length=3, max_length=50)
     email: EmailStr | None = Field(default=None, min_length=3, max_length=120)
-    password: str | None = Field(default=None, min_length=8, max_length=128)
 
 
 class UserPublic(BaseModel):

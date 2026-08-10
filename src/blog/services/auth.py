@@ -13,7 +13,7 @@ address and a wrong password must be indistinguishable — sat on either
 side of the split, where nothing kept them in step.
 """
 
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import Depends
@@ -80,11 +80,34 @@ async def get_current_user(token: TokenDep, db: DbSession) -> models.User:
 CurrentUser = Annotated[models.User, Depends(get_current_user)]
 
 
+async def _register_failed_attempt(db: AsyncSession, user: models.User) -> None:
+    """Count one more wrong password, and lock the account once too many pile up.
+
+    The backoff doubles with every attempt past the threshold rather than
+    resetting the clock to a fixed window, so a script that waits out one
+    delay meets a longer one immediately after.
+
+    Args:
+        db (AsyncSession): session to write through.
+        user (models.User): the account the attempt was against.
+    """
+    user.failed_login_attempts += 1
+    if user.failed_login_attempts >= settings.login_lockout_threshold:
+        backoff = settings.login_lockout_base_seconds * 2 ** (
+            user.failed_login_attempts - settings.login_lockout_threshold
+        )
+        user.locked_until = datetime.now(UTC) + timedelta(seconds=backoff)
+    await db.commit()
+
+
 async def authenticate(db: AsyncSession, email: str, password: str) -> models.User:
     """The account these credentials belong to, or a 401.
 
     Which of the two was wrong is not said — that an account exists is
-    itself something worth not telling an unauthenticated caller.
+    itself something worth not telling an unauthenticated caller. A
+    locked account is refused the same way, for the same reason: a
+    different message here would tell a caller trying random passwords
+    against random addresses which ones are real.
 
     Args:
         db (AsyncSession): session to look the account up in.
@@ -96,18 +119,30 @@ async def authenticate(db: AsyncSession, email: str, password: str) -> models.Us
         models.User: the account, now known to be theirs.
 
     Raises:
-        Unauthorized: the address is unknown or the password is wrong.
+        Unauthorized: the address is unknown, the account is locked out
+            from too many recent failures, or the password is wrong.
     """
     result = await db.execute(
         select(models.User).where(func.lower(models.User.email) == email.lower())
     )
     user = result.scalars().first()
 
+    if user is not None and user.locked_until is not None and user.locked_until > datetime.now(UTC):
+        raise Unauthorized("Incorrect password or email")
+
     # ! One refusal for both cases, and no lookup that raises on its own.
     # ! A 404 for an unknown address and a 401 for a wrong password tells
     # ! anybody who asks whether a given email has an account here.
     if not user or not verify_password(password, user.password_hash):
+        if user is not None:
+            await _register_failed_attempt(db, user)
         raise Unauthorized("Incorrect password or email")
+
+    if user.failed_login_attempts:
+        user.failed_login_attempts = 0
+        user.locked_until = None
+        await db.commit()
+
     return user
 
 

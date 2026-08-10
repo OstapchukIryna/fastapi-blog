@@ -31,7 +31,7 @@ from typing import Any
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from blog.infrastructure.database import AsyncSessionLocal, engine
+from blog.infrastructure import database
 from blog.schemas.pagination import Pagination
 from blog.services import posts, tags
 
@@ -152,9 +152,16 @@ def report(label: str, queries: list[Query], *, full: bool = False) -> None:
 
 async def main() -> None:
     """Profile the read paths that serve a page."""
+    # * setup_engine() is normally lifespan's job; this script is not the
+    # * app, so it has to open and close the pool itself.
+    database.setup_engine()
+    assert database.engine is not None
+    assert database.AsyncSessionLocal is not None
+    engine = database.engine
+
     page = Pagination()
 
-    async with AsyncSessionLocal() as session:
+    async with database.AsyncSessionLocal() as session:
         with watching(engine) as queries:
             await posts.list_all(session, page)
         report("posts.list_all — the front page", queries, full=True)
@@ -178,7 +185,7 @@ async def main() -> None:
                 await posts.list_all(session, Pagination(limit=size))
             print(f"\nlist_all(limit={size:>3}) -> {len(queries)} queries")
 
-    await engine.dispose()
+    await database.teardown_engine()
 
 
 if __name__ == "__main__":

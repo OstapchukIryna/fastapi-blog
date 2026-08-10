@@ -9,7 +9,7 @@ from typing import Annotated
 
 from botocore.exceptions import ClientError
 from fastapi import Depends, UploadFile, status
-from PIL import UnidentifiedImageError
+from PIL import Image, UnidentifiedImageError
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
@@ -82,7 +82,7 @@ async def set_picture(
 
     try:
         file_bytes, new_filename = await run_in_threadpool(storage.process_profile_image, content)
-    except UnidentifiedImageError as err:
+    except (UnidentifiedImageError, Image.DecompressionBombError) as err:
         raise NotAnImage() from err
 
     # Upload to S3 (also runs in threadpool via async wrapper)

@@ -1,6 +1,7 @@
+from datetime import datetime
+
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from blog.infrastructure import models
@@ -67,6 +68,64 @@ async def test_get_posts_skip_limit(client: AsyncClient, five_posts):
     assert data["limit"] == 2
     assert data["skip"] == 2
     assert data["has_more"] is True
+
+
+@pytest.mark.anyio
+async def test_get_posts_pages_do_not_overlap(client: AsyncClient, five_posts):
+    # identity, not just count: two pages sharing a record (or a record
+    # missing from both) would still pass a length-only assertion
+    pages = [await client.get(f"/api/posts?skip={skip}&limit=2") for skip in (0, 2, 4)]
+    titles = [item["title"] for page in pages for item in page.json()["items"]]
+
+    assert len(titles) == 5
+    assert len(set(titles)) == 5
+
+
+@pytest.mark.anyio
+async def test_get_posts_has_more_false_at_exact_boundary(client: AsyncClient, five_posts):
+    # 5 posts, skip=3 + limit=2 lands exactly on the end - the classic
+    # off-by-one spot for has_more
+    response = await client.get("/api/posts?skip=3&limit=2")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["items"]) == 2
+    assert data["has_more"] is False
+
+
+@pytest.mark.anyio
+async def test_get_posts_limit_at_ceiling_accepted(client: AsyncClient):
+    response = await client.get("/api/posts?limit=100")
+
+    assert response.status_code == 200
+
+
+@pytest.mark.anyio
+async def test_get_posts_limit_over_ceiling_error(client: AsyncClient):
+    response = await client.get("/api/posts?limit=999999")
+
+    assert response.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_get_posts_negative_limit_error(client: AsyncClient):
+    response = await client.get("/api/posts?limit=-1")
+
+    assert response.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_get_posts_negative_skip_error(client: AsyncClient):
+    response = await client.get("/api/posts?skip=-1")
+
+    assert response.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_get_posts_limit_not_a_number_error(client: AsyncClient):
+    response = await client.get("/api/posts?limit=abc")
+
+    assert response.status_code == 422
 
 
 # --- GET /api/posts/{post_id}: get_post -------------------------------------
@@ -312,6 +371,35 @@ async def test_update_post_success(client: AsyncClient):
 
 
 @pytest.mark.anyio
+async def test_update_post_ignores_author_and_date(client: AsyncClient):
+    # PostUpdate has neither field: authorship and publication time are
+    # not something an edit can carry, the same way a password is not
+    # something a profile edit can carry.
+    await create_test_user(client, username="user1", email="user1@example.com")
+    token1 = await login_user(client, email="user1@example.com")
+    post = await create_test_post(client, auth_header(token1))
+
+    await create_test_user(client, username="user2", email="user2@example.com")
+
+    response = await client.patch(
+        f"/api/posts/{post['id']}",
+        json={"title": "still mine", "user_id": 999, "date_posted": "2020-01-01T00:00:00Z"},
+        headers=auth_header(token1),
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["title"] == "still mine"
+    assert data["author"]["username"] == "user1"
+    # compared as instants, not strings: the same moment can come back
+    # with a "Z" suffix from one endpoint and a numeric offset from
+    # another, which is a serialisation detail, not a changed value
+    assert datetime.fromisoformat(data["date_posted"]) == datetime.fromisoformat(
+        post["date_posted"]
+    )
+
+
+@pytest.mark.anyio
 async def test_update_wrong_user(client: AsyncClient):
     await create_test_user(client, username="user1", email="user1@example.com")
     token1 = await login_user(client, email="user1@example.com")
@@ -334,7 +422,7 @@ async def test_update_wrong_user(client: AsyncClient):
     assert response.json()["detail"] == "Not authorized to edit this post"
 
 
-# --- DELETE /api/posts/{post_id}: delete_post_api ---------------------------
+# --- DELETE /api/posts/{post_id}: delete_post --------------------------------
 @pytest.mark.anyio
 async def test_delete_post_success(client: AsyncClient):
     await create_test_user(client)
@@ -349,7 +437,49 @@ async def test_delete_post_success(client: AsyncClient):
     assert again.status_code == 404
 
 
-# --- services.posts: find_related and set_pinned (no JSON route) -----------
+@pytest.mark.anyio
+async def test_delete_post_wrong_user_error(client: AsyncClient):
+    await create_test_user(client, username="user1", email="user1@example.com")
+    token1 = await login_user(client, email="user1@example.com")
+    post = await create_test_post(client, auth_header(token1))
+
+    await create_test_user(client, username="user2", email="user2@example.com")
+    token2 = await login_user(client, email="user2@example.com")
+
+    response = await client.delete(f"/api/posts/{post['id']}", headers=auth_header(token2))
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Not authorized to edit this post"
+
+    # independent check: the post survives a refusal
+    still_there = await client.get(f"/api/posts/{post['id']}")
+    assert still_there.status_code == 200
+
+
+@pytest.mark.anyio
+async def test_delete_post_unauthorized(client: AsyncClient):
+    await create_test_user(client)
+    token = await login_user(client)
+    post = await create_test_post(client, auth_header(token))
+
+    response = await client.delete(f"/api/posts/{post['id']}")
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Not authenticated"
+
+
+@pytest.mark.anyio
+async def test_delete_post_not_found(client: AsyncClient):
+    await create_test_user(client)
+    token = await login_user(client)
+
+    response = await client.delete("/api/posts/999", headers=auth_header(token))
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Post not found"
+
+
+# --- services.posts: find_related (no JSON route) ---------------------------
 # Used only by the web pages, not the JSON API — tested here directly
 # against the service, without going through either front door.
 async def _load_post_with_tags(db_session: AsyncSession, post_id: int) -> models.Post:
@@ -456,59 +586,3 @@ async def test_find_related_respects_limit(client: AsyncClient, db_session: Asyn
     related = await posts_service.find_related(db_session, post, limit=2)
 
     assert len(related) == 2
-
-
-@pytest.mark.anyio
-async def test_set_pinned_pins_a_post(client: AsyncClient, db_session: AsyncSession):
-    await create_test_user(client)
-    token = await login_user(client)
-    created = await create_test_post(client, auth_header(token))
-    post = await db_session.get(models.Post, created["id"])
-    assert post is not None
-
-    await posts_service.set_pinned(db_session, post, pinned=True)
-
-    assert post.is_pinned is True
-
-
-@pytest.mark.anyio
-async def test_set_pinned_unpins_a_post(client: AsyncClient, db_session: AsyncSession):
-    await create_test_user(client)
-    token = await login_user(client)
-    created = await create_test_post(client, auth_header(token))
-    post = await db_session.get(models.Post, created["id"])
-    assert post is not None
-    await posts_service.set_pinned(db_session, post, pinned=True)
-
-    await posts_service.set_pinned(db_session, post, pinned=False)
-
-    assert post.is_pinned is False
-
-
-@pytest.mark.anyio
-async def test_set_pinned_unpins_the_previous_post(client: AsyncClient, db_session: AsyncSession):
-    await create_test_user(client)
-    token = await login_user(client)
-    headers = auth_header(token)
-    post1 = await create_test_post(client, headers)
-    post2 = await create_test_post(client, headers)
-
-    row1 = await db_session.get(models.Post, post1["id"])
-    assert row1 is not None
-    await posts_service.set_pinned(db_session, row1, pinned=True)
-
-    row2 = await db_session.get(models.Post, post2["id"])
-    assert row2 is not None
-    await posts_service.set_pinned(db_session, row2, pinned=True)
-
-    # independent check via a fresh query: set_pinned's own bulk UPDATE
-    # does not sync row1's in-memory state, so re-read rather than trust it
-    pinned_count = await db_session.scalar(
-        select(func.count()).where(models.Post.is_pinned.is_(True))
-    )
-    assert pinned_count == 1
-
-    still_pinned_id = await db_session.scalar(
-        select(models.Post.id).where(models.Post.is_pinned.is_(True))
-    )
-    assert still_pinned_id == post2["id"]

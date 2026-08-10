@@ -22,23 +22,18 @@ from blog.schemas import Pagination
 def arrange(items: Sequence[models.Post]) -> dict:
     """Split one batch into the post shown large and the ones below it.
 
-    The pinned post is found by looking at the first element rather than
-    by scanning, because the query already sorts pinned first. Scanning
-    used to be necessary, and with pagination it also became wrong: on
-    the second batch the pinned post is not in the slice at all, so the
-    scan found nothing and an arbitrary post took the lead position.
+    Only the first batch has a lead at all: on the second batch, "load
+    more" appends straight to the archive list instead of re-arranging
+    what is already on the page.
 
     Args:
         items (Sequence[models.Post]): one batch, in query order.
 
     Returns:
-        dict: the template context — `pinned` (only when the lead really
-            is pinned), `lead`, and `rest`.
+        dict: the template context — `lead` and `rest`.
     """
-    lead = items[0] if items else None
     return {
-        "pinned": lead if lead is not None and lead.is_pinned else None,
-        "lead": lead,
+        "lead": items[0] if items else None,
         "rest": list(items[1:]),
     }
 

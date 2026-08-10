@@ -27,6 +27,19 @@ from starlette.concurrency import run_in_threadpool
 
 from blog.core.config import settings
 
+# * Pillow's own default (~89 megapixels) only warns up to double that
+# * and raises DecompressionBombError past it — so a file just inside the
+# * upload size cap but built to decode into, say, 100 megapixels would
+# * sail through as a warning, not a refusal, and this process would
+# * still have to allocate the bitmap. Lowering the ceiling here brings
+# * the raise threshold down with it (Pillow's is always 2x this value).
+# * 40 megapixels is generous for what this module ever does with the
+# * result — everything gets cropped to AVATAR_SIZE regardless of how
+# * large it arrived — so nothing legitimate is refused, and anything
+# * built to be a bomb hits DecompressionBombError, which
+# * services/avatars.py already turns into a 400.
+Image.MAX_IMAGE_PIXELS = 40_000_000
+
 AVATAR_SIZE = (300, 300)
 JPEG_QUALITY = 85
 
@@ -61,15 +74,6 @@ def _upload_to_s3(file_bytes: bytes, key: str) -> None:
 def _delete_from_s3(key: str) -> None:
     s3 = _get_s3_client()
     s3.delete_object(Bucket=settings.s3_bucket_name, Key=key)
-
-
-def _clear_s3_prefix(prefix: str) -> None:
-    s3 = _get_s3_client()
-    paginator = s3.get_paginator("list_objects_v2")
-    for page in paginator.paginate(Bucket=settings.s3_bucket_name, Prefix=prefix):
-        keys = [{"Key": obj["Key"]} for obj in page.get("Contents", [])]
-        if keys:
-            s3.delete_objects(Bucket=settings.s3_bucket_name, Delete={"Objects": keys})
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,12 +147,3 @@ class AWSAvatars:
             return
         key = f"profile_pics/{filename}"
         await run_in_threadpool(_delete_from_s3, key)
-
-    async def clear_profile_pictures(self) -> None:
-        """Remove every stored avatar, known to the database or not.
-
-        For resetting the bucket wholesale: a per-user delete would leave
-        behind any avatar the database has since forgotten about (a
-        previous run's upload that was never cleanly replaced).
-        """
-        await run_in_threadpool(_clear_s3_prefix, "profile_pics/")

@@ -18,8 +18,6 @@ from pydantic import BaseModel, Field, computed_field
 
 from blog.core.config import settings
 
-MAX_PAGE_SIZE = 100
-
 
 class Pagination(BaseModel):
     """How much has already been shown, and how much to fetch next.
@@ -40,7 +38,7 @@ class Pagination(BaseModel):
     limit: int = Field(
         default=settings.posts_per_page,
         ge=1,
-        le=MAX_PAGE_SIZE,
+        le=settings.max_page_size,
         description="how many entries to return in one page",
     )
 
@@ -89,6 +87,15 @@ class Page[T](BaseModel):
         errors happen in the places where an expression was written a
         second time.
 
+        Known and accepted: `total` and `items` come from two separate
+        queries in the same transaction, and under READ COMMITTED
+        (Postgres's default) a row inserted between them is invisible to
+        the first but could be counted by the second, or the reverse —
+        either can make this answer wrong right at the boundary, for one
+        response. Offset pagination cannot avoid that; keyset pagination
+        (paging from the last row seen rather than a row count) can, at
+        the cost of losing "jump to page 6". Not worth that trade here.
+
         Returns:
             bool: True when the end has not been reached.
         """
@@ -102,6 +109,14 @@ class Page[T](BaseModel):
         — so the ORM objects are validated into the response model right
         here. On the bare class the parameter is Any and anything at all
         would be accepted.
+
+        Validating here means reading every attribute the response model
+        names — tags and author included, for a post — before this
+        returns. Under asyncio that raises MissingGreenlet, not a clean
+        error, if any of them was not already loaded on the query that
+        produced `items`. Every current call site goes through
+        base_query(), which eager-loads both; a new query that skips it
+        would fail inside this call, not at the query itself.
 
         Args:
             items (Iterable[Any]): the records, usually ORM rows.

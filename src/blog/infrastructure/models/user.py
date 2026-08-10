@@ -1,8 +1,9 @@
 """Accounts."""
 
+from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import String
+from sqlalchemy import DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from blog.core.config import settings
@@ -31,6 +32,11 @@ class User(Base):
             Nullable and meaningful: None is "no picture of their own",
             not "unknown", and it is what image_path turns into the
             shared default.
+        failed_login_attempts (int): consecutive wrong passwords since the
+            last successful sign-in. Reset to 0 on success.
+        locked_until (datetime | None): sign-in refuses everything until
+            this passes, win or lose — set once failed_login_attempts
+            crosses the threshold, and growing with each attempt after.
         reset_tokens (list[PasswordResetToken]): outstanding "I forgot my
             password" requests. Deleted with the account.
         posts (list[Post]): everything this person wrote. Deleting the
@@ -45,6 +51,8 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     image_file: Mapped[str | None] = mapped_column(String(200), default=None)
+    failed_login_attempts: Mapped[int] = mapped_column(default=0, server_default="0")
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
     posts: Mapped[list["Post"]] = relationship(
         back_populates="author",

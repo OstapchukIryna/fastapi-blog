@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 from math import ceil
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from blog.infrastructure.database import Base
@@ -25,11 +25,6 @@ class Post(Base):
         content (str): the body, as Markdown. Rendered to HTML at display
             time, not at write time, so a change to the renderer applies
             to everything already published.
-        is_pinned (bool): whether this post leads the front page. At most
-            one row should be true, and nothing in the schema enforces
-            that — services.posts.set_pinned clears the others inside the
-            same transaction, so the invariant lives in one function
-            rather than in a constraint.
         user_id (int): author. Indexed because the author page filters on
             it, and cascading because a post without an author cannot be
             displayed.
@@ -46,7 +41,6 @@ class Post(Base):
     title: Mapped[str] = mapped_column(String(100), nullable=False)
     summary: Mapped[str] = mapped_column(String(250), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    is_pinned: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
