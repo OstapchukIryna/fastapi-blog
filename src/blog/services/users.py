@@ -142,9 +142,11 @@ async def _already_taken(db: AsyncSession, user: models.User, wanted: dict[str, 
         return False
 
     # * Case-insensitively, matching register(): "TestUser" is "testuser"
-    # * taken, not a free name. A raw == here would miss that clash - the
-    # * unique index is on the raw column, so nothing at the database
-    # * layer would catch it either, and the row would simply be written.
+    # * taken, not a free name. A raw == here would miss that clash. The
+    # * functional unique indexes on lower(username) and lower(email)
+    # * would still catch it at the database layer, but only as an
+    # * IntegrityError after the write - this check exists to answer with
+    # * the same clean message register() gives, before that write happens.
     clash = await db.execute(
         select(models.User).where(
             models.User.id != user.id,
