@@ -147,3 +147,25 @@ class AWSAvatars:
             return
         key = f"profile_pics/{filename}"
         await run_in_threadpool(_delete_from_s3, key)
+
+    def avatar_url(self, filename: str) -> str:
+        """The URL a stored avatar is reachable at.
+
+        Path-style when s3_endpoint_url is set, not virtual-hosted: a
+        custom endpoint means a non-AWS S3-compatible provider — Linode
+        Object Storage or a local MinIO, the two this setting exists
+        for — and path-style is the one addressing scheme every one of
+        them accepts, where virtual-hosted subdomains are not guaranteed
+        to resolve. Falls back to AWS's own virtual-hosted URL when no
+        endpoint override is configured, which is the ordinary case.
+
+        Args:
+            filename (str): the stored name, as kept in `image_file`.
+
+        Returns:
+            str: the full URL to fetch the image from.
+        """
+        key = f"profile_pics/{filename}"
+        if settings.s3_endpoint_url:
+            return f"{settings.s3_endpoint_url}/{settings.s3_bucket_name}/{key}"
+        return f"https://{settings.s3_bucket_name}.s3.{settings.s3_region}.amazonaws.com/{key}"

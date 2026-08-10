@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 from math import ceil
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from blog.infrastructure.database import Base
@@ -55,8 +55,6 @@ class Post(Base):
         nullable=False,
         index=True,
     )
-    # Python-side and SQL-side defaults
-    likes: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     author: Mapped[User] = relationship(back_populates="posts")
     tags: Mapped[list[Tag]] = relationship(secondary="post_tags", back_populates="posts")

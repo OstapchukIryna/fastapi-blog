@@ -3,11 +3,11 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, String
+from sqlalchemy import DateTime, Index, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from blog.core.config import settings
 from blog.infrastructure.database import Base
+from blog.infrastructure.images import AWSAvatars
 
 if TYPE_CHECKING:
     from blog.infrastructure.models.post import Post
@@ -21,12 +21,16 @@ class User(Base):
 
     Attributes:
         id (int): surrogate primary key, and the subject of the JWT.
-        username (str): the public handle. Unique, and compared
-            case-insensitively when registering so two accounts cannot
-            differ only in capitals.
-        email (str): stored lower-case, which is what makes the unique
-            index a real constraint rather than one a different
-            capitalisation can slip past.
+        username (str): the public handle. Unique on lower(username), not
+            on the raw column — a plain unique=True would let "alice" and
+            "Alice" both exist, agreeing with services/users.py's
+            case-insensitive check right up until that check is ever
+            bypassed or a row is written some other way. The index makes
+            the guarantee the schema's, not the caller's.
+        email (str): stored lower-case on write, and unique on
+            lower(email) for the same reason as username — belt as well
+            as braces, since the lower-casing on write is what a caller
+            could still skip.
         password_hash (str): Argon2 hash. Never the password.
         image_file (str | None): the stored avatar's filename, or None.
             Nullable and meaningful: None is "no picture of their own",
@@ -47,12 +51,22 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
-    email: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
+    username: Mapped[str] = mapped_column(String(50), nullable=False)
+    email: Mapped[str] = mapped_column(String(120), nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     image_file: Mapped[str | None] = mapped_column(String(200), default=None)
     failed_login_attempts: Mapped[int] = mapped_column(default=0, server_default="0")
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
+    # * Functional, not unique=True on the column: a plain unique index is
+    # * case-sensitive, so it would let "alice" and "Alice" both exist
+    # * even though every service-layer check compares through
+    # * func.lower(). This is what makes that comparison an actual
+    # * guarantee instead of a convention every caller has to remember.
+    __table_args__ = (
+        Index("ix_users_username_lower", func.lower(username), unique=True),
+        Index("ix_users_email_lower", func.lower(email), unique=True),
+    )
 
     posts: Mapped[list["Post"]] = relationship(
         back_populates="author",
@@ -76,10 +90,16 @@ class User(Base):
         and two ways for them to disagree. Changing the picture means
         changing image_file, which is what the service does.
 
+        Delegated to AWSAvatars rather than built here: how a storage URL
+        is shaped is exactly the knowledge that class exists to hold in
+        one place, and a second copy of it here already went stale once —
+        this docstring used to promise a path under /media, which nothing
+        in the URL below has ever pointed at.
+
         Returns:
-            str: a path under /media for an uploaded picture, or the
-                shared default under /static.
+            str: the S3 URL for an uploaded picture, or the shared
+                default under /static.
         """
         if self.image_file:
-            return f"https://{settings.s3_bucket_name}.s3.{settings.s3_region}.amazonaws.com/profile_pics/{self.image_file}"
+            return AWSAvatars().avatar_url(self.image_file)
         return DEFAULT_AVATAR

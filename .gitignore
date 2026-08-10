@@ -48,3 +48,5 @@ site/
 .coverage
 coverage.xml
 htmlcov/
+
+vps_setup.txt

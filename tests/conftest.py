@@ -36,6 +36,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import NullPool
 
 from blog.core.rate_limit import limiter
+from blog.infrastructure import database
 from blog.infrastructure.database import Base, get_db
 from blog.main import app
 
@@ -117,6 +118,10 @@ async def client(db_session: AsyncSession, mocked_aws) -> AsyncGenerator[AsyncCl
     # otherwise carry counts over from whichever test ran before this one -
     # every test starts under the same fake IP address.
     limiter.reset()
+    # ASGITransport does not run the app's lifespan, so nothing else ever
+    # calls setup_engine() in tests - only /api/health needs it (its own
+    # connection, deliberately outside get_db's override above).
+    database.setup_engine()
     # Asynchronous Server Gateway Interface mocks real server invoke
     async with (
         AsyncClient(
@@ -126,6 +131,7 @@ async def client(db_session: AsyncSession, mocked_aws) -> AsyncGenerator[AsyncCl
     ):
         yield ac
 
+    await database.teardown_engine()
     app.dependency_overrides.clear()
 
 

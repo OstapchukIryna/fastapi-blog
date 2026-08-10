@@ -13,13 +13,12 @@ from fastapi import FastAPI, HTTPException, status
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
-from sqlalchemy import text
 
 from blog.core.config import STATIC_DIR, settings
 from blog.core.logging import configure_logging
 from blog.core.rate_limit import limiter
 from blog.infrastructure import models  # noqa: F401
-from blog.infrastructure.database import DbSession, setup_engine, teardown_engine
+from blog.infrastructure.database import check_database_alive, setup_engine, teardown_engine
 from blog.presentation.api import API_PREFIX, posts, tags, users
 from blog.presentation.errors import register_error_handlers
 from blog.presentation.middleware import RequestContextMiddleware
@@ -58,12 +57,17 @@ app.include_router(posts.router, prefix=f"{API_PREFIX}/posts", tags=["posts"])
 app.include_router(tags.router, prefix=f"{API_PREFIX}/tags", tags=["tags"])
 
 
-@app.get(f"{API_PREFIX}/health")
-async def health_check(db: DbSession) -> dict[str, str]:
+@app.get(f"{API_PREFIX}/health", include_in_schema=False)
+async def health_check() -> dict[str, str]:
     """Report whether the app can reach its database.
 
-    Args:
-        db (DbSession): request-scoped session.
+    Not in the OpenAPI document: this answers a load balancer, not a
+    client of the API, and does not belong next to the resources it lists.
+
+    Checked on a connection of its own, outside the pool DbSession draws
+    from — through that pool, an exhausted one would make this hang
+    waiting for a connection instead of answering, which is exactly the
+    moment a load balancer needs a fast refusal.
 
     Returns:
         dict[str, str]: `{"status": "ok"}` once the query succeeds.
@@ -71,12 +75,10 @@ async def health_check(db: DbSession) -> dict[str, str]:
     Raises:
         HTTPException: 503 when the database does not answer.
     """
-    try:
-        await db.execute(text("SELECT 1"))
-    except Exception as exc:
+    if not await check_database_alive():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Database connection failed"
-        ) from exc
+        )
     return {"status": "ok"}
 
 

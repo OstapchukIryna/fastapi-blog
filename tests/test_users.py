@@ -13,6 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from blog.core.config import settings
+from blog.core.security import hash_password
 from blog.infrastructure import models
 from blog.infrastructure.images import AWSAvatars
 from blog.schemas import UserCreate, UserUpdate
@@ -1329,3 +1330,39 @@ async def test_update_user_race_condition_becomes_already_registered(
         await users.update(db_session, row, UserUpdate(username="racedname"))
 
     assert exc_info.value.detail == "Username or email already registered"
+
+
+# --- Schema-level guarantee: case-insensitive uniqueness is the database's,
+# --- not just services/users.py's, to enforce ---------------------------
+@pytest.mark.anyio
+async def test_username_case_variants_rejected_by_database_directly(
+    db_session: AsyncSession,
+):
+    # Bypasses services/users.py entirely - no func.lower() check runs
+    # here at all. If this ever passed, the guarantee would only be a
+    # convention every future write has to remember, not a fact the
+    # schema enforces.
+    db_session.add(
+        models.User(username="caseuser", email="one@example.com", password_hash=hash_password("x"))
+    )
+    await db_session.commit()
+
+    db_session.add(
+        models.User(username="CaseUser", email="two@example.com", password_hash=hash_password("x"))
+    )
+    with pytest.raises(IntegrityError):
+        await db_session.commit()
+
+
+@pytest.mark.anyio
+async def test_email_case_variants_rejected_by_database_directly(db_session: AsyncSession):
+    db_session.add(
+        models.User(username="one", email="same@example.com", password_hash=hash_password("x"))
+    )
+    await db_session.commit()
+
+    db_session.add(
+        models.User(username="two", email="Same@Example.com", password_hash=hash_password("x"))
+    )
+    with pytest.raises(IntegrityError):
+        await db_session.commit()

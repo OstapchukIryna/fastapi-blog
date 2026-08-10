@@ -76,6 +76,11 @@ ALLOWED_SIDEWAYS = {
         "blog.infrastructure.database",
     ): "Base is declared there",
     (
+        "blog.infrastructure.models.user",
+        "blog.infrastructure.images",
+    ): "image_path defers to AWSAvatars for how a storage URL is shaped, "
+    "rather than keeping a second copy of that knowledge here",
+    (
         "blog.infrastructure.models.reset_password",
         "blog.infrastructure.database",
     ): "Base is declared there",
