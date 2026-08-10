@@ -176,10 +176,14 @@ async def authenticate(db: AsyncSession, email: str, password: str) -> models.Us
     # ! A 404 for an unknown address and a 401 for a wrong password tells
     # ! anybody who asks whether a given email has an account here. Every
     # ! branch below calls verify_password before raising, on purpose: an
-    # ! unknown address, a locked account, and a wrong password all take
-    # ! the same message and the same tens of milliseconds to refuse -
-    # ! whichever one returned early would be the one a timing measurement
-    # ! could tell apart from the other two.
+    # ! unknown address, a locked account, and a wrong password all spend
+    # ! the same tens of milliseconds on Argon2. A wrong password against
+    # ! a real account also earns a database round trip: _register_failed_attempt
+    # ! writes and commits the failed count, something neither of the
+    # ! other two branches does. That gap shows up on a local network and
+    # ! buries itself in internet jitter. It stays open on purpose -
+    # ! writing on every attempt, real or fake, would close it at a cost
+    # ! the leak does not justify.
     if user is None:
         verify_password(password, DUMMY_HASH)
         raise Unauthorized("Incorrect password or email")
