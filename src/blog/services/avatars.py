@@ -84,7 +84,11 @@ logger = logging.getLogger(__name__)
 
 
 async def _read_within_limit(file: UploadFile, limit: int) -> bytes:
-    """Read an upload without ever holding more than limit (plus one chunk) of it.
+    """Read an upload in chunks, rejecting it as soon as it exceeds limit.
+
+    Peak memory runs to roughly twice limit. The chunks join into a second
+    buffer before returning, so the list of chunks and the joined result
+    sit in memory together for a moment.
 
     Args:
         file (UploadFile): the upload, not yet read.
