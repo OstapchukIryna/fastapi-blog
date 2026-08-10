@@ -6,6 +6,7 @@ here commits, because deciding when a change is final belongs to the
 service performing it.
 """
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator
 from typing import Annotated
@@ -47,8 +48,9 @@ AsyncSessionLocal: async_sessionmaker[AsyncSession] | None = None
 # * a load balancer needs a fast 503, this would instead just hang until
 # * its own timeout, indistinguishable from a dead backend but slower to
 # * notice. NullPool means every check opens its own connection and closes
-# * it again, and the short connect_timeout means an unreachable database
-# * fails fast instead of hanging on the TCP handshake.
+# * it again; the timeout that keeps an unreachable database from hanging
+# * is applied in check_database_alive() itself, not here — see its
+# * docstring for why it is not a connect_args value on this engine.
 _health_check_engine: AsyncEngine | None = None
 
 
@@ -69,11 +71,7 @@ def setup_engine() -> None:
     global engine, AsyncSessionLocal, _health_check_engine
     engine = create_async_engine(settings.database_url, pool_pre_ping=True)
     AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    _health_check_engine = create_async_engine(
-        settings.database_url,
-        poolclass=NullPool,
-        connect_args={"connect_timeout": HEALTH_CHECK_TIMEOUT_SECONDS},
-    )
+    _health_check_engine = create_async_engine(settings.database_url, poolclass=NullPool)
 
 
 async def teardown_engine() -> None:
@@ -91,6 +89,17 @@ async def teardown_engine() -> None:
 async def check_database_alive() -> bool:
     """Whether the database answers, checked on a connection of its own.
 
+    asyncio.timeout() around the whole block, not connect_args on the
+    engine: a driver-level connect timeout only bounds the TCP handshake
+    — SELECT 1 against a database that accepted the connection but is
+    too overloaded to answer it would still hang past
+    HEALTH_CHECK_TIMEOUT_SECONDS. It is also spelled differently per
+    driver (psycopg wants connect_timeout, asyncpg wants timeout and
+    rejects connect_timeout outright), so it silently stops working the
+    day DATABASE_URL's driver ever changes. asyncio.timeout() covers
+    connect and query alike and does not know or care which driver is
+    underneath.
+
     Returns:
         bool: True if a trivial query succeeded within
             HEALTH_CHECK_TIMEOUT_SECONDS, False for a timeout, a refused
@@ -100,8 +109,9 @@ async def check_database_alive() -> bool:
     if _health_check_engine is None:
         raise RuntimeError("setup_engine() has not run")
     try:
-        async with _health_check_engine.connect() as conn:
-            await conn.execute(text("SELECT 1"))
+        async with asyncio.timeout(HEALTH_CHECK_TIMEOUT_SECONDS):
+            async with _health_check_engine.connect() as conn:
+                await conn.execute(text("SELECT 1"))
     except Exception:
         logger.exception("health check could not reach the database")
         return False

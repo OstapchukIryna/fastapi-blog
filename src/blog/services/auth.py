@@ -26,6 +26,7 @@ from blog.core.logging import user_id_var
 from blog.core.security import (
     Unauthorized,
     create_access_token,
+    hash_password,
     verify_access_token,
     verify_password,
 )
@@ -40,6 +41,16 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/users/token")
 
 TokenDep = Annotated[str, Depends(oauth2_scheme)]
 
+# * Hashed once at import, not per request: Argon2 takes tens of
+# * milliseconds, and authenticate() spends it against this whenever
+# * there is no real hash to check against, so an unknown address takes
+# * the same time to refuse as a wrong password does. Without this, the
+# * short-circuit in authenticate()'s `or` never calls verify_password at
+# * all for an unknown address, and the two cases become distinguishable
+# * by response time alone — the same information the identical message
+# * was written to withhold.
+DUMMY_HASH = hash_password("this hash exists only to spend the same time an account lookup would")
+
 
 async def get_current_user(token: TokenDep, db: DbSession) -> models.User:
     """Resolve the bearer token to the account it names.
@@ -52,24 +63,42 @@ async def get_current_user(token: TokenDep, db: DbSession) -> models.User:
         models.User: the signed-in account.
 
     Raises:
-        Unauthorized: the token is unusable, or names an account that no
-            longer exists. Both are 401 because in both cases the caller
-            has to obtain a new token; the message differs only to help
-            somebody debugging their own client.
+        Unauthorized: the token is unusable, names an account that no
+            longer exists, or was issued before the account's password
+            was last changed. All but one are 401 because in both cases
+            the caller has to obtain a new token; the message differs
+            only to help somebody debugging their own client.
     """
-    # * int() collapses two refusals into one: a rejected token gives
-    # * None, and a `sub` that is not a number gives whatever was in the
-    # * claim. Neither is a user id, and neither deserves its own branch.
+    claims = verify_access_token(token)
+    if claims is None:
+        raise Unauthorized("Invalid or expired token")
+
     try:
-        # pyrefly: ignore [bad-argument-type]
-        user_id = int(verify_access_token(token))
-    except (TypeError, ValueError):
+        user_id = int(claims.sub)
+    except ValueError:
+        # A signature that checks out but names a sub that was never a
+        # user id - not reachable through this application's own tokens,
+        # only through one crafted by someone who has the signing key.
         raise Unauthorized("Invalid or expired token") from None
 
     user = await db.get(models.User, user_id)
-    if not user:
+    if user is None:
         # Signed correctly, but the account has since been deleted.
         raise Unauthorized("User not found")
+
+    # * A reset or a change stamps this; a token minted before that
+    # * moment was signed by the account's old password, and a person
+    # * changing their password is very often doing it because that old
+    # * one just leaked. Without this, that token would keep working
+    # * until its own exp regardless of the reason the password changed.
+    # * A direct comparison is safe here specifically because
+    # * create_access_token encodes iat as a float: a naive comparison
+    # * against an iat truncated to whole seconds would make a token
+    # * minted a fraction of a second after the change indistinguishable
+    # * from one minted a fraction before it, in whichever direction that
+    # * truncation happened to round.
+    if user.password_changed_at is not None and claims.issued_at < user.password_changed_at:
+        raise Unauthorized("Invalid or expired token")
 
     # * Set once the account is known, not before — an anonymous or a
     # * rejected request should never appear to belong to somebody.
@@ -84,8 +113,16 @@ async def _register_failed_attempt(db: AsyncSession, user: models.User) -> None:
     """Count one more wrong password, and lock the account once too many pile up.
 
     The backoff doubles with every attempt past the threshold rather than
-    resetting the clock to a fixed window, so a script that waits out one
-    delay meets a longer one immediately after.
+    resetting the clock to a fixed window. That growth only happens here,
+    though, and this only runs once a request actually reaches the
+    password check — authenticate() refuses everything for free while
+    locked_until is still in the future, without calling this. A script
+    that keeps hammering during that window gains nothing and loses
+    nothing: attempts made while locked are not counted at all, so the
+    backoff is exactly as long the next time it is checked as it was when
+    it was set. It only grows again once a request arrives after
+    locked_until has passed and is still wrong — not from waiting less,
+    not from trying harder, only from one more genuine failure.
 
     Args:
         db (AsyncSession): session to write through.
@@ -109,6 +146,14 @@ async def authenticate(db: AsyncSession, email: str, password: str) -> models.Us
     different message here would tell a caller trying random passwords
     against random addresses which ones are real.
 
+    The same reasoning applies to how long this takes, not only to what
+    it says: verify_password always runs, against DUMMY_HASH when there
+    is no real one, so an unknown address costs the same tens of
+    milliseconds a wrong password against a real one does. A short-circuit
+    that skipped hashing for an unknown address would leave the message
+    identical while the response time was not — which is exactly the
+    signal an address list gets built from.
+
     Args:
         db (AsyncSession): session to look the account up in.
         email (str): the address as typed; matched case-insensitively,
@@ -127,14 +172,23 @@ async def authenticate(db: AsyncSession, email: str, password: str) -> models.Us
     )
     user = result.scalars().first()
 
-    if user is not None and user.locked_until is not None and user.locked_until > datetime.now(UTC):
-        raise Unauthorized("Incorrect password or email")
-
     # ! One refusal for both cases, and no lookup that raises on its own.
     # ! A 404 for an unknown address and a 401 for a wrong password tells
-    # ! anybody who asks whether a given email has an account here.
-    if not user or not verify_password(password, user.password_hash):
-        if user is not None:
+    # ! anybody who asks whether a given email has an account here. Every
+    # ! branch below calls verify_password before raising, on purpose: an
+    # ! unknown address, a locked account, and a wrong password all take
+    # ! the same message and the same tens of milliseconds to refuse -
+    # ! whichever one returned early would be the one a timing measurement
+    # ! could tell apart from the other two.
+    if user is None:
+        verify_password(password, DUMMY_HASH)
+        raise Unauthorized("Incorrect password or email")
+
+    locked = user.locked_until is not None and user.locked_until > datetime.now(UTC)
+    password_ok = verify_password(password, user.password_hash)
+
+    if locked or not password_ok:
+        if not locked:
             await _register_failed_attempt(db, user)
         raise Unauthorized("Incorrect password or email")
 

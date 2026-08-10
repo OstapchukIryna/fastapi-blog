@@ -7,7 +7,21 @@ class the route names, so the separation is enforced by the response
 model rather than by remembering to filter.
 """
 
+from typing import Annotated
+
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
+# * Declared once so UserBase and UserUpdate cannot drift the way the
+# * same pair of fields drifted before in schemas/post.py. max_length
+# * matches infrastructure/models/user.py's String(50)/String(120)
+# * columns - kept in sync by hand, since Pydantic and SQLAlchemy have no
+# * way to read the limit off one another.
+Username = Annotated[str, Field(min_length=3, max_length=50)]
+# * EmailStr has no min_length of its own: min_length=3 here used to
+# * claim one, but a string short enough to fail it cannot pass EmailStr
+# * first - "a@b" is already 3 characters, and nothing valid is shorter.
+# * The bound that actually does something is the upper one.
+Email = Annotated[EmailStr, Field(max_length=120)]
 
 
 class UserBase(BaseModel):
@@ -19,8 +33,8 @@ class UserBase(BaseModel):
             it yet, so no confirmation step exists.
     """
 
-    username: str = Field(min_length=3, max_length=50)
-    email: EmailStr = Field(min_length=3, max_length=120)
+    username: Username
+    email: Email
 
 
 class UserCreate(UserBase):
@@ -52,8 +66,8 @@ class UserUpdate(BaseModel):
         email (EmailStr | None): new address, if changing it.
     """
 
-    username: str | None = Field(default=None, min_length=3, max_length=50)
-    email: EmailStr | None = Field(default=None, min_length=3, max_length=120)
+    username: Username | None = None
+    email: Email | None = None
 
 
 class UserPublic(BaseModel):
@@ -86,8 +100,6 @@ class UserPrivate(UserPublic):
         email (EmailStr): the address on the account. Returned only from
             endpoints that have already established who is asking.
     """
-
-    model_config = ConfigDict(from_attributes=True)
 
     email: EmailStr
 

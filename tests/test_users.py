@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from blog.core.config import settings
 from blog.core.security import hash_password
+from blog.core.security import verify_password as real_verify_password
 from blog.infrastructure import models
 from blog.infrastructure.images import AWSAvatars
 from blog.schemas import UserCreate, UserUpdate
@@ -214,6 +215,22 @@ async def test_login_unknown_email_error(client: AsyncClient):
 
 
 @pytest.mark.anyio
+async def test_login_unknown_email_still_hashes(client: AsyncClient):
+    # Proof at the level that matters, not by timing - timing is
+    # unreliable in CI. A short-circuit that skipped the hash for an
+    # unknown address would leave this at zero calls; the fix is that it
+    # never does.
+    with patch("blog.services.auth.verify_password", wraps=real_verify_password) as mock_verify:
+        response = await client.post(
+            "/api/users/token",
+            data={"username": "nobody@example.com", "password": "whatever"},
+        )
+
+    assert response.status_code == 401
+    mock_verify.assert_called_once()
+
+
+@pytest.mark.anyio
 async def test_login_email_case_insensitive(client: AsyncClient):
     await create_test_user(client, email="Mixed@Example.com")
 
@@ -253,6 +270,29 @@ async def test_login_locks_out_after_repeated_failures(client: AsyncClient):
     )
     assert response.status_code == 401
     assert response.json()["detail"] == "Incorrect password or email"
+
+
+@pytest.mark.anyio
+async def test_login_locked_account_still_hashes(client: AsyncClient):
+    # Same proof as the unknown-email case, for the other branch that
+    # used to return before hashing: a locked account refusing for free
+    # would answer measurably faster than a wrong password against an
+    # account that is not locked, and the message alone would not show it.
+    await create_test_user(client)
+    for _ in range(settings.login_lockout_threshold):
+        await client.post(
+            "/api/users/token",
+            data={"username": "test@example.com", "password": "wrong-password"},
+        )
+
+    with patch("blog.services.auth.verify_password", wraps=real_verify_password) as mock_verify:
+        response = await client.post(
+            "/api/users/token",
+            data={"username": "test@example.com", "password": PASSWORD},
+        )
+
+    assert response.status_code == 401
+    mock_verify.assert_called_once()
 
 
 @pytest.mark.anyio
@@ -399,7 +439,7 @@ async def test_current_user_deleted_account_error(client: AsyncClient):
     secret = settings.secret_key.get_secret_value()
     # a valid token with not valid user
     token = jwt.encode(
-        {"sub": "99999", "exp": datetime.now(UTC) + timedelta(minutes=5)},
+        {"sub": "99999", "exp": datetime.now(UTC) + timedelta(minutes=5), "iat": datetime.now(UTC)},
         secret,
         algorithm=settings.algorithm,
     )
@@ -522,6 +562,29 @@ async def test_reset_password_success(client: AsyncClient, reset_token: str):
 
 
 @pytest.mark.anyio
+async def test_reset_password_invalidates_previously_issued_tokens(
+    client: AsyncClient, reset_token: str
+):
+    # same guard as the change-password path, for the other way a
+    # password gets replaced - a token minted before the reset must not
+    # keep answering to /me afterward
+    old_token = await login_user(client)
+
+    await client.post(
+        "/api/users/reset-password",
+        json={"token": reset_token, "new_password": "newpassword123"},
+    )
+
+    response = await client.get("/api/users/me", headers=auth_header(old_token))
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid or expired token"
+
+    new_token = await login_user(client, password="newpassword123")
+    response = await client.get("/api/users/me", headers=auth_header(new_token))
+    assert response.status_code == 200
+
+
+@pytest.mark.anyio
 async def test_reset_password_unknown_token_error(client: AsyncClient):
     response = await client.post(
         "/api/users/reset-password",
@@ -638,6 +701,30 @@ async def test_change_password_success(client: AsyncClient):
         data={"username": "test@example.com", "password": "newpassword123"},
     )
     assert new_login.status_code == 200
+
+
+@pytest.mark.anyio
+async def test_change_password_invalidates_previously_issued_tokens(client: AsyncClient):
+    # the bug this guards against: a token minted before the change kept
+    # answering to /me until its own exp, regardless of why the password
+    # was changed - often that reason is "the old one just leaked"
+    await create_test_user(client)
+    old_token = await login_user(client)
+
+    await client.patch(
+        "/api/users/me/password",
+        json={"current_password": PASSWORD, "new_password": "newpassword123"},
+        headers=auth_header(old_token),
+    )
+
+    response = await client.get("/api/users/me", headers=auth_header(old_token))
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid or expired token"
+
+    # independent check: a token minted after the change still works
+    new_token = await login_user(client, password="newpassword123")
+    response = await client.get("/api/users/me", headers=auth_header(new_token))
+    assert response.status_code == 200
 
 
 @pytest.mark.anyio
@@ -1099,6 +1186,40 @@ async def test_upload_profile_picture(client: AsyncClient, mocked_aws):
 
 
 @pytest.mark.anyio
+async def test_upload_profile_picture_old_file_delete_failure_is_logged_not_raised(
+    client: AsyncClient, mocked_aws, caplog
+):
+    user = await create_test_user(client)
+    token = await login_user(client)
+    test_image_path = Path(__file__).parent / "test_image.jpg"
+    image_bytes = test_image_path.read_bytes()
+
+    await client.patch(
+        f"/api/users/{user['id']}/picture",
+        files={"file": ("first.jpg", BytesIO(image_bytes), "image/jpeg")},
+        headers=auth_header(token),
+    )
+
+    error = ClientError({"Error": {"Code": "500", "Message": "S3 is down"}}, "DeleteObject")
+    with patch(
+        "blog.infrastructure.images.AWSAvatars.delete_profile_picture",
+        new_callable=AsyncMock,
+        side_effect=error,
+    ):
+        # the new picture is already stored and the row already updated -
+        # a failure to clean up the one it replaced must not turn into a
+        # 500 for something that already succeeded
+        response = await client.patch(
+            f"/api/users/{user['id']}/picture",
+            files={"file": ("second.jpg", BytesIO(image_bytes), "image/jpeg")},
+            headers=auth_header(token),
+        )
+
+    assert response.status_code == 200
+    assert "orphaned avatar" in caplog.text
+
+
+@pytest.mark.anyio
 async def test_upload_profile_picture_too_large_error(client: AsyncClient, mocked_aws):
     user = await create_test_user(client)
     token = await login_user(client)
@@ -1243,6 +1364,39 @@ async def test_delete_profile_picture_success(client: AsyncClient, mocked_aws):
     # independent check: the file is gone from the mocked bucket
     s3_object = mocked_aws.list_objects_v2(Bucket=S3_BUCKET_NAME)
     assert "Contents" not in s3_object
+
+
+@pytest.mark.anyio
+async def test_delete_profile_picture_storage_failure_is_logged_not_raised(
+    client: AsyncClient, mocked_aws, caplog
+):
+    user = await create_test_user(client)
+    token = await login_user(client)
+    test_image_path = Path(__file__).parent / "test_image.jpg"
+    await client.patch(
+        f"/api/users/{user['id']}/picture",
+        files={"file": ("profile.jpg", BytesIO(test_image_path.read_bytes()), "image/jpeg")},
+        headers=auth_header(token),
+    )
+
+    error = ClientError({"Error": {"Code": "500", "Message": "S3 is down"}}, "DeleteObject")
+    with patch(
+        "blog.infrastructure.images.AWSAvatars.delete_profile_picture",
+        new_callable=AsyncMock,
+        side_effect=error,
+    ):
+        response = await client.delete(
+            f"/api/users/{user['id']}/picture", headers=auth_header(token)
+        )
+
+    assert response.status_code == 200
+    assert response.json()["image_file"] is None
+    assert "orphaned avatar" in caplog.text
+
+    # independent check: the file really is still in the bucket - the
+    # deletion genuinely failed, this is not a false pass
+    s3_object = mocked_aws.list_objects_v2(Bucket=S3_BUCKET_NAME)
+    assert "Contents" in s3_object
 
 
 @pytest.mark.anyio

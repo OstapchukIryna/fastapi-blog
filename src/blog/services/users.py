@@ -236,7 +236,14 @@ async def delete(db: AsyncSession, user: models.User, storage: AWSAvatars) -> No
             argument rather than imported: this module has an opinion about
             *when* the file goes, and none about where it lives.
     """
+    # * Both read before the delete, not after: SQLAlchemy makes no
+    # * promise about what a deleted instance's attributes still answer.
+    # * expire_on_commit=False likely means they do, but "likely" is not
+    # * a contract, and the one place this would ever be wrong is inside
+    # * the except block below - reachable only when S3 is down, which is
+    # * exactly the path nothing exercises by accident.
     old_filename = user.image_file
+    user_id = user.id
     await db.delete(user)
     await db.commit()
 
@@ -246,5 +253,5 @@ async def delete(db: AsyncSession, user: models.User, storage: AWSAvatars) -> No
         logger.exception(
             "orphaned avatar %r: account %s was deleted but its picture was not",
             old_filename,
-            user.id,
+            user_id,
         )

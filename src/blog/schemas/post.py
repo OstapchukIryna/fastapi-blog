@@ -1,17 +1,32 @@
 """Posts as they cross the boundary — in from a client, out to one.
 
-Four inbound shapes: a complete post (PostForm and its API alias
-PostCreate), a partial change (PostUpdate), and info the browser put
-in a form (PostFormInput).
+Four inbound shapes: a complete post (PostForm, aliased as PostCreate at
+the API boundary), a partial change (PostUpdate), and info the browser
+put in a form (PostFormInput).
 """
 
 from datetime import datetime
+from typing import TYPE_CHECKING, Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from blog.infrastructure.models.tag import Tag
 from blog.schemas.tag import normalise_tags
 from blog.schemas.user import UserPublic
+
+if TYPE_CHECKING:
+    # Only ever used as a type hint on flatten_tags's parameter below,
+    # which Pydantic never inspects at runtime — the field's real type
+    # comes from PostResponse.tags itself. Nothing here needs the import
+    # to exist once the process is running.
+    from blog.infrastructure.models.tag import Tag
+
+# * Declared once so PostForm and PostUpdate cannot drift: without this,
+# * the same min_length and max_length would be written out twice each,
+# * and a change to one call site silently leaves the other accepting
+# * what the first now rejects - a PATCH taking a title a POST refuses.
+Title = Annotated[str, Field(min_length=1, max_length=100)]
+Summary = Annotated[str, Field(min_length=1, max_length=250)]
+Content = Annotated[str, Field(min_length=1)]
 
 
 class PostForm(BaseModel):
@@ -24,9 +39,9 @@ class PostForm(BaseModel):
         tags (list[str]): labels, cleaned on the way in.
     """
 
-    title: str = Field(min_length=1, max_length=100)
-    summary: str = Field(min_length=1, max_length=250)
-    content: str = Field(min_length=1)
+    title: Title
+    summary: Summary
+    content: Content
     tags: list[str] = Field(default_factory=list)
 
     @field_validator("tags")
@@ -35,16 +50,20 @@ class PostForm(BaseModel):
         return normalise_tags(value)
 
 
-class PostCreate(PostForm):
-    """The JSON body of a create or a full replace."""
+# * An assignment, not a subclass: PostCreate() and PostForm() used to be
+# * two distinct types with nothing between them but a name - a second
+# * entry in the OpenAPI document a reader had to compare to the first to
+# * confirm they matched. This is the same class under a second name,
+# * which is exactly what "alias" already meant.
+PostCreate = PostForm
 
 
 class PostUpdate(BaseModel):
     """A partial change to a post for PATCH."""
 
-    title: str | None = Field(default=None, min_length=1, max_length=100)
-    summary: str | None = Field(default=None, min_length=1, max_length=250)
-    content: str | None = Field(default=None, min_length=1)
+    title: Title | None = None
+    summary: Summary | None = None
+    content: Content | None = None
     tags: list[str] | None = None
 
     @field_validator("tags")
@@ -105,7 +124,7 @@ class PostResponse(BaseModel):
 
     @field_validator("tags", mode="before")
     @classmethod
-    def flatten_tags(cls, value: list[Tag] | list[str]) -> list[str]:
+    def flatten_tags(cls, value: "list[Tag] | list[str]") -> list[str]:
         """Accept either Tag rows or plain text.
 
         Runs before validation because at that point the value is still

@@ -41,6 +41,12 @@ class User(Base):
         locked_until (datetime | None): sign-in refuses everything until
             this passes, win or lose — set once failed_login_attempts
             crosses the threshold, and growing with each attempt after.
+        password_changed_at (datetime | None): when the password was last
+            reset or changed, or None if never. get_current_user compares
+            this against a token's own `iat` and refuses one issued
+            before it — otherwise a token minted before the owner reset
+            their password because it leaked would keep working for
+            whoever had it until it expired on its own.
         reset_tokens (list[PasswordResetToken]): outstanding "I forgot my
             password" requests. Deleted with the account.
         posts (list[Post]): everything this person wrote. Deleting the
@@ -57,6 +63,9 @@ class User(Base):
     image_file: Mapped[str | None] = mapped_column(String(200), default=None)
     failed_login_attempts: Mapped[int] = mapped_column(default=0, server_default="0")
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    password_changed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
 
     # * Functional, not unique=True on the column: a plain unique index is
     # * case-sensitive, so it would let "alice" and "Alice" both exist

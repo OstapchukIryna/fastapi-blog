@@ -10,6 +10,7 @@ limit are not a property of posts.
 
 from collections.abc import Sequence
 
+from sqlalchemy import delete as delete_statement
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -92,19 +93,36 @@ async def delete_if_orphaned(db: AsyncSession, candidates: Sequence[models.Tag])
     still in use is simply found still in use and left alone, which is
     cheaper to write than working out the difference at every call site.
 
+    One DELETE with a NOT EXISTS, not a SELECT-then-maybe-DELETE per
+    candidate: two round trips per tag would leave a gap of their own
+    between the two, the same shape of race as calling this after the
+    post's own commit did — a concurrent request could attach a fresh
+    post to a tag in between this deciding it was orphaned and the row
+    actually going away. A single statement is one atomic decision at
+    the database, not two round trips this session could be paused
+    between, and it costs one query for eight candidate tags instead of
+    up to sixteen.
+
+    Call this before the post's own commit, not after: within one
+    transaction, SQLAlchemy autoflushes pending changes ahead of a query
+    that could be affected by them, so the NOT EXISTS below already sees
+    this post's own dropped association rows without needing them
+    committed first.
+
     Args:
-        db (AsyncSession): session to query and delete through. The
-            caller's own commit (already done, for the post) covers
-            these deletes too if this runs before the next one — but
-            each check needs the association rows already gone, so this
-            must run after that commit, not before it.
+        db (AsyncSession): session to delete through. Not committed here
+            — the caller decides where the transaction ends, the same
+            contract as _clear_tokens in services/passwords.py and
+            get_or_create above.
         candidates (Sequence[models.Tag]): tags that used to label a
-            post that no longer does, or still does — either is fine.
+            post that no longer does, or still does — either is fine,
+            a tag any post still names is simply not matched.
     """
-    for tag in candidates:
-        still_used = await db.scalar(
-            select(models.Post.id).join(models.Post.tags).where(models.Tag.id == tag.id).limit(1)
+    if not candidates:
+        return
+    await db.execute(
+        delete_statement(models.Tag).where(
+            models.Tag.id.in_([tag.id for tag in candidates]),
+            ~models.Tag.posts.any(),
         )
-        if still_used is None:
-            await db.delete(tag)
-    await db.commit()
+    )

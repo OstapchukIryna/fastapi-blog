@@ -132,7 +132,7 @@ async def _slice(
 
 
 async def list_all(db: AsyncSession, page: Pagination) -> tuple[Sequence[models.Post], int]:
-    """One slice of every post, pinned first."""
+    """One slice of every post, newest first."""
     return await _slice(db, base_query(), page)
 
 
@@ -352,9 +352,9 @@ async def replace(db: AsyncSession, post: models.Post, form: PostForm) -> models
     for name, value in replacement.items():
         setattr(post, name, value)
 
+    await tag_service.delete_if_orphaned(db, old_tags)
     await db.commit()
     await db.refresh(post, attribute_names=["author"])
-    await tag_service.delete_if_orphaned(db, old_tags)
     return post
 
 
@@ -389,15 +389,16 @@ async def update(db: AsyncSession, post: models.Post, changes: PostUpdate) -> mo
     # ! needs a sentinel to tell the two apart, not exclude_none.
     wanted = changes.model_dump(exclude_unset=True, exclude_none=True)
 
-    old_tags = list(post.tags) if "tags" in wanted else []
+    old_tags: list[models.Tag] = []
     if "tags" in wanted:
+        old_tags = list(post.tags)
         post.tags = await tag_service.get_or_create(db, wanted.pop("tags"))
     for name, value in wanted.items():
         setattr(post, name, value)
 
-    await db.commit()
     if old_tags:
         await tag_service.delete_if_orphaned(db, old_tags)
+    await db.commit()
     return post
 
 
@@ -410,7 +411,10 @@ async def delete(db: AsyncSession, post: models.Post) -> None:
     the world that is false.
 
     The rows in post_tags go with the post. A tag this was the last user
-    of goes too, checked after the post is actually gone.
+    of goes too, checked in the same transaction as the delete — by the
+    time delete_if_orphaned's query runs, autoflush has already sent
+    this post's own cascaded removal from post_tags, without needing it
+    committed first.
 
     Args:
         db (AsyncSession): session to write through.
@@ -418,5 +422,5 @@ async def delete(db: AsyncSession, post: models.Post) -> None:
     """
     old_tags = list(post.tags)
     await db.delete(post)
-    await db.commit()
     await tag_service.delete_if_orphaned(db, old_tags)
+    await db.commit()

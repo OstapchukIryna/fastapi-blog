@@ -110,10 +110,15 @@ class WrongPassword(AppHTTPError):
 async def _clear_tokens(db: AsyncSession, user_id: int) -> None:
     """Drop every outstanding reset token for one account.
 
-    Called on issue, on use, and on an ordinary password change: in all
-    three the tokens that existed a moment ago must stop working. Rows
-    are removed rather than flagged, so a spent token and one that never
-    existed look the same from outside.
+    Called on issue, on use, on an expired token being found, and on an
+    ordinary password change: in all four the tokens that existed a
+    moment ago must stop working. Rows are removed rather than flagged,
+    so a spent token and one that never existed look the same from
+    outside. Reused for the single-row expired case too, rather than a
+    one-off db.delete(reset_token), so every deletion in this module goes
+    through the one place that never commits — a caller that forgets is
+    left with an uncommitted delete, not a delete committed somewhere
+    other functions in this file do not expect.
 
     Args:
         db (AsyncSession): session to write through. Not committed here —
@@ -235,7 +240,7 @@ async def complete_reset(db: AsyncSession, token: str, new_password: str) -> Non
         raise InvalidResetToken()
 
     if reset_token.expired:
-        await db.delete(reset_token)
+        await _clear_tokens(db, reset_token.user_id)
         await db.commit()
         raise InvalidResetToken()
 
@@ -244,6 +249,7 @@ async def complete_reset(db: AsyncSession, token: str, new_password: str) -> Non
         raise InvalidResetToken()
 
     user.password_hash = hash_password(new_password)
+    user.password_changed_at = datetime.now(UTC)
     await _clear_tokens(db, user.id)
     await db.commit()
 
@@ -271,8 +277,11 @@ async def change(
         raise WrongPassword()
 
     user.password_hash = hash_password(new_password)
-    # A password change is also a statement that outstanding reset links
-    # should stop working — often it is what somebody does *because* they
-    # think one leaked.
+    user.password_changed_at = datetime.now(UTC)
+    # A password change is also a statement that outstanding reset links,
+    # and every access token minted before this moment, should stop
+    # working — often it is what somebody does *because* they think one
+    # leaked. The tokens are handled here by row; the JWTs by comparing
+    # password_changed_at against a token's own iat in get_current_user.
     await _clear_tokens(db, user.id)
     await db.commit()

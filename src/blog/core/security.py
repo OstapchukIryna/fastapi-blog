@@ -8,6 +8,7 @@ services/auth.py, one layer up, because answering it needs the database.
 
 import hashlib
 import secrets
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 import jwt
@@ -120,20 +121,53 @@ def create_access_token(data: dict[str, str], expires_delta: timedelta | None = 
     Returns:
         str: the encoded token.
     """
-    to_encode: dict[str, str | datetime] = dict(data)
+    to_encode: dict[str, str | datetime | float] = dict(data)
     if expires_delta:
         expire = datetime.now(UTC) + expires_delta
     else:
         expire = datetime.now(UTC) + timedelta(minutes=settings.access_token_expire_minutes)
 
     to_encode["exp"] = expire
+    # * Needed so a password change can invalidate tokens minted before
+    # * it — see TokenClaims.issued_at and services/auth.get_current_user.
+    # * PyJWT does not add this on its own the way some libraries do.
+    # *
+    # * A float timestamp, not a datetime: PyJWT converts a datetime given
+    # * for a registered claim through calendar.timegm(), which keeps only
+    # * whole seconds. That is fine for exp - nobody needs their session to
+    # * expire mid-second - but iat exists here specifically to be compared
+    # * against password_changed_at, and losing sub-second precision on
+    # * only one side of that comparison is what let a token minted a
+    # * fraction of a second after a change look like it came before one
+    # * minted a fraction before it. JWT's NumericDate is explicitly
+    # * allowed a fractional part (RFC 7519 §2); passing a float instead
+    # * of a datetime is what makes PyJWT keep it.
+    to_encode["iat"] = datetime.now(UTC).timestamp()
     return jwt.encode(
         to_encode, settings.secret_key.get_secret_value(), algorithm=settings.algorithm
     )
 
 
-def verify_access_token(token: str) -> str | None:
-    """Check a token's signature and return the subject it names.
+@dataclass(frozen=True, slots=True)
+class TokenClaims:
+    """The two claims anything downstream of a decoded token needs.
+
+    Attributes:
+        sub (str): the subject — a user id, as a string because JWT
+            requires StringOrURI there.
+        issued_at (datetime): when this specific token was minted. Not
+            when the account was created, and not when it was last used
+            — the one moment that lets a later event (a password change)
+            say "anything from before this doesn't count any more"
+            without keeping a list of every token to revoke by name.
+    """
+
+    sub: str
+    issued_at: datetime
+
+
+def verify_access_token(token: str) -> TokenClaims | None:
+    """Check a token's signature and return the claims it carries.
 
     Every way a token can be unacceptable — wrong signature, expired,
     missing claims, not a JWT at all — collapses into the same None. The
@@ -145,26 +179,30 @@ def verify_access_token(token: str) -> str | None:
         token (str): the bearer token as received.
 
     Returns:
-        str | None: the `sub` claim, or None if the token is not
-            acceptable. Still a string at this point, guaranteed twice
-            over: PyJWT itself raises InvalidSubjectError (a subclass of
-            InvalidTokenError, caught below) for a `sub` of any other
-            JSON type, and the isinstance check restates that as our own
-            contract rather than a behaviour borrowed silently from a
-            dependency we do not control the changelog of. Whether the
-            string names a real user is still the next layer's question.
+        TokenClaims | None: `sub` and `issued_at`, or None if the token
+            is not acceptable — including a `sub` of the wrong JSON type.
+            `require` below checks that `iat` is present, not that it
+            predates this feature: a token minted before iat was added
+            has no such claim at all and is rejected here the same as
+            any other malformed token, which costs whoever was still
+            holding one a single re-login and nothing else. Whether the
+            subject names a real user is still the next layer's question.
     """
     try:
         payload = jwt.decode(
             token,
             settings.secret_key.get_secret_value(),
             algorithms=[settings.algorithm],
-            # * Reject a token that omits either claim instead of reading
-            # * a missing expiry as "never expires".
-            options={"require": ["exp", "sub"]},
+            # * Reject a token that omits any of these instead of reading
+            # * a missing expiry as "never expires", or a missing iat as
+            # * "issued at the dawn of time".
+            options={"require": ["exp", "sub", "iat"]},
         )
     except jwt.InvalidTokenError:
         return None
     else:
         sub = payload.get("sub")
-        return sub if isinstance(sub, str) else None
+        iat = payload.get("iat")
+        if not isinstance(sub, str) or not isinstance(iat, int | float):
+            return None
+        return TokenClaims(sub=sub, issued_at=datetime.fromtimestamp(iat, tz=UTC))
