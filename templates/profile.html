@@ -397,8 +397,9 @@
             identityForm.email.value = user.email;
             passwordForm.reset();
 
-            nowSection.hidden = !user.is_owner;
-            if (user.is_owner) {
+            const isOwner = user.is_owner;
+            nowSection.hidden = !isOwner;
+            if (isOwner) {
                 nowForm.now_building.value = user.now_building ?? "";
                 nowForm.now_next.value = user.now_next ?? "";
             }

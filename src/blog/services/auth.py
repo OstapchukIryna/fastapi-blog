@@ -121,14 +121,14 @@ def owner_only(current_user: CurrentUser) -> models.User:
         current_user (CurrentUser): whoever the token belongs to.
 
     Raises:
-        Forbidden: 403 when the caller is not the owner, or when no owner
-            is configured at all — an unset OWNER_USER_ID means nobody
-            holds the privilege, not that everybody does.
+        Forbidden: 403 when the caller is not the owner. settings.is_owner
+            already treats an unset OWNER_USER_ID as nobody holding the
+            privilege, not everybody.
 
     Returns:
         models.User: the same account, now known to be the owner's.
     """
-    if settings.owner_user_id is None or current_user.id != settings.owner_user_id:
+    if not settings.is_owner(current_user.id):
         raise Forbidden("Not authorized")
     return current_user
 

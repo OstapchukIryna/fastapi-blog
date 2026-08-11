@@ -109,5 +109,15 @@ class Settings(BaseSettings):
                 raise ValueError("frontend_url must not point at localhost in production")
         return self
 
+    def is_owner(self, user_id: int) -> bool:
+        """Whether this id is the blog's owner.
+
+        The one place the comparison is written: services/auth.py's
+        Owner dependency enforces it, schemas/user.py's UserPrivate
+        exposes it to the client. An unset owner_user_id means nobody
+        holds the privilege, not that everybody does.
+        """
+        return self.owner_user_id is not None and self.owner_user_id == user_id
+
 
 settings = Settings()

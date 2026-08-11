@@ -114,12 +114,12 @@ class UserPrivate(UserPublic):
     def is_owner(self) -> bool:
         """Whether PATCH /users/me/now would accept this account.
 
-        Not a stored column - settings.owner_user_id is the one source,
-        this just answers the same question the Owner dependency already
-        checks, so the profile page can decide whether to show the form
-        without comparing an id it has no business seeing.
+        Not a stored column - settings.is_owner is the one place this is
+        decided, the same check the Owner dependency runs, so the profile
+        page can show the form without comparing an id it has no business
+        seeing.
         """
-        return settings.owner_user_id is not None and self.id == settings.owner_user_id
+        return settings.is_owner(self.id)
 
 
 NowLine = Annotated[str, Field(max_length=120)]
