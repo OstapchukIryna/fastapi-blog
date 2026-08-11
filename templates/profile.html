@@ -88,8 +88,12 @@
                            type="file"
                            id="photoFile"
                            name="file"
+                           form="photoConfirmForm"
                            accept="image/jpeg,image/png,image/gif,image/webp">
-                    <label class="btn record-btn" id="photoChoose" for="photoFile">Choose a photo</label>
+                    <label class="btn record-btn"
+                           id="photoChoose"
+                           for="photoFile"
+                           data-bs-target="#photoConfirmModal">Choose a photo</label>
                     <button class="btn record-btn is-danger"
                             type="button"
                             id="photoRemove"
@@ -160,7 +164,7 @@
          data-bs-theme="dark"
          aria-labelledby="photoConfirmLabel"
          aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
             <div class="modal-content">
                 <div class="modal-header">
                     <h2 class="modal-title" id="photoConfirmLabel">Use this photo?</h2>
@@ -169,16 +173,22 @@
                             data-bs-dismiss="modal"
                             aria-label="Close"></button>
                 </div>
-                <div class="modal-body photo-confirm-body">
-                    <img class="avatar photo-confirm-preview"
-                         id="photoModalPreview"
-                         src=""
-                         alt="">
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn record-btn" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-light write-btn" id="photoModalSave">Save photo</button>
-                </div>
+                {# The file input lives outside this form (its own change
+                   handler already opens this modal); `form=` associates it
+                   without moving it, so wireForm's `new FormData(form)`
+                   still picks it up. #}
+                <form id="photoConfirmForm">
+                    <div class="modal-body photo-confirm-body">
+                        <img class="avatar photo-confirm-preview"
+                             id="photoModalPreview"
+                             src=""
+                             alt="">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn record-btn" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-light write-btn">Save photo</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -188,7 +198,7 @@
          data-bs-theme="dark"
          aria-labelledby="removePhotoLabel"
          aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
             <div class="modal-content">
                 <div class="modal-header">
                     <h2 class="modal-title is-danger" id="removePhotoLabel">Remove this photo?</h2>
@@ -197,15 +207,15 @@
                             data-bs-dismiss="modal"
                             aria-label="Close"></button>
                 </div>
-                <div class="modal-body">
-                    <p class="modal-message mb-0">It falls back to the shared default avatar.</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn record-btn" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button"
-                            class="btn btn-danger write-btn"
-                            id="photoRemoveConfirm">Remove</button>
-                </div>
+                <form id="removePhotoForm">
+                    <div class="modal-body">
+                        <p class="modal-message mb-0">It falls back to the shared default avatar.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn record-btn" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger write-btn">Remove</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -246,8 +256,6 @@
         import { authHeaders, clearToken, isSignedIn } from "/static/js/auth.js";
         import {
             API,
-            getErrorMessage,
-            hideModal,
             sendRequest,
             showError,
             showModal,
@@ -264,8 +272,6 @@
         const photoChoose = document.getElementById("photoChoose");
         const photoRemove = document.getElementById("photoRemove");
         const photoModalPreview = document.getElementById("photoModalPreview");
-        const photoModalSave = document.getElementById("photoModalSave");
-        const photoRemoveConfirm = document.getElementById("photoRemoveConfirm");
         const identityAvatar = document.getElementById("identityAvatar");
         const photoPreview = document.getElementById("photoPreview");
         let userId = null;
@@ -305,13 +311,32 @@
                 photoFile.value = "";
             });
 
+        // Same wording as the server's own refusal for each case, so a
+        // caught-early rejection and a server one never disagree.
+        const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+        const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+
         photoFile.addEventListener("change", () => {
             const [file] = photoFile.files;
             if (!file) return;
 
+            if (!ACCEPTED_TYPES.includes(file.type)) {
+                photoFile.value = "";
+                showError(
+                    "Invalid image file. Please upload a valid file format (JPEG, PNG, GIF, WebP).",
+                    { title: "Not changed" },
+                );
+                return;
+            }
+            if (file.size > MAX_UPLOAD_BYTES) {
+                photoFile.value = "";
+                showError("File is too large. Maximum size is 5 MB", { title: "Not changed" });
+                return;
+            }
+
             pendingPreviewUrl = URL.createObjectURL(file);
             photoModalPreview.src = pendingPreviewUrl;
-            photoModalPreview.alt = file.name;
+            photoModalPreview.alt = "Preview of the selected photo";
             showModal("photoConfirmModal");
         });
 
@@ -384,70 +409,46 @@
             loading.querySelector("p").textContent = "Could not load your account.";
         }
 
-        // Not through wireForm: there is no <form> element or field here,
-        // only a dialog button submitting whichever action it belongs to.
-        async function changePhoto(busyLabel, options, busyButton, modalId) {
-            const idleLabel = busyButton.textContent;
-            busyButton.textContent = busyLabel;
-            busyButton.classList.add("is-busy");
-            busyButton.disabled = true;
-
-            try {
-                const { ok, status, data } = await sendRequest(
-                    `${API}/users/${userId}/picture`,
-                    { headers: authHeaders(), ...options },
-                );
-
-                if (ok) {
-                    showPhoto(data);
-                    hideModal(modalId);
-                    return;
-                }
-                if (status === 401) {
-                    clearToken();
-                    toLogin("expired");
-                    return;
-                }
-                // The refusals here are meaningful — "too large", "not an
-                // image" — and the server states them, rather than the page
-                // guessing.
-                hideModal(modalId);
-                showError(getErrorMessage(data ?? {}), { title: "Not changed" });
-            } catch {
-                hideModal(modalId);
-                showError(
-                    "Network error. Please check your connection and try again.",
-                    { title: "Not changed" },
-                );
-            } finally {
-                busyButton.classList.remove("is-busy");
-                busyButton.disabled = false;
-                busyButton.textContent = idleLabel;
-            }
-        }
-
-        photoModalSave.addEventListener("click", () => {
-            const [file] = photoFile.files;
-            if (!file) return;
-
-            const body = new FormData();
-            body.append("file", file);
-            changePhoto(
-                "Uploading…",
-                { method: "PATCH", encoding: "multipart", payload: body },
-                photoModalSave,
-                "photoConfirmModal",
-            );
+        // Through wireForm now, the same as every other form on this page:
+        // the confirm step earns the same busy state, focus recovery and
+        // closing confirmation identity/password already had, instead of
+        // a second, thinner version of the same plumbing.
+        wireForm(document.getElementById("photoConfirmForm"), {
+            request: (fields) => ({
+                url: `${API}/users/${userId}/picture`,
+                method: "PATCH",
+                encoding: "multipart",
+                payload: fields,
+                headers: authHeaders(),
+            }),
+            // The avatar updates immediately, before the "Saved" window
+            // even opens - the window confirms what already happened
+            // rather than gating it.
+            result: (data) => {
+                showPhoto(data);
+                return { title: "Saved", message: "Your photo is updated.", action: "Close" };
+            },
+            busy: "Uploading…",
+            closes: "photoConfirmModal",
         });
 
-        photoRemoveConfirm.addEventListener("click", () =>
-            changePhoto(
-                "Removing…",
-                { method: "DELETE" },
-                photoRemoveConfirm,
-                "removePhotoModal",
-            ),
-        );
+        wireForm(document.getElementById("removePhotoForm"), {
+            request: () => ({
+                url: `${API}/users/${userId}/picture`,
+                method: "DELETE",
+                headers: authHeaders(),
+            }),
+            result: (data) => {
+                showPhoto(data);
+                return {
+                    title: "Removed",
+                    message: "Back to the shared default avatar.",
+                    action: "Close",
+                };
+            },
+            busy: "Removing…",
+            closes: "removePhotoModal",
+        });
 
         wireForm(identityForm, {
             request: (fields) => ({

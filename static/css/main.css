@@ -1067,7 +1067,6 @@ h4 {
 .photo-confirm-body {
     display: flex;
     justify-content: center;
-    padding-top: 0.5rem;
 }
 
 .photo-confirm-preview {
@@ -1863,7 +1862,8 @@ h4 {
 
     /* Кнопка во всю ширину: на телефоне это основная цель касания */
     .now-foot,
-    .contact-actions {
+    .contact-actions,
+    .modal-footer {
         flex-direction: column;
         align-items: stretch;
     }
