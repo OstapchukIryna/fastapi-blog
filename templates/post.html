@@ -1,5 +1,4 @@
 {% extends "layout.html" %}
-{% import "_contact.html" as contact %}
 {% block reading_progress %}
     <div class="reading-progress" id="reading-progress"></div>
 {% endblock reading_progress %}
@@ -39,29 +38,6 @@
                 {% endfor %}
             </div>
         {% endif %}
-        <div class="author-byline">
-            <img class="avatar"
-                 src="{{ post.author.image_path }}"
-                 alt="{{ post.author.username }}"
-                 width="64"
-                 height="64"
-                 loading="lazy">
-            <div class="byline-body">
-                <span class="eyebrow mono-label">Written by</span>
-                <div class="name">
-                    <a href="{{ url_for('user_posts', user_id=post.author.id) }}">{{ post.author.username }}</a>
-                </div>
-                <p class="bio">
-                    Learning backend Python — web-app with FastAPI.
-                    This blog is the practice project.
-                </p>
-                <p class="byline-invite">Ran into this too, or got a different answer? Write to me.</p>
-                <div class="byline-actions">
-                    {{ contact.write_button() }}
-                    {{ contact.channels() }}
-                </div>
-            </div>
-        </div>
     </article>
     {% if related %}
         <section class="related" aria-label="{{ related_label }}">

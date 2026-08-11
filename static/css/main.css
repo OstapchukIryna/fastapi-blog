@@ -898,37 +898,16 @@ h4 {
     font-size: inherit;
 }
 
-/* --- Подпись автора ----------------------------------------- */
-
-/* Конец статьи — момент, когда читатель спрашивает «кто это написал».
-   Поэтому здесь не подпись, а короткая справка и способ связаться. */
-.author-byline {
-    display: flex;
-    align-items: flex-start;
-    gap: 1.25rem;
-    margin-top: 2.5rem;
-    padding: 1.5rem;
-    background-color: var(--bs-tertiary-bg);
-    border: 1px solid var(--bs-border-color);
-    border-radius: var(--bs-border-radius);
-}
-
 .eyebrow {
     display: block;
     margin-bottom: 0.4rem;
     color: var(--bs-secondary-color);
 }
 
-.author-byline .bio {
-    margin: 0.45rem 0 0.9rem;
-    font-size: var(--text-base);
-    color: var(--bs-secondary-color);
-}
-
 /* --- Контакты -------------------------------------------------
-   Один набор правил на все точки контакта: герой, конец записи,
-   страница About, подвал. Незаполненный канал шаблон не рисует,
-   поэтому ссылки в никуда здесь невозможны. */
+   Один набор правил на все точки контакта: герой, страница About,
+   подвал. Незаполненный канал шаблон не рисует, поэтому ссылки в
+   никуда здесь невозможны. */
 
 .channels {
     display: flex;
@@ -968,20 +947,6 @@ h4 {
     color: var(--bs-secondary-color);
 }
 
-/* Подпись автора: приглашение возразить, а не «подпишитесь».
-   Для блога про собственные ошибки это единственный честный
-   повод написать — и он не давит на читателя. */
-.byline-body {
-    min-width: 0;
-}
-
-.byline-invite {
-    margin: 0 0 1.2rem;
-    font-size: var(--text-base);
-    color: var(--bs-emphasis-color);
-}
-
-.byline-actions,
 .contact-actions {
     display: flex;
     flex-wrap: wrap;
@@ -1170,20 +1135,12 @@ h4 {
     flex-shrink: 0;
 }
 
-.author-byline .name {
-    font-family: var(--font-display);
-    font-weight: 700;
-    line-height: 1.3;
-}
-
-.author-byline .name a,
 .post-meta a {
     color: var(--bs-emphasis-color);
     text-decoration: none;
     transition: color 0.2s ease;
 }
 
-.author-byline .name a:hover,
 .post-meta a:hover {
     color: var(--link);
 }
@@ -1873,13 +1830,6 @@ h4 {
         margin-bottom: 0;
     }
 
-    /* Аватар рядом с текстом съедает треть узкого экрана — тот же
-       перенос в столбец, что у шапки автора и блока About */
-    .author-byline {
-        flex-direction: column;
-        gap: 1.1rem;
-    }
-
     /* Цели касания были 20px при минимуме 44. Растёт только область
        нажатия, вид не меняется — под тегами лежит перекрытие на всю
        карточку, и промах уводил на запись, которую не выбирали. */
@@ -1899,7 +1849,6 @@ h4 {
 
     /* Кнопка во всю ширину: на телефоне это основная цель касания */
     .now-foot,
-    .byline-actions,
     .contact-actions {
         flex-direction: column;
         align-items: stretch;
