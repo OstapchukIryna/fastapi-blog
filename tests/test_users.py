@@ -1519,6 +1519,31 @@ async def test_update_now_null_clears_line(
     assert row.now_next == "tests"
 
 
+@pytest.mark.anyio
+async def test_current_user_is_owner_true_when_ids_match(client: AsyncClient, monkeypatch):
+    user = await create_test_user(client)
+    monkeypatch.setattr(settings, "owner_user_id", user["id"])
+    token = await login_user(client)
+
+    response = await client.get("/api/users/me", headers=auth_header(token))
+
+    assert response.status_code == 200
+    assert response.json()["is_owner"] is True
+
+
+@pytest.mark.anyio
+async def test_current_user_is_owner_false_for_everyone_else(client: AsyncClient, monkeypatch):
+    owner = await create_test_user(client, username="owner", email="owner@example.com")
+    await create_test_user(client, username="stranger", email="stranger@example.com")
+    monkeypatch.setattr(settings, "owner_user_id", owner["id"])
+    token = await login_user(client, email="stranger@example.com")
+
+    response = await client.get("/api/users/me", headers=auth_header(token))
+
+    assert response.status_code == 200
+    assert response.json()["is_owner"] is False
+
+
 # * --- services.users: IntegrityError race guard -------------------------------
 # Can't be exercised as a real race: one db_session per test, not safe for
 # concurrent use. Instead patch commit() to raise the same exception a real

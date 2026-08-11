@@ -104,6 +104,35 @@
                 </div>
             </div>
         </section>
+        {# Hidden until fill() knows the signed-in account is the owner's -
+           is_owner comes from the server, which is also the one place
+           PATCH /users/me/now actually checks; this only decides whether
+           to show the form, not whether the request behind it succeeds. #}
+        <section class="profile-section" id="nowSection" hidden>
+            <h2 class="profile-section-title">Now panel</h2>
+            <p class="profile-section-note">
+                The Now and Next lines under the front page's masthead. Clear a field and save to drop that line.
+            </p>
+            <form id="nowForm">
+                <div class="field">
+                    <label class="form-label mono-label" for="nowBuilding">Now</label>
+                    <input class="form-control"
+                           type="text"
+                           id="nowBuilding"
+                           name="now_building"
+                           maxlength="120">
+                </div>
+                <div class="field">
+                    <label class="form-label mono-label" for="nowNext">Next</label>
+                    <input class="form-control"
+                           type="text"
+                           id="nowNext"
+                           name="now_next"
+                           maxlength="120">
+                </div>
+                <button class="btn btn-light write-btn" type="submit">Save</button>
+            </form>
+        </section>
         <section class="profile-section">
             <h2 class="profile-section-title">Password</h2>
             <form id="passwordForm">
@@ -267,6 +296,8 @@
         const identityForm = document.getElementById("identityForm");
         const passwordForm = document.getElementById("passwordForm");
         const deleteForm = document.getElementById("deleteAccountForm");
+        const nowSection = document.getElementById("nowSection");
+        const nowForm = document.getElementById("nowForm");
 
         const photoFile = document.getElementById("photoFile");
         const photoChoose = document.getElementById("photoChoose");
@@ -365,6 +396,12 @@
             identityForm.username.value = user.username;
             identityForm.email.value = user.email;
             passwordForm.reset();
+
+            nowSection.hidden = !user.is_owner;
+            if (user.is_owner) {
+                nowForm.now_building.value = user.now_building ?? "";
+                nowForm.now_next.value = user.now_next ?? "";
+            }
 
             loading.hidden = true;
             body.hidden = false;
@@ -472,6 +509,27 @@
             // and a full page restart would add nothing.
             after: () => load(),
             failure: { action: "Back to the form" },
+            busy: "Saving",
+        });
+
+        wireForm(nowForm, {
+            request: (fields) => ({
+                url: `${API}/users/me/now`,
+                method: "PATCH",
+                // A blank field clears the line - unlike identityForm above,
+                // there is no "leave it alone" reading of an empty box the
+                // owner just saved, so this sends null instead of omitting.
+                payload: {
+                    now_building: fields.get("now_building").trim() || null,
+                    now_next: fields.get("now_next").trim() || null,
+                },
+                headers: authHeaders(),
+            }),
+            result: () => ({
+                title: "Saved",
+                message: "The Now panel is updated.",
+                action: "Close",
+            }),
             busy: "Saving",
         });
 

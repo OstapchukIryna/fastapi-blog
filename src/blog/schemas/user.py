@@ -9,7 +9,9 @@ model rather than by remembering to filter.
 
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, computed_field
+
+from blog.core.config import settings
 
 # * Declared once so UserBase and UserUpdate cannot drift the way the
 # * same pair of fields drifted before in schemas/post.py. max_length
@@ -99,11 +101,25 @@ class UserPrivate(UserPublic):
     Attributes:
         email (EmailStr): the address on the account. Returned only from
             endpoints that have already established who is asking.
+        now_building (str | None): the front page's Now line, or None.
+        now_next (str | None): the front page's Next line, or None.
     """
 
     email: EmailStr
     now_building: str | None
     now_next: str | None
+
+    @computed_field
+    @property
+    def is_owner(self) -> bool:
+        """Whether PATCH /users/me/now would accept this account.
+
+        Not a stored column - settings.owner_user_id is the one source,
+        this just answers the same question the Owner dependency already
+        checks, so the profile page can decide whether to show the form
+        without comparing an id it has no business seeing.
+        """
+        return settings.owner_user_id is not None and self.id == settings.owner_user_id
 
 
 NowLine = Annotated[str, Field(max_length=120)]
