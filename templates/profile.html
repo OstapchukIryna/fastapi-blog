@@ -70,12 +70,12 @@
         </section>
         <section class="profile-section">
             <h2 class="profile-section-title">Photo</h2>
-            {# Choosing a file only starts a preview. Save and Cancel decide
-               what happens next, the way a phone's own photo picker holds a
-               pick until it is confirmed. A native file input cannot be
-               styled, so it stays hidden and the label takes the click. The
-               label already points at the input, which keeps it reachable
-               from the keyboard. #}
+            {# Choosing a file opens a confirmation dialog rather than
+               uploading right away, the way a phone's own photo picker
+               holds a pick until it is confirmed. A native file input
+               cannot be styled, so it stays hidden and the label takes
+               the click. The label already points at the input, which
+               keeps it reachable from the keyboard. #}
             <div class="profile-photo">
                 <img class="avatar"
                      id="photoPreview"
@@ -93,9 +93,9 @@
                     <button class="btn record-btn is-danger"
                             type="button"
                             id="photoRemove"
+                            data-bs-toggle="modal"
+                            data-bs-target="#removePhotoModal"
                             hidden>Remove</button>
-                    <button class="btn record-btn" type="button" id="photoSave" hidden>Save photo</button>
-                    <button class="btn record-btn" type="button" id="photoCancel" hidden>Cancel</button>
                     <p class="field-hint mono-label" id="photoHint">JPEG, PNG, GIF or WebP · up to 5 MB</p>
                 </div>
             </div>
@@ -155,6 +155,61 @@
         </section>
     </div>
     <div class="modal fade"
+         id="photoConfirmModal"
+         tabindex="-1"
+         data-bs-theme="dark"
+         aria-labelledby="photoConfirmLabel"
+         aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title" id="photoConfirmLabel">Use this photo?</h2>
+                    <button type="button"
+                            class="btn-close"
+                            data-bs-dismiss="modal"
+                            aria-label="Close"></button>
+                </div>
+                <div class="modal-body photo-confirm-body">
+                    <img class="avatar photo-confirm-preview"
+                         id="photoModalPreview"
+                         src=""
+                         alt="">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn record-btn" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-light write-btn" id="photoModalSave">Save photo</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade"
+         id="removePhotoModal"
+         tabindex="-1"
+         data-bs-theme="dark"
+         aria-labelledby="removePhotoLabel"
+         aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title is-danger" id="removePhotoLabel">Remove this photo?</h2>
+                    <button type="button"
+                            class="btn-close"
+                            data-bs-dismiss="modal"
+                            aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="modal-message mb-0">It falls back to the shared default avatar.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn record-btn" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button"
+                            class="btn btn-danger write-btn"
+                            id="photoRemoveConfirm">Remove</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal fade"
          id="deleteAccountModal"
          tabindex="-1"
          data-bs-theme="dark"
@@ -192,8 +247,10 @@
         import {
             API,
             getErrorMessage,
+            hideModal,
             sendRequest,
             showError,
+            showModal,
             wireForm,
         } from "/static/js/utils.js";
 
@@ -206,27 +263,18 @@
         const photoFile = document.getElementById("photoFile");
         const photoChoose = document.getElementById("photoChoose");
         const photoRemove = document.getElementById("photoRemove");
-        const photoSave = document.getElementById("photoSave");
-        const photoCancel = document.getElementById("photoCancel");
+        const photoModalPreview = document.getElementById("photoModalPreview");
+        const photoModalSave = document.getElementById("photoModalSave");
+        const photoRemoveConfirm = document.getElementById("photoRemoveConfirm");
         const identityAvatar = document.getElementById("identityAvatar");
         const photoPreview = document.getElementById("photoPreview");
         let userId = null;
         let hasPhoto = false;
-        // What photoPreview reverts to on cancel or a failed save - the
-        // account's actual picture, not whatever was last picked.
-        let currentPhotoSrc = identityAvatar.src;
         let pendingPreviewUrl = null;
 
-        // The label is derived from state rather than restored from a
-        // snapshot: restoring overwrote the "Replace" that a successful
-        // response had just set.
         function showPhotoActions() {
-            photoChoose.hidden = false;
             photoChoose.textContent = hasPhoto ? "Replace" : "Choose a photo";
             photoRemove.hidden = !hasPhoto;
-            photoSave.hidden = true;
-            photoSave.textContent = "Save photo";
-            photoCancel.hidden = true;
         }
 
         // Both images are the same picture: the one in the profile header and
@@ -234,7 +282,6 @@
         function showPhoto(user) {
             userId = user.id;
             hasPhoto = Boolean(user.image_file);
-            currentPhotoSrc = user.image_path;
 
             for (const image of [identityAvatar, photoPreview]) {
                 image.src = user.image_path;
@@ -243,28 +290,30 @@
             showPhotoActions();
         }
 
-        // The chosen file only previews here. It reaches the server when
-        // Save is pressed, the way a phone's own photo picker holds a pick
-        // until it is confirmed rather than acting on it right away.
-        function previewPendingFile(file) {
-            if (pendingPreviewUrl) URL.revokeObjectURL(pendingPreviewUrl);
-            pendingPreviewUrl = URL.createObjectURL(file);
-            photoPreview.src = pendingPreviewUrl;
-            photoChoose.hidden = true;
-            photoRemove.hidden = true;
-            photoSave.hidden = false;
-            photoCancel.hidden = false;
-        }
+        // Closing the dialog drops whatever was picked, whatever closed
+        // it - Cancel, the backdrop, Escape, or a save that just went
+        // through. One place to clean up rather than one per exit.
+        document
+            .getElementById("photoConfirmModal")
+            .addEventListener("hidden.bs.modal", () => {
+                if (pendingPreviewUrl) {
+                    URL.revokeObjectURL(pendingPreviewUrl);
+                    pendingPreviewUrl = null;
+                }
+                // The same file chosen twice must count as a choice both
+                // times: without the reset, `change` does not fire again.
+                photoFile.value = "";
+            });
 
-        function clearPendingFile() {
-            if (pendingPreviewUrl) {
-                URL.revokeObjectURL(pendingPreviewUrl);
-                pendingPreviewUrl = null;
-            }
-            photoPreview.src = currentPhotoSrc;
-            photoFile.value = "";
-            showPhotoActions();
-        }
+        photoFile.addEventListener("change", () => {
+            const [file] = photoFile.files;
+            if (!file) return;
+
+            pendingPreviewUrl = URL.createObjectURL(file);
+            photoModalPreview.src = pendingPreviewUrl;
+            photoModalPreview.alt = file.name;
+            showModal("photoConfirmModal");
+        });
 
         // Send them to sign in rather than show an empty page. replace, not
         // assign: "back" from the login page should lead where the person
@@ -336,13 +385,12 @@
         }
 
         // Not through wireForm: there is no <form> element or field here,
-        // only the Save button submitting whichever file was chosen.
-        async function changePhoto(busyLabel, options, busyButton = photoChoose) {
+        // only a dialog button submitting whichever action it belongs to.
+        async function changePhoto(busyLabel, options, busyButton, modalId) {
+            const idleLabel = busyButton.textContent;
             busyButton.textContent = busyLabel;
             busyButton.classList.add("is-busy");
-            photoRemove.disabled = true;
-            photoSave.disabled = true;
-            photoCancel.disabled = true;
+            busyButton.disabled = true;
 
             try {
                 const { ok, status, data } = await sendRequest(
@@ -352,6 +400,7 @@
 
                 if (ok) {
                     showPhoto(data);
+                    hideModal(modalId);
                     return;
                 }
                 if (status === 401) {
@@ -362,38 +411,22 @@
                 // The refusals here are meaningful — "too large", "not an
                 // image" — and the server states them, rather than the page
                 // guessing.
+                hideModal(modalId);
                 showError(getErrorMessage(data ?? {}), { title: "Not changed" });
             } catch {
+                hideModal(modalId);
                 showError(
                     "Network error. Please check your connection and try again.",
                     { title: "Not changed" },
                 );
             } finally {
                 busyButton.classList.remove("is-busy");
-                photoRemove.disabled = false;
-                photoSave.disabled = false;
-                photoCancel.disabled = false;
-                if (pendingPreviewUrl) {
-                    URL.revokeObjectURL(pendingPreviewUrl);
-                    pendingPreviewUrl = null;
-                }
-                photoPreview.src = currentPhotoSrc;
-                showPhotoActions();
-                // The same file chosen twice must count as a choice both
-                // times: without the reset, `change` does not fire again.
-                photoFile.value = "";
+                busyButton.disabled = false;
+                busyButton.textContent = idleLabel;
             }
         }
 
-        photoFile.addEventListener("change", () => {
-            const [file] = photoFile.files;
-            if (!file) return;
-            previewPendingFile(file);
-        });
-
-        photoCancel.addEventListener("click", clearPendingFile);
-
-        photoSave.addEventListener("click", () => {
+        photoModalSave.addEventListener("click", () => {
             const [file] = photoFile.files;
             if (!file) return;
 
@@ -402,12 +435,18 @@
             changePhoto(
                 "Uploading…",
                 { method: "PATCH", encoding: "multipart", payload: body },
-                photoSave,
+                photoModalSave,
+                "photoConfirmModal",
             );
         });
 
-        photoRemove.addEventListener("click", () =>
-            changePhoto("Removing…", { method: "DELETE" }),
+        photoRemoveConfirm.addEventListener("click", () =>
+            changePhoto(
+                "Removing…",
+                { method: "DELETE" },
+                photoRemoveConfirm,
+                "removePhotoModal",
+            ),
         );
 
         wireForm(identityForm, {

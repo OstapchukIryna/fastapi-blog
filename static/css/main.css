@@ -1061,6 +1061,20 @@ h4 {
     color: var(--bs-emphasis-color);
 }
 
+/* The one modal body carrying an image rather than a question. Centered
+   and large enough to actually judge the picture, not just confirm a
+   file was picked. */
+.photo-confirm-body {
+    display: flex;
+    justify-content: center;
+    padding-top: 0.5rem;
+}
+
+.photo-confirm-preview {
+    width: 220px;
+    height: 220px;
+}
+
 /* Кнопки окна говорят тем же служебным голосом, что и остальные:
    моноширинный капслок из .write-btn/.record-btn. Оставался
    единственный экран, где кнопка была Bootstrap'овской — Newsreader
