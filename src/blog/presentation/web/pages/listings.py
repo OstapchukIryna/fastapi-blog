@@ -12,6 +12,8 @@ a page and in JSON.
 
 from fastapi import APIRouter, Request, Response
 
+from blog.core.config import settings
+from blog.infrastructure import models
 from blog.infrastructure.database import DbSession
 from blog.presentation.web.pages.feed import Feed, arrange
 from blog.presentation.web.templating import templates
@@ -37,6 +39,11 @@ async def home(request: Request, db: DbSession, page: PageParams) -> Response:
         Response: the rendered home page.
     """
     items, total = await posts.list_all(db, page)
+    owner = (
+        await db.get(models.User, settings.owner_user_id)
+        if settings.owner_user_id is not None
+        else None
+    )
     return templates.TemplateResponse(
         request,
         "home.html",
@@ -44,6 +51,7 @@ async def home(request: Request, db: DbSession, page: PageParams) -> Response:
             **arrange(items),
             "title": "Home",
             "feed": Feed.after(request, "list_posts", page, items, total),
+            "owner": owner,
         },
     )
 

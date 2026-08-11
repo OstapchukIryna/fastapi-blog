@@ -102,6 +102,28 @@ class UserPrivate(UserPublic):
     """
 
     email: EmailStr
+    now_building: str | None
+    now_next: str | None
+
+
+NowLine = Annotated[str, Field(max_length=120)]
+
+
+class NowUpdate(BaseModel):
+    """The two lines of the masthead strip.
+
+    Both optional and both nullable, and here null means something: it
+    clears the line. That is the opposite of UserUpdate, where None means
+    "not sent" — so this cannot use exclude_none, and the service reads
+    exclude_unset alone.
+
+    Attributes:
+        now_building (str | None): what is being worked on now.
+        now_next (str | None): what comes after.
+    """
+
+    now_building: NowLine | None = None
+    now_next: NowLine | None = None
 
 
 class Token(BaseModel):

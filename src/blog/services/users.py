@@ -24,6 +24,7 @@ from blog.infrastructure import models
 from blog.infrastructure.database import DbSession
 from blog.infrastructure.images import AWSAvatars
 from blog.schemas import UserCreate, UserUpdate
+from blog.schemas.user import NowUpdate
 from blog.services.auth import CurrentUser
 
 logger = logging.getLogger(__name__)
@@ -159,6 +160,30 @@ async def _already_taken(db: AsyncSession, user: models.User, wanted: dict[str, 
         )
     )
     return clash.scalars().first() is not None
+
+
+async def set_now(db: AsyncSession, user: models.User, changes: NowUpdate) -> models.User:
+    """Update the masthead strip.
+
+    exclude_unset without exclude_none, unlike update() above: here an
+    explicit null is a request to clear the line, and an omitted key is a
+    request to leave it. Collapsing the two would make the strip
+    impossible to empty once it had been filled.
+
+    Args:
+        db (AsyncSession): session to write through.
+        user (models.User): the owner, already established by the
+            dependency.
+        changes (NowUpdate): the lines to set or clear.
+
+    Returns:
+        models.User: the owner, as stored.
+    """
+    for name, value in changes.model_dump(exclude_unset=True).items():
+        setattr(user, name, value)
+
+    await db.commit()
+    return user
 
 
 async def update(db: AsyncSession, user: models.User, changes: UserUpdate) -> models.User:

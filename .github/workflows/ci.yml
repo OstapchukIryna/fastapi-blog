@@ -161,6 +161,11 @@ jobs:
       S3_REGION: ${{ secrets.S3_REGION || 'eu-north-1' }}
       S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
       S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+      # api-tests.sh drops and recreates the schema before every run, so
+      # the collection's own "Create user" request - the first write to
+      # a fresh users table - always lands on id 1. That makes it the
+      # one caller the /me/now test can rely on being the owner.
+      OWNER_USER_ID: "1"
 
     steps:
       - uses: actions/checkout@v4

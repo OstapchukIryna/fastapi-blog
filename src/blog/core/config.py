@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     # Needs to be taken from the environment
     database_url: str
 
+    # owners' model
+    owner_user_id: int | None = None
+
     # JWT token configs
     # * 32 bytes: short enough that PyJWT's own InsecureKeyLengthWarning
     # * would already say something, long enough that HMAC-SHA256 is not

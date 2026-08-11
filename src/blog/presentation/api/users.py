@@ -32,8 +32,9 @@ from blog.schemas.password_reset import (
     Message,
     ResetPasswordRequest,
 )
+from blog.schemas.user import NowUpdate
 from blog.services import auth, avatars, passwords, posts, users
-from blog.services.auth import CurrentUser
+from blog.services.auth import CurrentUser, Owner
 from blog.services.avatars import AvatarStore
 from blog.services.users import OwnAccount, UserDep
 
@@ -197,6 +198,22 @@ def get_user(user: UserDep) -> models.User:
         models.User: the row; the response model drops the email.
     """
     return user
+
+
+@router.patch("/me/now", response_model=UserPrivate)
+async def update_now(changes: NowUpdate, owner: Owner, db: DbSession) -> models.User:
+    """Set or clear the two lines of the masthead strip.
+
+    Args:
+        changes (NowUpdate): the lines to set. An explicit null clears one.
+        owner (Owner): the caller, already established to be the blog's
+            owner — anybody else is a 403 before this body runs.
+        db (DbSession): request-scoped session.
+
+    Returns:
+        models.User: the owner's account, with the new lines.
+    """
+    return await users.set_now(db, owner, changes)
 
 
 @router.get("/{user_id}/posts", response_model=Page[PostResponse])

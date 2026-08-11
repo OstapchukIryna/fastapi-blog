@@ -82,14 +82,23 @@
                 <span class="mono-label now-date">Updated {{ site.now_updated }}</span>
             </div>
             <dl class="now-rows">
-                <dt class="mono-label">Building</dt>
-                <dd>
-                    This blog — FastAPI, Python, REST API architecture
-                </dd>
-                <dt class="mono-label">Next</dt>
-                <dd>
-                    Alembic migrations, pytest coverage
-                </dd>
+                {# Блок целиком исчезает, если владелец не задан или обе строки
+                   пусты: янтарная линейка без текста читается как
+                   недогрузившийся элемент, а не как пустое состояние. #}
+                {% if owner and (owner.now_building or owner.now_next) %}
+                    {% if owner.now_building %}
+                        <dt class="mono-label">Now</dt>
+                        <dd>
+                            {{ owner.now_building }}
+                        </dd>
+                    {% endif %}
+                    {% if owner.now_next %}
+                        <dt class="mono-label">Next</dt>
+                        <dd>
+                            {{ owner.now_next }}
+                        </dd>
+                    {% endif %}
+                {% endif %}
                 <dt class="mono-label">Source</dt>
                 <dd>
                     <a class="now-source"

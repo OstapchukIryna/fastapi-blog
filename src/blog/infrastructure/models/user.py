@@ -47,6 +47,10 @@ class User(Base):
             before it — otherwise a token minted before the owner reset
             their password because it leaked would keep working for
             whoever had it until it expired on its own.
+        now_building (str | None): what the owner is working on, shown in the
+            masthead strip on the front page. None hides the line.
+        now_next (str | None): what comes after it. None hides the line; both
+            None hides the strip entirely.
         reset_tokens (list[PasswordResetToken]): outstanding "I forgot my
             password" requests. Deleted with the account.
         posts (list[Post]): everything this person wrote. Deleting the
@@ -66,6 +70,10 @@ class User(Base):
     password_changed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), default=None
     )
+
+    # the owner's rows
+    now_building: Mapped[str | None] = mapped_column(String(120), default=None)
+    now_next: Mapped[str | None] = mapped_column(String(120), default=None)
 
     # * Functional, not unique=True on the column: a plain unique index is
     # * case-sensitive, so it would let "alice" and "Alice" both exist

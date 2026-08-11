@@ -1,0 +1,27 @@
+$kind: http-request
+description: "The two lines behind the front page's Now panel. Nulling one clears it - pytest already covers that and the 403 for a caller who isn't the owner, so this only proves the happy path is wired end to end."
+url: "{{baseUrl}}/api/users/me/now"
+method: PATCH
+headers:
+  Authorization: Bearer {{accessToken}}
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "now_building": "the Postman contract",
+      "now_next": "cleanup"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("200 OK", () => pm.response.to.have.status(200));
+
+      const user = pm.response.json();
+
+      pm.test("echoes both lines", () => {
+          pm.expect(user.now_building).to.eql("the Postman contract");
+          pm.expect(user.now_next).to.eql("cleanup");
+      });
+    language: text/javascript
+order: 8500

@@ -1445,6 +1445,80 @@ async def test_delete_profile_picture_not_found(client: AsyncClient):
     assert response.json()["detail"] == "User not found"
 
 
+# * --- PATCH /api/users/me/now: the masthead strip ------------------------------
+
+
+@pytest.mark.anyio
+async def test_update_now_success(client: AsyncClient, db_session: AsyncSession, monkeypatch):
+    user = await create_test_user(client)
+    monkeypatch.setattr(settings, "owner_user_id", user["id"])
+    token = await login_user(client)
+
+    response = await client.patch(
+        "/api/users/me/now",
+        json={"now_building": "the masthead strip", "now_next": "tests"},
+        headers=auth_header(token),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["now_building"] == "the masthead strip"
+    assert response.json()["now_next"] == "tests"
+
+    row = await db_session.get(models.User, user["id"])
+    assert row is not None
+    assert row.now_building == "the masthead strip"
+    assert row.now_next == "tests"
+
+
+@pytest.mark.anyio
+async def test_update_now_wrong_user_error(client: AsyncClient, monkeypatch):
+    owner = await create_test_user(client, username="owner", email="owner@example.com")
+    await create_test_user(client, username="stranger", email="stranger@example.com")
+    monkeypatch.setattr(settings, "owner_user_id", owner["id"])
+    token = await login_user(client, email="stranger@example.com")
+
+    response = await client.patch(
+        "/api/users/me/now",
+        json={"now_building": "someone else's line"},
+        headers=auth_header(token),
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Not authorized"
+
+
+@pytest.mark.anyio
+async def test_update_now_null_clears_line(
+    client: AsyncClient, db_session: AsyncSession, monkeypatch
+):
+    user = await create_test_user(client)
+    monkeypatch.setattr(settings, "owner_user_id", user["id"])
+    token = await login_user(client)
+    await client.patch(
+        "/api/users/me/now",
+        json={"now_building": "the masthead strip", "now_next": "tests"},
+        headers=auth_header(token),
+    )
+
+    response = await client.patch(
+        "/api/users/me/now",
+        json={"now_building": None},
+        headers=auth_header(token),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["now_building"] is None
+    # now_next was not sent this time - exclude_unset must leave it alone,
+    # the same as an omitted field does everywhere else, even though an
+    # explicit null here means something UserUpdate's fields never do.
+    assert response.json()["now_next"] == "tests"
+
+    row = await db_session.get(models.User, user["id"])
+    assert row is not None
+    assert row.now_building is None
+    assert row.now_next == "tests"
+
+
 # * --- services.users: IntegrityError race guard -------------------------------
 # Can't be exercised as a real race: one db_session per test, not safe for
 # concurrent use. Instead patch commit() to raise the same exception a real

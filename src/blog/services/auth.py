@@ -22,6 +22,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from blog.core.config import settings
+from blog.core.errors import Forbidden
 from blog.core.logging import user_id_var
 from blog.core.security import (
     Unauthorized,
@@ -107,6 +108,32 @@ async def get_current_user(token: TokenDep, db: DbSession) -> models.User:
 
 
 CurrentUser = Annotated[models.User, Depends(get_current_user)]
+
+
+def owner_only(current_user: CurrentUser) -> models.User:
+    """The caller, established to be the blog's owner.
+
+    A dependency rather than a check inside a route body, matching
+    owned_post and own_account: `user: Owner` in a signature says the
+    caller is authenticated and entitled.
+
+    Args:
+        current_user (CurrentUser): whoever the token belongs to.
+
+    Raises:
+        Forbidden: 403 when the caller is not the owner, or when no owner
+            is configured at all — an unset OWNER_USER_ID means nobody
+            holds the privilege, not that everybody does.
+
+    Returns:
+        models.User: the same account, now known to be the owner's.
+    """
+    if settings.owner_user_id is None or current_user.id != settings.owner_user_id:
+        raise Forbidden("Not authorized")
+    return current_user
+
+
+Owner = Annotated[models.User, Depends(owner_only)]
 
 
 async def _register_failed_attempt(db: AsyncSession, user: models.User) -> None:
