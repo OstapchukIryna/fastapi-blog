@@ -70,11 +70,12 @@
         </section>
         <section class="profile-section">
             <h2 class="profile-section-title">Photo</h2>
-            {# Choosing the file is the submission: a second click on "save"
-               would decide nothing, and the picture is visible immediately.
-               A native file input cannot be styled, so it is hidden and the
-               label is what gets pressed — the label already targets it, and
-               it stays reachable from the keyboard. #}
+            {# Choosing a file only starts a preview. Save and Cancel decide
+               what happens next, the way a phone's own photo picker holds a
+               pick until it is confirmed. A native file input cannot be
+               styled, so it stays hidden and the label takes the click. The
+               label already points at the input, which keeps it reachable
+               from the keyboard. #}
             <div class="profile-photo">
                 <img class="avatar"
                      id="photoPreview"
@@ -93,6 +94,8 @@
                             type="button"
                             id="photoRemove"
                             hidden>Remove</button>
+                    <button class="btn record-btn" type="button" id="photoSave" hidden>Save photo</button>
+                    <button class="btn record-btn" type="button" id="photoCancel" hidden>Cancel</button>
                     <p class="field-hint mono-label" id="photoHint">JPEG, PNG, GIF or WebP · up to 5 MB</p>
                 </div>
             </div>
@@ -203,15 +206,27 @@
         const photoFile = document.getElementById("photoFile");
         const photoChoose = document.getElementById("photoChoose");
         const photoRemove = document.getElementById("photoRemove");
+        const photoSave = document.getElementById("photoSave");
+        const photoCancel = document.getElementById("photoCancel");
+        const identityAvatar = document.getElementById("identityAvatar");
+        const photoPreview = document.getElementById("photoPreview");
         let userId = null;
         let hasPhoto = false;
+        // What photoPreview reverts to on cancel or a failed save - the
+        // account's actual picture, not whatever was last picked.
+        let currentPhotoSrc = identityAvatar.src;
+        let pendingPreviewUrl = null;
 
         // The label is derived from state rather than restored from a
         // snapshot: restoring overwrote the "Replace" that a successful
         // response had just set.
         function showPhotoActions() {
-            photoRemove.hidden = !hasPhoto;
+            photoChoose.hidden = false;
             photoChoose.textContent = hasPhoto ? "Replace" : "Choose a photo";
+            photoRemove.hidden = !hasPhoto;
+            photoSave.hidden = true;
+            photoSave.textContent = "Save photo";
+            photoCancel.hidden = true;
         }
 
         // Both images are the same picture: the one in the profile header and
@@ -219,12 +234,35 @@
         function showPhoto(user) {
             userId = user.id;
             hasPhoto = Boolean(user.image_file);
+            currentPhotoSrc = user.image_path;
 
-            for (const id of ["identityAvatar", "photoPreview"]) {
-                const image = document.getElementById(id);
+            for (const image of [identityAvatar, photoPreview]) {
                 image.src = user.image_path;
                 image.alt = user.username;
             }
+            showPhotoActions();
+        }
+
+        // The chosen file only previews here. It reaches the server when
+        // Save is pressed, the way a phone's own photo picker holds a pick
+        // until it is confirmed rather than acting on it right away.
+        function previewPendingFile(file) {
+            if (pendingPreviewUrl) URL.revokeObjectURL(pendingPreviewUrl);
+            pendingPreviewUrl = URL.createObjectURL(file);
+            photoPreview.src = pendingPreviewUrl;
+            photoChoose.hidden = true;
+            photoRemove.hidden = true;
+            photoSave.hidden = false;
+            photoCancel.hidden = false;
+        }
+
+        function clearPendingFile() {
+            if (pendingPreviewUrl) {
+                URL.revokeObjectURL(pendingPreviewUrl);
+                pendingPreviewUrl = null;
+            }
+            photoPreview.src = currentPhotoSrc;
+            photoFile.value = "";
             showPhotoActions();
         }
 
@@ -297,12 +335,14 @@
             loading.querySelector("p").textContent = "Could not load your account.";
         }
 
-        // Not through wireForm: there are no fields and no submit button here
-        // — only a file input that is its own submission.
-        async function changePhoto(busyLabel, options) {
-            photoChoose.textContent = busyLabel;
-            photoChoose.classList.add("is-busy");
+        // Not through wireForm: there is no <form> element or field here,
+        // only the Save button submitting whichever file was chosen.
+        async function changePhoto(busyLabel, options, busyButton = photoChoose) {
+            busyButton.textContent = busyLabel;
+            busyButton.classList.add("is-busy");
             photoRemove.disabled = true;
+            photoSave.disabled = true;
+            photoCancel.disabled = true;
 
             try {
                 const { ok, status, data } = await sendRequest(
@@ -329,8 +369,15 @@
                     { title: "Not changed" },
                 );
             } finally {
-                photoChoose.classList.remove("is-busy");
+                busyButton.classList.remove("is-busy");
                 photoRemove.disabled = false;
+                photoSave.disabled = false;
+                photoCancel.disabled = false;
+                if (pendingPreviewUrl) {
+                    URL.revokeObjectURL(pendingPreviewUrl);
+                    pendingPreviewUrl = null;
+                }
+                photoPreview.src = currentPhotoSrc;
                 showPhotoActions();
                 // The same file chosen twice must count as a choice both
                 // times: without the reset, `change` does not fire again.
@@ -341,15 +388,22 @@
         photoFile.addEventListener("change", () => {
             const [file] = photoFile.files;
             if (!file) return;
+            previewPendingFile(file);
+        });
+
+        photoCancel.addEventListener("click", clearPendingFile);
+
+        photoSave.addEventListener("click", () => {
+            const [file] = photoFile.files;
+            if (!file) return;
 
             const body = new FormData();
             body.append("file", file);
-            // No success dialog: the changed picture is the answer.
-            changePhoto("Uploading…", {
-                method: "PATCH",
-                encoding: "multipart",
-                payload: body,
-            });
+            changePhoto(
+                "Uploading…",
+                { method: "PATCH", encoding: "multipart", payload: body },
+                photoSave,
+            );
         });
 
         photoRemove.addEventListener("click", () =>
