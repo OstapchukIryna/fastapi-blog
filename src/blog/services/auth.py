@@ -13,6 +13,7 @@ address and a wrong password must be indistinguishable — sat on either
 side of the split, where nothing kept them in step.
 """
 
+import logging
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
@@ -39,6 +40,7 @@ from blog.schemas import Token
 # interactive docs put behind the Authorize button. Written out rather
 # than built from API_PREFIX — services must not import presentation.
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/users/token")
+logger = logging.getLogger(__name__)
 
 TokenDep = Annotated[str, Depends(oauth2_scheme)]
 
@@ -106,6 +108,7 @@ async def get_current_user(request: Request, token: TokenDep, db: DbSession) -> 
     user_id_var.set(user.id)
 
     request.scope["user_id"] = user.id
+    logger.info("scope stamped: %s / id(scope)=%s", user.id, id(request.scope))
     return user
 
 

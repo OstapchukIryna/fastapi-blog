@@ -101,6 +101,7 @@ class RequestContextMiddleware:
             else:
                 level = logging.INFO
 
+            logger.info("middleware reads: %s / id(scope)=%s", scope.get("user_id"), id(scope))
             logger.log(
                 level,
                 "%s %s -> %s (%sms)",
