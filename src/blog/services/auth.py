@@ -16,7 +16,7 @@ side of the split, where nothing kept them in step.
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -53,7 +53,7 @@ TokenDep = Annotated[str, Depends(oauth2_scheme)]
 DUMMY_HASH = hash_password("this hash exists only to spend the same time an account lookup would")
 
 
-async def get_current_user(token: TokenDep, db: DbSession) -> models.User:
+async def get_current_user(request: Request, token: TokenDep, db: DbSession) -> models.User:
     """Resolve the bearer token to the account it names.
 
     Args:
@@ -104,6 +104,8 @@ async def get_current_user(token: TokenDep, db: DbSession) -> models.User:
     # * Set once the account is known, not before — an anonymous or a
     # * rejected request should never appear to belong to somebody.
     user_id_var.set(user.id)
+
+    request.scope["user_id"] = user.id
     return user
 
 

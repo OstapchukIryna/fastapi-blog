@@ -28,7 +28,7 @@ import uuid
 from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from blog.core.logging import request_id_var
+from blog.core.logging import SLOW_REQUEST_MS, request_id_var
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +60,7 @@ class RequestContextMiddleware:
 
         request_id = self._incoming_id(scope) or str(uuid.uuid4())
         token = request_id_var.set(request_id)
+
         started = time.perf_counter()
         status_code = 0
 
@@ -88,7 +89,15 @@ class RequestContextMiddleware:
             raise
         else:
             duration_ms = round((time.perf_counter() - started) * 1000, 1)
-            logger.info(
+            if status_code >= 500 or duration_ms >= SLOW_REQUEST_MS:
+                level = logging.WARNING
+            elif status_code == 404:
+                level = logging.DEBUG
+            else:
+                level = logging.INFO
+
+            logger.log(
+                level,
                 "%s %s -> %s (%sms)",
                 method,
                 path,
@@ -99,6 +108,7 @@ class RequestContextMiddleware:
                     "path": path,
                     "status_code": status_code,
                     "duration_ms": duration_ms,
+                    "user_id": scope.get("user_id", "-"),
                 },
             )
         finally:

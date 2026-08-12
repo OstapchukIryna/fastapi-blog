@@ -86,6 +86,8 @@ class Settings(BaseSettings):
 
     frontend_url: str = "http://localhost:8000"
 
+    trusted_hosts: list[str] = ["localhost", "127.0.0.1"]
+
     # Logging
     environment: Literal["development", "production"] = "development"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
