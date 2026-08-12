@@ -108,7 +108,6 @@ async def get_current_user(request: Request, token: TokenDep, db: DbSession) -> 
     user_id_var.set(user.id)
 
     request.scope["user_id"] = user.id
-    logger.info("stamped %s into scope id=%s", user.id, id(request.scope))
     return user
 
 

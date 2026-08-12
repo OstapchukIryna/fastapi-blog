@@ -88,12 +88,11 @@ class RequestContextMiddleware:
                     "method": method,
                     "path": path,
                     "duration_ms": duration_ms,
-                    "user_id": scope.get("user_id", "-"),
+                    "user_id": str(scope.get("user_id", "-")),
                 },
             )
             raise
         else:
-            logger.info("middleware sees %r in scope id=%s", scope.get("user_id"), id(scope))
             duration_ms = round((time.perf_counter() - started) * 1000, 1)
             if status_code >= 500 or duration_ms >= SLOW_REQUEST_MS:
                 level = logging.WARNING
