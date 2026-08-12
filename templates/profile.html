@@ -416,8 +416,8 @@
             link.textContent = "Your posts";
 
             const { ok, data } = await sendRequest(`${API}/users/${userId}/posts`);
-            if (!ok || !Array.isArray(data)) return;
-            link.textContent = data.length === 1 ? "1 post" : `${data.length} posts`;
+            if (!ok || typeof data?.total !== "number") return;
+            link.textContent = data.total === 1 ? "1 post" : `${data.total} posts`;
         }
 
         async function load() {

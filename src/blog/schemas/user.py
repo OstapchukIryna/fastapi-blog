@@ -106,8 +106,8 @@ class UserPrivate(UserPublic):
     """
 
     email: EmailStr
-    now_building: str | None
-    now_next: str | None
+    now_building: str | None = None
+    now_next: str | None = None
 
     @computed_field
     @property

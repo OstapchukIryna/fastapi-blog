@@ -10,6 +10,7 @@ caller's live here too, beside the row they load.
 """
 
 import logging
+from dataclasses import dataclass
 from typing import Annotated
 
 from botocore.exceptions import ClientError
@@ -18,6 +19,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from blog.core.config import settings
 from blog.core.errors import AppHTTPError, Forbidden, NotFound
 from blog.core.security import hash_password
 from blog.infrastructure import models
@@ -162,6 +164,70 @@ async def _already_taken(db: AsyncSession, user: models.User, wanted: dict[str, 
     return clash.scalars().first() is not None
 
 
+@dataclass(slots=True, frozen=True)
+class OwnerNow:
+    """The masthead's two lines, without the rest of the row they live on.
+
+    Attributes:
+        now_building (str | None): the front page's Now line, or None.
+        now_next (str | None): the front page's Next line, or None.
+    """
+
+    now_building: str | None
+    now_next: str | None
+
+
+# * Module-level, not request-scoped: the home page reads this on every
+# * visit - the site's busiest route - for two columns that change
+# * through exactly one place, set_now, and nowhere else. _owner_now_set
+# * distinguishes "not loaded yet" from "loaded, and there is no owner",
+# * which a plain None on its own could not.
+_owner_now: OwnerNow | None = None
+_owner_now_set = False
+
+
+async def get_owner_now(db: AsyncSession) -> OwnerNow | None:
+    """The owner's masthead lines, loaded once per process and reused.
+
+    Known and accepted: the cache is per process, so a second worker
+    keeps its own copy until it independently misses. Correct for the
+    single-instance deployment this project runs; would go stale on a
+    multi-worker one.
+
+    Args:
+        db (AsyncSession): session to load through, on a cache miss only.
+
+    Returns:
+        OwnerNow | None: the two lines, or None when no owner is
+            configured.
+    """
+    global _owner_now, _owner_now_set
+
+    if not _owner_now_set:
+        owner = (
+            await db.get(models.User, settings.owner_user_id)
+            if settings.owner_user_id is not None
+            else None
+        )
+        _owner_now = OwnerNow(owner.now_building, owner.now_next) if owner else None
+        _owner_now_set = True
+
+    return _owner_now
+
+
+def reset_owner_now_cache() -> None:
+    """Drop the cached masthead lines, so the next read reloads them.
+
+    Same shape as the rate limiter's reset in tests/conftest.py: a
+    module-level singleton would otherwise carry state from whichever
+    test read it last into the next one, which does not share its data.
+    Not used by the application itself - set_now already invalidates the
+    one entry it changes.
+    """
+    global _owner_now_set
+    _owner_now_set = False
+
+
 async def set_now(db: AsyncSession, user: models.User, changes: NowUpdate) -> models.User:
     """Update the masthead strip.
 
@@ -179,10 +245,13 @@ async def set_now(db: AsyncSession, user: models.User, changes: NowUpdate) -> mo
     Returns:
         models.User: the owner, as stored.
     """
+    global _owner_now_set
+
     for name, value in changes.model_dump(exclude_unset=True).items():
         setattr(user, name, value)
 
     await db.commit()
+    _owner_now_set = False
     return user
 
 

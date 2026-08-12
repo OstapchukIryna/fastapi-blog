@@ -18,6 +18,7 @@ and returning it is what broke the front page once.
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import Depends
@@ -134,6 +135,22 @@ async def _slice(
 async def list_all(db: AsyncSession, page: Pagination) -> tuple[Sequence[models.Post], int]:
     """One slice of every post, newest first."""
     return await _slice(db, base_query(), page)
+
+
+async def latest_date(db: AsyncSession) -> datetime | None:
+    """When the newest post went up, or None if nothing has been published yet.
+
+    Independent of pagination on purpose: the front page's "Updated"
+    line means the blog as a whole, not whatever slice `?skip=` happens
+    to be showing, so it cannot be read off `list_all`'s first item.
+
+    Args:
+        db (AsyncSession): session to query through.
+
+    Returns:
+        datetime | None: the latest date_posted, or None for an empty blog.
+    """
+    return await db.scalar(select(func.max(models.Post.date_posted)))
 
 
 async def for_author(

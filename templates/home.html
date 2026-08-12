@@ -79,7 +79,9 @@
         <section class="now-panel closing-panel" aria-label="What I'm working on now">
             <div class="now-head">
                 <span class="mono-label now-title">Now</span>
-                <span class="mono-label now-date">Updated {{ site.now_updated }}</span>
+                {% if now_updated %}
+                    <span class="mono-label now-date">Updated {{ now_updated.strftime("%d %b %Y") }}</span>
+                {% endif %}
             </div>
             <dl class="now-rows">
                 {# Блок целиком исчезает, если владелец не задан или обе строки

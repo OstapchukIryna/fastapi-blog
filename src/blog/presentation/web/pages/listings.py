@@ -12,13 +12,11 @@ a page and in JSON.
 
 from fastapi import APIRouter, Request, Response
 
-from blog.core.config import settings
-from blog.infrastructure import models
 from blog.infrastructure.database import DbSession
 from blog.presentation.web.pages.feed import Feed, arrange
 from blog.presentation.web.templating import templates
 from blog.schemas import PageParams
-from blog.services import posts, tags
+from blog.services import posts, tags, users
 from blog.services.users import UserDep
 
 router = APIRouter()
@@ -39,19 +37,17 @@ async def home(request: Request, db: DbSession, page: PageParams) -> Response:
         Response: the rendered home page.
     """
     items, total = await posts.list_all(db, page)
-    owner = (
-        await db.get(models.User, settings.owner_user_id)
-        if settings.owner_user_id is not None
-        else None
-    )
+    owner = await users.get_owner_now(db)
+    now_updated = await posts.latest_date(db)
     return templates.TemplateResponse(
         request,
         "home.html",
         {
-            **arrange(items),
+            **arrange(items, page),
             "title": "Home",
             "feed": Feed.after(request, "list_posts", page, items, total),
             "owner": owner,
+            "now_updated": now_updated,
         },
     )
 
@@ -105,7 +101,7 @@ async def get_tag(request: Request, tag: str, db: DbSession, page: PageParams) -
         request,
         "home.html",
         {
-            **arrange(items),
+            **arrange(items, page),
             "filter_tag": tag,
             "title": f"#{tag}",
             "feed": Feed.after(request, "get_tag_posts", page, items, total, tag=tag),

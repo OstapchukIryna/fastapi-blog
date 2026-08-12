@@ -21,7 +21,7 @@ class PostFormView:
     """
     State of the post form, from which the page is drawn.
 
-    Prevents passing too much arguments in functions and routs
+    Prevents passing too many arguments in functions and routes.
 
     Three fields instead of the previous six arguments. Two of the old
     ones are derived rather than passed: editing means "there is a post",
@@ -100,13 +100,13 @@ def post_to_input(post: models.Post) -> PostFormInput:
 
 def form_errors(exception: ValidationError) -> dict[str, str]:
     """
-    Generate human-readable exeptions
+    Turn a pydantic ValidationError into one human-readable message per field.
 
     Args:
-        exception (ValidationError): exeption from pydantic validation
+        exception (ValidationError): the exception pydantic raised.
 
     Returns:
-        dict[str, str]: dictionary with field name and error message
+        dict[str, str]: field name to message.
 
     """
     errors: dict[str, str] = {}
@@ -115,12 +115,15 @@ def form_errors(exception: ValidationError) -> dict[str, str]:
         context = error.get("ctx", {})
         kind = error["type"]
 
-        if kind == "string_too_short" and context.get("min_length") == 1:
+        min_length = context.get("min_length")
+        max_length = context.get("max_length")
+
+        if kind == "string_too_short" and min_length == 1:
             message = "Required."
-        elif kind == "string_too_short":
-            message = f"At least {context['min_length']} characters."
-        elif kind == "string_too_long":
-            message = f"At most {context['max_length']} characters."
+        elif kind == "string_too_short" and min_length is not None:
+            message = f"At least {min_length} characters."
+        elif kind == "string_too_long" and max_length is not None:
+            message = f"At most {max_length} characters."
         else:
             message = error["msg"]
 

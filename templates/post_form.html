@@ -21,7 +21,7 @@
           id="postForm"
           method="post"
           data-post-id="{{ post.id if editing else '' }}"
-          action="{{ url_for('update_post', post_id=post.id) if editing else url_for('create_post_page') }}">
+          action="{{ url_for('edit_post', post_id=post.id) if editing else url_for('new_post') }}">
         <div class="field">
             <label class="form-label mono-label" for="title">Title</label>
             <input class="form-control{{ ' is-invalid' if errors.title }}"
@@ -112,7 +112,7 @@
                     <form id="deletePostForm"
                           data-post-id="{{ post.id }}"
                           data-post-title="{{ post.title }}"
-                          action="{{ url_for('delete_post', post_id=post.id) }}"
+                          action="{{ url_for('post_page', post_id=post.id) }}/delete"
                           method="post">
                         <div class="modal-body">
                             <p class="mb-0">

@@ -8,6 +8,7 @@ pages should not be passed by three routes.
 from collections.abc import MutableMapping
 from typing import Any
 
+import bleach
 import markdown
 from fastapi.templating import Jinja2Templates
 
@@ -25,7 +26,6 @@ SITE = {
     "handle": SITE_HANDLE,
     "name": SITE_NAME,
     "role": "backend Python dev",
-    "now_updated": "28 Jul 2026",
     "github": "https://github.com/OstapchukIryna",
     "telegram": "https://t.me/parzifay",
     "email": "blue.hunde@gmail.com",
@@ -34,6 +34,37 @@ SITE = {
 }
 
 MARKDOWN_EXTENSIONS = ["fenced_code", "tables"]
+
+# * markdown.markdown() passes raw HTML in the source straight through -
+# * registration is open, so "the source is Markdown" is not the same
+# * guarantee as "the source cannot contain a <script> tag". Every tag
+# * and attribute not named here is escaped to visible text rather than
+# * rendered, which is what keeps a post from running JavaScript in
+# * another reader's session. The list is what this blog's posts
+# * actually use: prose, code blocks, tables, links.
+ALLOWED_TAGS = [
+    "p",
+    "br",
+    "strong",
+    "em",
+    "code",
+    "pre",
+    "blockquote",
+    "h2",
+    "h3",
+    "ul",
+    "ol",
+    "li",
+    "a",
+    "hr",
+    "table",
+    "thead",
+    "tbody",
+    "tr",
+    "th",
+    "td",
+]
+ALLOWED_ATTRS = {"a": ["href", "title"]}
 
 
 # * There is no `is_author` in this context, and there deliberately is
@@ -60,6 +91,8 @@ jinja_globals["site"] = SITE
 # * Markdown is rendered at display time rather than stored as HTML, so a
 # * change here applies to everything already published — and so the
 # * database keeps the source the author actually wrote.
-templates.env.filters["markdown"] = lambda text: markdown.markdown(
-    text, extensions=MARKDOWN_EXTENSIONS
+templates.env.filters["markdown"] = lambda text: bleach.clean(
+    markdown.markdown(text, extensions=MARKDOWN_EXTENSIONS),
+    tags=ALLOWED_TAGS,
+    attributes=ALLOWED_ATTRS,
 )

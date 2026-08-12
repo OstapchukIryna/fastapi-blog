@@ -39,6 +39,7 @@ from blog.core.rate_limit import limiter
 from blog.infrastructure import database
 from blog.infrastructure.database import Base, get_db
 from blog.main import app
+from blog.services.users import reset_owner_now_cache
 
 # Tells pytest that we test async func so add it in an event loop
 pytest_plugins = ["anyio"]
@@ -118,6 +119,9 @@ async def client(db_session: AsyncSession, mocked_aws) -> AsyncGenerator[AsyncCl
     # otherwise carry counts over from whichever test ran before this one -
     # every test starts under the same fake IP address.
     limiter.reset()
+    # Same reason: the owner-now cache is a module-level singleton too, and
+    # would otherwise serve a previous test's owner or masthead lines.
+    reset_owner_now_cache()
     # ASGITransport does not run the app's lifespan, so nothing else ever
     # calls setup_engine() in tests - only /api/health needs it (its own
     # connection, deliberately outside get_db's override above).

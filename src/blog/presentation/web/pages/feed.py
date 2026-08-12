@@ -11,7 +11,7 @@ routes — and so this can be read without scrolling past them.
 
 from collections.abc import Sequence, Sized
 from dataclasses import dataclass
-from typing import Self
+from typing import Self, TypedDict
 
 from fastapi import Request
 
@@ -19,23 +19,33 @@ from blog.infrastructure import models
 from blog.schemas import Pagination
 
 
-def arrange(items: Sequence[models.Post]) -> dict:
+class FeedContext(TypedDict):
+    """The template context `arrange` returns — `lead` and `rest`."""
+
+    lead: models.Post | None
+    rest: list[models.Post]
+
+
+def arrange(items: Sequence[models.Post], page: Pagination) -> FeedContext:
     """Split one batch into the post shown large and the ones below it.
 
     Only the first batch has a lead at all: on the second batch, "load
     more" appends straight to the archive list instead of re-arranging
-    what is already on the page.
+    what is already on the page. `page.skip == 0` is what "first batch"
+    means here — a deep link with `?skip=` renders a later slice
+    server-side (see the `home` route), and its first item is not the
+    lead, just the top of whatever page it happens to be.
 
     Args:
         items (Sequence[models.Post]): one batch, in query order.
+        page (Pagination): the slice this batch was fetched at.
 
     Returns:
-        dict: the template context — `lead` and `rest`.
+        FeedContext: the template context — `lead` and `rest`.
     """
-    return {
-        "lead": items[0] if items else None,
-        "rest": list(items[1:]),
-    }
+    if page.skip == 0 and items:
+        return {"lead": items[0], "rest": list(items[1:])}
+    return {"lead": None, "rest": list(items)}
 
 
 @dataclass(slots=True, frozen=True)

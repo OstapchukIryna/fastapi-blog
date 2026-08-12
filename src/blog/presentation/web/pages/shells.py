@@ -99,10 +99,16 @@ async def forgot_password_page(request: Request) -> Response:
 async def reset_password_page(request: Request) -> Response:
     """Render the form that sets a new password from an emailed link.
 
-    The token is not read here. It stays in the query string and is sent
-    by the page's own script, so it never reaches the server as part of a
-    page request — where it would end up in access logs and in the
-    Referer header of anything the page loads.
+    The token is not read here — this route's own GET still carries it in
+    the query string, though, the same as any link does, and that copy is
+    already in nginx's access log by the time this function runs. No
+    header or history trick undoes that; only excluding the parameter
+    from the log format, or a POST-based link, would, and neither is
+    done. What is done: `Referrer-Policy: no-referrer` stops the token
+    riding along in the Referer header of anything this page loads next,
+    and the page's own script calls `history.replaceState` on load so the
+    token does not linger in the browser's address bar, history, or
+    clipboard after the link has been used.
 
     Args:
         request (Request): needed by the template.
@@ -113,6 +119,7 @@ async def reset_password_page(request: Request) -> Response:
     response = templates.TemplateResponse(
         request, "reset_password.html", {"title": "Reset password"}
     )
-    # Security measure
+    # Closes the Referer leak, not the access-log or browser-history one -
+    # see the docstring above for what those need instead.
     response.headers["Referrer-Policy"] = "no-referrer"
     return response
