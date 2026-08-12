@@ -72,12 +72,19 @@ class ContextFilter(logging.Filter):
             bool: always True — this filter only annotates, never drops.
         """
         request_id = request_id_var.get()
-        user_id = user_id_var.get()
-        # `is None`, not `or`: user id 0 would read as absent otherwise.
-        # No such row exists today, and a guard that depends on that is
-        # a guard that breaks the day the sequence is reset.
-        record.request_id = request_id if request_id is not None else "-"
-        record.user_id = str(user_id) if user_id is not None else "-"
+        record.request_id = getattr(record, "request_id", None) or (
+            request_id if request_id is not None else "-"
+        )
+
+        # ! Не перезаписывать то, что вызывающий передал явно: middleware
+        # ! читает id из scope, потому что contextvar, установленная
+        # ! внутри зависимости FastAPI, до него не доходит. Фильтр —
+        # ! запасной вариант для всех остальных мест, а не источник
+        # ! истины.
+        if not hasattr(record, "user_id"):
+            user_id = user_id_var.get()
+            record.user_id = str(user_id) if user_id is not None else "-"
+
         return True
 
 
