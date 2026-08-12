@@ -74,6 +74,7 @@ class RequestContextMiddleware:
 
         method = scope["method"]
         path = scope["path"]
+        user_id = scope.get("user_id", "-")
 
         try:
             await self.app(scope, receive, send_wrapper)
@@ -84,7 +85,12 @@ class RequestContextMiddleware:
                 method,
                 path,
                 duration_ms,
-                extra={"method": method, "path": path, "duration_ms": duration_ms},
+                extra={
+                    "method": method,
+                    "path": path,
+                    "duration_ms": duration_ms,
+                    "user_id": user_id,
+                },
             )
             raise
         else:
@@ -108,7 +114,7 @@ class RequestContextMiddleware:
                     "path": path,
                     "status_code": status_code,
                     "duration_ms": duration_ms,
-                    "user_id": scope.get("user_id", "-"),
+                    "user_id": user_id,
                 },
             )
         finally:
