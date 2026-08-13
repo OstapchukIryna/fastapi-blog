@@ -149,4 +149,7 @@ class RequestContextMiddleware:
         for name, value in scope.get("headers", []):
             if name == wanted:
                 return value.decode()
+        logger.warning(
+            "no X-CSP-Nonce; headers: %s", [n.decode() for n, _ in scope.get("headers", [])]
+        )
         return ""
