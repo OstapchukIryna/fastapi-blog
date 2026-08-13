@@ -34,7 +34,7 @@
     </p>
 {% endblock content %}
 {% block scripts %}
-    <script type="module">
+    <script nonce="{{ request.scope['csp_nonce'] }}" type="module">
         import { wireFeeds } from "/static/js/archive.js";
         wireFeeds();
     </script>

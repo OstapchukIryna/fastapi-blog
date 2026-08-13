@@ -281,7 +281,7 @@
 {% endblock content %}
 {% block scripts %}
     <!-- Profile Handler -->
-    <script type="module">
+    <script nonce="{{ request.scope['csp_nonce'] }}" type="module">
         import { authHeaders, clearToken, isSignedIn } from "/static/js/auth.js";
         import {
             API,

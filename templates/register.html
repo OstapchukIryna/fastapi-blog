@@ -77,7 +77,7 @@
 {% endblock content %}
 {% block scripts %}
     <!-- Register Form Handler -->
-    <script type="module">
+    <script nonce="{{ request.scope['csp_nonce'] }}" type="module">
         import { API, markFields, wireForm } from "/static/js/utils.js";
 
         const form = document.getElementById("registerForm");

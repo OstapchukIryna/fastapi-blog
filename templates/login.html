@@ -60,7 +60,7 @@
 {% endblock content %}
 {% block scripts %}
     <!-- Sign-in Form Handler -->
-    <script type="module">
+    <script nonce="{{ request.scope['csp_nonce'] }}" type="module">
         import { saveToken } from "/static/js/auth.js";
         import { API, wireForm } from "/static/js/utils.js";
 

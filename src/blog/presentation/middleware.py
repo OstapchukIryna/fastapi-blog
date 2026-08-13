@@ -59,6 +59,7 @@ class RequestContextMiddleware:
             return
 
         request_id = self._incoming_id(scope) or str(uuid.uuid4())
+        scope["csp_nonce"] = self._csp_nonce(scope)
         token = request_id_var.set(request_id)
 
         started = time.perf_counter()
@@ -134,3 +135,18 @@ class RequestContextMiddleware:
             if name == wanted:
                 return value.decode()
         return None
+
+    @staticmethod
+    def _csp_nonce(scope: Scope) -> str:
+        """Read the nonce nginx generated for this response.
+
+        The same value is already in the Content-Security-Policy header
+        nginx set: the browser will only run an inline tag carrying it.
+        Generating one here instead would produce a second, different
+        value that the policy does not list.
+        """
+        wanted = b"x-csp-nonce"
+        for name, value in scope.get("headers", []):
+            if name == wanted:
+                return value.decode()
+        return ""
