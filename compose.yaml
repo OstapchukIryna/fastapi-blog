@@ -1,0 +1,86 @@
+# Прод-развёртывание. Две службы и один разовый шаг.
+
+# ! Наружу смотрит только nginx. У app порта на хост нет вовсе: до него
+# ! можно достучаться лишь из сети compose, по имени службы.
+
+services:
+  # Ждёт, пока база начнёт отвечать, и завершается. 
+  #
+  # * Существует ради диагностики: миграции и так
+  # * упали бы на недоступной базе. Но упали бы трассировкой alembic, из
+  # * которой не видно, дело в базе, в сети до неё или в самой миграции.
+  # * Отдельный шаг разделяет эти случаи по имени упавшей службы.
+  # *
+  # ! pg_isready не понимает префикс диалекта SQLAlchemy, поэтому здесь
+  # ! третья переменная с чистым postgresql:// вместо
+  # ! postgresql+psycopg://. Хост тот без пулера, что у миграций: пулер
+  # ! отвечает даже когда база за ним спит.
+  db-check:
+    image: postgres:17-alpine
+    command:
+      - sh
+      - -c
+      - |
+        for i in $$(seq 1 30); do
+          pg_isready -d "$$PLAIN_DATABASE_URL" && exit 0
+          echo "waiting for the database ($$i/30)"
+          sleep 2
+        done
+        echo "database did not answer in 60s" >&2
+        exit 1
+    env_file: .env
+    restart: "no"
+
+  # Разовая служба: накатывает миграции и завершается. Приложение ждёт
+  # её успешного выхода.
+
+  migrate:
+    build: .
+    command: [ "alembic", "upgrade", "head" ]
+    env_file: .env
+    depends_on:
+      db-check:
+        condition: service_completed_successfully
+    restart: "no"
+
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # про X-Forwarded-For
+      FORWARDED_ALLOW_IPS: "172.16.0.0/12"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    expose:
+      - "8000"
+    logging:
+      driver: json-file
+      options:
+        # Без лимита json-file растёт до конца диска.
+        max-size: "10m"
+        max-file: "5"
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx/calledmad.com.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/nginx/snippets:/etc/nginx/snippets:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      # Файл проверки при продлении сертификата.
+      - /var/www/certbot:/var/www/certbot:ro
+
+      - ./static:/var/www/fastapi-blog/static:ro
+    depends_on:
+      app:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"

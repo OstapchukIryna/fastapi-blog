@@ -21,7 +21,11 @@ from blog.infrastructure import models  # noqa: F401
 from blog.infrastructure.database import check_database_alive, setup_engine, teardown_engine
 from blog.presentation.api import API_PREFIX, posts, tags, users
 from blog.presentation.errors import register_error_handlers
-from blog.presentation.middleware import RequestContextMiddleware
+from blog.presentation.middleware import (
+    PathAllowlistMiddleware,
+    RequestContextMiddleware,
+    SecurityHeadersMiddleware,
+)
 from blog.presentation.static import RevalidatedStaticFiles
 from blog.presentation.web import pages
 
@@ -45,8 +49,18 @@ app.state.limiter = limiter
 # pyrefly: ignore [bad-argument-type]  # slowapi's handler is typed for its
 # own exception, narrower than the Exception Starlette's signature wants.
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# * Order matters: middleware is applied in the order added, and the first one
+# to see a request is the last one added. Not allowed paths cannot pass through
+# the allowlist, so it must be the first to see a request. The rate limiter
+# must be the last to see a request, so it can count all requests that passed
+# through the other middleware. The other middleware can be in any order, but
+# the security headers must be added before the request context, so that the
+# request context can see the headers and use them to set the request context
 app.add_middleware(SlowAPIMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RequestContextMiddleware)
+app.add_middleware(PathAllowlistMiddleware)
 
 
 app.mount("/static", RevalidatedStaticFiles(directory=STATIC_DIR), name="static")

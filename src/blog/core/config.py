@@ -40,6 +40,12 @@ class Settings(BaseSettings):
 
     # Needs to be taken from the environment
     database_url: str
+    direct_database_url: str | None = None  # for migrations, if different from the pooled one
+
+    @property
+    def migration_database_url(self) -> str:
+        """Direct connection string for migrations, if different is set."""
+        return self.direct_database_url or self.database_url
 
     # owners' model
     owner_user_id: int | None = None

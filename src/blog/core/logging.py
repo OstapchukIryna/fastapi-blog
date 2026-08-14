@@ -52,6 +52,7 @@ SLOW_REQUEST_MS = 500
 _BUILTIN_RECORD_ATTRS = frozenset(vars(logging.LogRecord("", 0, "", 0, "", (), None))) | {
     "message",
     "asctime",
+    "color_message",
 }
 
 

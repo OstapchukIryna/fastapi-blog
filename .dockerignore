@@ -1,0 +1,53 @@
+
+.env
+.env.*
+
+
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+.git/
+.github/
+.gitignore
+
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+
+# Локальные артефакты, не нужные приложению
+*.db
+*.sqlite3
+media/
+node_modules/
+.DS_Store
+
+
+# Конфигурация редакторов и инструментов разработки
+.vscode/
+.claude/
+.impeccable/
+CLAUDE.md
+
+# Контрактные тесты: гоняются снаружи, приложению не нужны
+.postman/
+postman/
+
+# Артефакт прогона тестов
+coverage.xml
+
+# Хуки: работают на машине разработчика, в образе бесполезны
+.pre-commit-config.yaml
+
+# Документация и тесты: в рантайме не используются, а слой раздувают.
+# ! Если решишь гонять pytest внутри контейнера в CI — убрать эти три
+# ! строки, иначе тестам будет нечего запускать.
+tests/
+docs/
+
+vps_setup.txt
+
+

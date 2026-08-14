@@ -69,7 +69,7 @@ def setup_engine() -> None:
     that trade.
     """
     global engine, AsyncSessionLocal, _health_check_engine
-    engine = create_async_engine(settings.database_url, pool_pre_ping=True)
+    engine = create_async_engine(settings.database_url, poolclass=NullPool)
     AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     _health_check_engine = create_async_engine(settings.database_url, poolclass=NullPool)
 
