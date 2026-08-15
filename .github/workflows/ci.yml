@@ -71,13 +71,14 @@ jobs:
 
     # DATABASE_URL нужен и alembic, и pytest — conftest.py задаёт то же
     # самое значение сам, поэтому здесь просто общий env для job.
-    # S3_BUCKET_NAME нужен только alembic: Settings() требует его при
-    # любом импорте blog.core.config, а pytest ставит свой до того, как
-    # что-то импортирует, но отдельный процесс alembic импортирует
-    # напрямую и своего значения не получает.
+    # S3_BUCKET_NAME и SECRET_KEY нужны только alembic: Settings() требует
+    # их при любом импорте blog.core.config, а pytest ставит свои до
+    # того, как что-то импортирует, но отдельный процесс alembic
+    # импортирует напрямую и своих значений не получает.
     env:
       DATABASE_URL: postgresql+psycopg://bloguser:blogpassword@localhost/test_blog
       S3_BUCKET_NAME: ci-placeholder-bucket
+      SECRET_KEY: ci-run-only-${{ github.run_id }}-${{ github.run_attempt }}
 
     steps:
       - uses: actions/checkout@v4

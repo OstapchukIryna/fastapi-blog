@@ -31,6 +31,13 @@ WORK_DIR=""
 # if one is already set.
 export SECRET_KEY="${SECRET_KEY:-throwaway-secret-for-the-api-test-run}"
 
+# The masthead request in the collection expects to act as the blog's
+# owner. The schema gets dropped and recreated above, so the first user
+# the collection itself creates always lands on id 1 — that id is what
+# this run's owner is set to, overridden by a real OWNER_USER_ID if one
+# is already set.
+export OWNER_USER_ID="${OWNER_USER_ID:-1}"
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --url) BASE_URL="$2"; shift 2 ;;
