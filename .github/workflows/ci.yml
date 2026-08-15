@@ -78,7 +78,9 @@ jobs:
     env:
       DATABASE_URL: postgresql+psycopg://bloguser:blogpassword@localhost/test_blog
       S3_BUCKET_NAME: ci-placeholder-bucket
-      SECRET_KEY: ci-run-only-${{ github.run_id }}-${{ github.run_attempt }}
+      # secret_key требует минимум 32 символа — сам run_id столько не
+      # гарантирует, отсюда хвост.
+      SECRET_KEY: ci-run-only-${{ github.run_id }}-${{ github.run_attempt }}-not-a-real-secret
 
     steps:
       - uses: actions/checkout@v4
