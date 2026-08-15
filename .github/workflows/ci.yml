@@ -1,9 +1,19 @@
-name: checks
+name: ci
 
+# Триггеры выбраны так, чтобы каждый коммит проверялся ровно один раз.
+#
+# push на master — потому что туда попадает то, что уже слито, и оно же
+# едет в прод. pull_request — потому что работа идёт в dev, и открытый
+# (пусть даже черновиком) PR даёт проверку на каждый push в ветку.
+#
+# ! Добавить dev в push означало бы два прогона на один коммит: один по
+# ! push, второй по pull_request. Concurrency их не склеит — это разные
+# ! события. Черновой PR решает то же самое одним прогоном.
 on:
   push:
-    branches: [main, master]
+    branches: [master]
   pull_request:
+    branches: [master]
 
 # Отменяет предыдущий запуск на той же ветке: два пуша подряд не должны
 # гоняться параллельно и тем более деплоиться в обратном порядке.
@@ -34,12 +44,13 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
+      # ! Везде --check и тот же путь `.`, что в pre-commit. CI ничего
+      # ! не переписывает: правка, сделанная автоматикой на сервере, не
+      # ! попадает в твою историю, и локально ты продолжишь коммитить
+      # ! неотформатированное, не зная об этом.
       - name: Lint
         run: uv run ruff check .
 
-      # --check ничего не переписывает, только сообщает: правки,
-      # сделанные автоматикой на сервере, не попадают в твою историю,
-      # и локально ты продолжишь коммитить неотформатированное
       - name: Format
         run: uv run ruff format --check .
 
@@ -70,10 +81,10 @@ jobs:
           --health-retries 10
 
     # DATABASE_URL нужен и alembic, и pytest — conftest.py задаёт то же
-    # самое значение сам, поэтому здесь просто общий env для job.
-    # S3_BUCKET_NAME и SECRET_KEY нужны только alembic: Settings() требует
-    # их при любом импорте blog.core.config, а pytest ставит свои до
-    # того, как что-то импортирует, но отдельный процесс alembic
+    # значение сам, поэтому здесь просто общий env для job.
+    # S3_BUCKET_NAME и SECRET_KEY нужны только alembic: Settings()
+    # требует их при любом импорте blog.core.config, а pytest ставит
+    # свои до того, как что-то импортирует. Отдельный процесс alembic
     # импортирует напрямую и своих значений не получает.
     env:
       DATABASE_URL: postgresql+psycopg://bloguser:blogpassword@localhost/test_blog
@@ -95,8 +106,8 @@ jobs:
 
       # Ловит модель, изменённую без миграции: alembic check
       # автогенерирует диф против уже смигрированной базы и падает,
-      # если он не пустой. create_all в conftest.py после этого не
-      # конфликтует — checkfirst пропускает то, что уже есть.
+      # если он не пустой. Закрывает единственное место, где README
+      # обещал больше, чем проверялось.
       - name: Migrations match the models
         run: |
           uv run alembic upgrade head
@@ -108,10 +119,6 @@ jobs:
   api:
     runs-on: ubuntu-latest
 
-    # Тот же движок и та же база, что у test: коллекция ходит через
-    # настоящий API, значит пишет в ту же базу, на которой API реально
-    # стоит. Порт и имя базы совпадают с тем, что scripts/api-tests.sh
-    # прописывает сам.
     services:
       postgres:
         image: postgres:17
@@ -128,8 +135,8 @@ jobs:
           --health-retries 10
 
     # В отличие от test, здесь загрузка и удаление файла идут через
-    # настоящий S3 — «Upload a picture» и соседние запросы дергают
-    # AWSAvatars по-настоящему, макет тут не подходит.
+    # настоящий S3: коллекция дёргает AWSAvatars по-настоящему, макет
+    # тут не подходит.
     env:
       S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
       S3_REGION: ${{ secrets.S3_REGION }}
@@ -157,15 +164,16 @@ jobs:
         run: ./scripts/api-tests.sh
 
   deploy:
-    # Только с основной ветки и только после зелёных проверок. На PR
-    # джоб не запускается вовсе — деплоить непринятый код незачем.
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    # Только с master и только после зелёных проверок. На PR джоб не
+    # запускается вовсе — деплоить непринятый код незачем.
+    if: github.ref == 'refs/heads/master'
     needs: [lint, test, api]
     runs-on: ubuntu-latest
 
-    # Нужно для Workload Identity Federation: GitHub выдаёт короткоживущий
-    # токен, который Google обменивает на доступ. Ключа сервисного
-    # аккаунта в секретах нет — нечему утекать и нечего ротировать.
+    # Нужно для Workload Identity Federation: GitHub выдаёт
+    # короткоживущий токен, который Google обменивает на доступ. Ключа
+    # сервисного аккаунта в секретах нет — нечему утекать и нечего
+    # ротировать.
     permissions:
       contents: read
       id-token: write
@@ -202,10 +210,10 @@ jobs:
       # место: инстансов Cloud Run может быть несколько, и каждый
       # запускал бы alembic одновременно.
       #
-      # Settings() требует database_url, secret_key и s3_bucket_name даже
-      # только чтобы импортировать blog.core.config — alembic/env.py
+      # Settings() требует database_url, secret_key и s3_bucket_name
+      # даже только чтобы импортировать blog.core.config — alembic/env.py
       # делает это раньше, чем доходит до миграций, так что без всех
-      # трёх джоб падает на импорте, а не на самих миграциях.
+      # трёх job падает на импорте, а не на самих миграциях.
       - name: Run migrations
         run: |
           gcloud run jobs deploy migrate \

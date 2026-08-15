@@ -79,8 +79,11 @@
         <section class="now-panel closing-panel" aria-label="What I'm working on now">
             <div class="now-head">
                 <span class="mono-label now-title">Now</span>
-                {% if now_updated %}
-                    <span class="mono-label now-date">Updated {{ now_updated.strftime("%d %b %Y") }}</span>
+                {% if owner.now_updated_at %}
+                    <dt>Updated</dt>
+                    <dd>
+                        {{ owner.now_updated_at.strftime("%d %b %Y") }}
+                    </dd>
                 {% endif %}
             </div>
             <dl class="now-rows">

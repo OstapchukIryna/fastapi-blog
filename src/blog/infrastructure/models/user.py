@@ -74,6 +74,7 @@ class User(Base):
     # the owner's rows
     now_building: Mapped[str | None] = mapped_column(String(120), default=None)
     now_next: Mapped[str | None] = mapped_column(String(120), default=None)
+    now_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
     # * Functional, not unique=True on the column: a plain unique index is
     # * case-sensitive, so it would let "alice" and "Alice" both exist

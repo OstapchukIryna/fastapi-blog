@@ -1,7 +1,7 @@
 # fastapi-blog
 
 A blog with a REST API and server-rendered pages with PostgreSQL
-database. List of posts and tags, users' profiles. 
+database. List of posts and tags, users' profiles.
 
 Built as a work sample. There is no commercial project behind it, so the
 code is the thing to look at.
@@ -12,7 +12,7 @@ code is the thing to look at.
 Needs Python 3.14, PostgreSQL, [uv](https://docs.astral.sh/uv/), and an
 S3 bucket for avatars.
 
-Configuration comes from `.env` in the repository root. 
+Configuration comes from `.env` in the repository root.
 
 ```bash
 echo "SECRET_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(32))')" >> .env

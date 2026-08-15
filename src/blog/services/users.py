@@ -11,6 +11,7 @@ caller's live here too, beside the row they load.
 
 import logging
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Annotated
 
 from botocore.exceptions import ClientError
@@ -249,6 +250,7 @@ async def set_now(db: AsyncSession, user: models.User, changes: NowUpdate) -> mo
 
     for name, value in changes.model_dump(exclude_unset=True).items():
         setattr(user, name, value)
+    user.now_updated_at = datetime.now(UTC)
 
     await db.commit()
     _owner_now_set = False

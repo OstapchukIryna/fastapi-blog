@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     # Needs to be taken from the environment
     database_url: str
     direct_database_url: str | None = None  # for migrations, if different from the pooled one
+    plain_database_url: str | None = None
 
     @property
     def migration_database_url(self) -> str:
