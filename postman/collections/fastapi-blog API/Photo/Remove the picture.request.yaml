@@ -20,7 +20,7 @@ scripts:
 
       pm.test("shape is UserPrivate - no password hash", () => {
           pm.expect(Object.keys(user).sort()).to.eql(
-              ["email", "id", "image_file", "image_path", "is_owner", "now_building", "now_next", "username"]);
+              ["email", "id", "image_file", "image_path", "is_owner", "now_building", "now_next", "now_updated_at", "username"]);
           pm.expect(user).to.not.have.property("password_hash");
       });
 
