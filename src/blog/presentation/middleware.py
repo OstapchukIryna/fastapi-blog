@@ -259,6 +259,7 @@ class PathAllowlistMiddleware:
 
     ALLOWED_PREFIXES: tuple[str, ...] = (
         "/api",
+        "/openapi.json",
         "/posts",
         "/tags",
         "/users",

@@ -43,6 +43,9 @@ jobs:
       - name: Format
         run: uv run ruff format --check .
 
+      - name: Templates
+        run: uv run djlint templates/ --check
+
       - name: Type check
         run: uv run pyrefly check
 
@@ -66,6 +69,16 @@ jobs:
           --health-timeout 5s
           --health-retries 10
 
+    # DATABASE_URL нужен и alembic, и pytest — conftest.py задаёт то же
+    # самое значение сам, поэтому здесь просто общий env для job.
+    # S3_BUCKET_NAME нужен только alembic: Settings() требует его при
+    # любом импорте blog.core.config, а pytest ставит свой до того, как
+    # что-то импортирует, но отдельный процесс alembic импортирует
+    # напрямую и своего значения не получает.
+    env:
+      DATABASE_URL: postgresql+psycopg://bloguser:blogpassword@localhost/test_blog
+      S3_BUCKET_NAME: ci-placeholder-bucket
+
     steps:
       - uses: actions/checkout@v4
 
@@ -77,16 +90,74 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
+      # Ловит модель, изменённую без миграции: alembic check
+      # автогенерирует диф против уже смигрированной базы и падает,
+      # если он не пустой. create_all в conftest.py после этого не
+      # конфликтует — checkfirst пропускает то, что уже есть.
+      - name: Migrations match the models
+        run: |
+          uv run alembic upgrade head
+          uv run alembic check
+
       - name: Run tests
-        env:
-          DATABASE_URL: postgresql+psycopg://bloguser:blogpassword@localhost/test_blog
         run: uv run pytest -q
+
+  api:
+    runs-on: ubuntu-latest
+
+    # Тот же движок и та же база, что у test: коллекция ходит через
+    # настоящий API, значит пишет в ту же базу, на которой API реально
+    # стоит. Порт и имя базы совпадают с тем, что scripts/api-tests.sh
+    # прописывает сам.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: bloguser
+          POSTGRES_PASSWORD: blogpassword
+          POSTGRES_DB: test_blog
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bloguser -d test_blog"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    # В отличие от test, здесь загрузка и удаление файла идут через
+    # настоящий S3 — «Upload a picture» и соседние запросы дергают
+    # AWSAvatars по-настоящему, макет тут не подходит.
+    env:
+      S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
+      S3_REGION: ${{ secrets.S3_REGION }}
+      S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
+      S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      # Newman — Node-инструмент, коллекция собирается Python-скриптом
+      # из дерева YAML под postman/.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Run the collection
+        run: ./scripts/api-tests.sh
 
   deploy:
     # Только с основной ветки и только после зелёных проверок. На PR
     # джоб не запускается вовсе — деплоить непринятый код незачем.
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-    needs: [lint, test]
+    needs: [lint, test, api]
     runs-on: ubuntu-latest
 
     # Нужно для Workload Identity Federation: GitHub выдаёт короткоживущий

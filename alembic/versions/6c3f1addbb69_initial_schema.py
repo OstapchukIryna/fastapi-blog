@@ -68,9 +68,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        op.f("ix_posts_date_posted"), "posts", ["date_posted"], unique=False
-    )
+    op.create_index(op.f("ix_posts_date_posted"), "posts", ["date_posted"], unique=False)
     op.create_index(op.f("ix_posts_user_id"), "posts", ["user_id"], unique=False)
     op.create_table(
         "post_tags",
@@ -90,9 +88,7 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_posts_user_id"), table_name="posts")
     op.drop_index(op.f("ix_posts_date_posted"), table_name="posts")
     op.drop_table("posts")
-    op.drop_index(
-        op.f("ix_password_reset_tokens_user_id"), table_name="password_reset_tokens"
-    )
+    op.drop_index(op.f("ix_password_reset_tokens_user_id"), table_name="password_reset_tokens")
     op.drop_table("password_reset_tokens")
     op.drop_table("users")
     op.drop_index(op.f("ix_tags_name"), table_name="tags")
