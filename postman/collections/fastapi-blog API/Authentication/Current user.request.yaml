@@ -16,7 +16,7 @@ scripts:
 
       pm.test("shape is UserPrivate - the email is included here", () => {
           pm.expect(Object.keys(user).sort()).to.eql(
-              ["email", "id", "image_file", "image_path", "is_owner", "now_building", "now_next", "username"]);
+              ["email", "id", "image_file", "image_path", "is_owner", "now_building", "now_next", "now_updated_at", "username"]);
           pm.expect(user.email).to.eql(pm.collectionVariables.get("newEmail").toLowerCase());
       });
 
