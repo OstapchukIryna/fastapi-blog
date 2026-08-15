@@ -201,13 +201,19 @@ jobs:
       # Миграции до деплоя, разовой задачей. В CMD приложения им не
       # место: инстансов Cloud Run может быть несколько, и каждый
       # запускал бы alembic одновременно.
+      #
+      # Settings() требует database_url, secret_key и s3_bucket_name даже
+      # только чтобы импортировать blog.core.config — alembic/env.py
+      # делает это раньше, чем доходит до миграций, так что без всех
+      # трёх джоб падает на импорте, а не на самих миграциях.
       - name: Run migrations
         run: |
           gcloud run jobs deploy migrate \
             --region "${REGION}" \
             --image "${IMAGE_URI}:${GITHUB_SHA}" \
             --command alembic --args upgrade,head \
-            --set-secrets DIRECT_DATABASE_URL=direct-database-url:latest \
+            --set-secrets DATABASE_URL=database-url:latest,DIRECT_DATABASE_URL=direct-database-url:latest,SECRET_KEY=secret-key:latest \
+            --set-env-vars "S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}" \
             --quiet
           gcloud run jobs execute migrate --region "${REGION}" --wait
 
