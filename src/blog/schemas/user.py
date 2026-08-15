@@ -7,6 +7,7 @@ class the route names, so the separation is enforced by the response
 model rather than by remembering to filter.
 """
 
+from datetime import datetime
 from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, computed_field
@@ -108,6 +109,7 @@ class UserPrivate(UserPublic):
     email: EmailStr
     now_building: str | None = None
     now_next: str | None = None
+    now_updated_at: datetime | None = None
 
     @computed_field
     @property
