@@ -45,6 +45,7 @@ ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
+# Cloud Run задаёт PORT сам; 8000 — значение для локального compose
 ENV PORT=8000
 
 ENV FORWARDED_ALLOW_IPS=""
@@ -54,8 +55,8 @@ EXPOSE 8000
 # Проверяется тот же /api/health, который в приложении ходит в базу на
 # отдельном соединении: контейнер считается готовым, когда отвечает
 # приложение вместе с базой, а не когда просто запустился процесс.
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD python -c "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=4).status == 200 else 1)"
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD python -c "import os,sys,urllib.request; port=os.environ.get('PORT','8000'); sys.exit(0 if urllib.request.urlopen(f'http://127.0.0.1:{port}/api/health', timeout=8).status == 200 else 1)"
 
 USER appuser
 

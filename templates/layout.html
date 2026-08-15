@@ -71,10 +71,10 @@
                                href="/">Posts</a>
                             <a class="nav-link{{ ' active' if path.startswith("/tags") }}"
                                {% if path.startswith('/tags') %}aria-current="page"{% endif %}
-                               href="{{ url_for("tags_index") }}">Topics</a>
+                               href="{{ url_for("tags_index").path }}">Topics</a>
                             <a class="nav-link{{ ' active' if path.startswith("/about") }}"
                                {% if path.startswith('/about') %}aria-current="page"{% endif %}
-                               href="{{ url_for("about") }}">About</a>
+                               href="{{ url_for("about").path }}">About</a>
                         </div>
                         <div class="navbar-nav align-items-md-center">
                             {# Rendered for everyone and shown by CSS only when data-signed-in is
@@ -86,16 +86,16 @@
                                ! Appearance only: the addresses and the API stay
                                ! reachable until a server-side dependency closes them. #}
                             <a class="nav-link nav-auth nav-write{{ ' active' if path.startswith("/posts/new") }}"
-                               href="{{ url_for("new_post") }}">Write</a>
+                               href="{{ url_for("new_post").path }}">Write</a>
                             <a class="nav-link nav-auth{{ ' active' if path.startswith("/profile") }}"
                                {% if path.startswith('/profile') %}aria-current="page"{% endif %}
-                               href="{{ url_for("profile") }}">Profile</a>
+                               href="{{ url_for("profile").path }}">Profile</a>
                             {# Both links are rendered and the right one is
                                shown — see data-signed-in in <head>. Signing
                                out leads to no address, so it is a button
                                rather than an <a href="#">. #}
                             <a class="nav-link nav-anon{{ ' active' if path.startswith("/login") or path.startswith('/register') }}"
-                               href="{{ url_for("login") }}">Sign in</a>
+                               href="{{ url_for("login").path }}">Sign in</a>
                             <button class="nav-link nav-auth" type="button" id="signOut">Sign out</button>
                             <div class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle"

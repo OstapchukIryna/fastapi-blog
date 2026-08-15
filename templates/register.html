@@ -65,7 +65,7 @@
             </div>
             <button class="btn btn-light write-btn w-100" type="submit">Create account</button>
             <p class="auth-note mono-label">
-                Already have one? <a href="{{ url_for("login") }}">Sign in</a>
+                Already have one? <a href="{{ url_for("login").path }}">Sign in</a>
             </p>
         </form>
         <p class="mt-4">
@@ -133,7 +133,7 @@
                 message: `Account ${user.username} created. Sign in to start writing.`,
                 action: "Go to sign in",
             }),
-            after: () => window.location.assign("{{ url_for('login') }}"),
+            after: () => window.location.assign("{{ url_for.path }}"),
             failure: { title: "Not registered", action: "Back to the form" },
             busy: "Creating",
         });

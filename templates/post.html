@@ -8,7 +8,7 @@
             <p class="post-meta mono-label">
                 <span>{{ post.date_posted.strftime("%d %b, %Y") }}</span>
                 <span class="sep">/</span>
-                <span><a href="{{ url_for('user_posts', user_id=post.author.id) }}">{{ post.author.username }}</a></span>
+                <span><a href="{{ url_for('user_posts', user_id=post.author.id).path }}">{{ post.author.username }}</a></span>
                 <span class="sep">/</span>
                 <span>{{ post.reading_minutes }} min</span>
                 {% for tag in post.tags %}
@@ -29,12 +29,12 @@
         <div class="post-actions mono-label"
              data-author-only="{{ post.author.id }}"
              hidden>
-            <a href="{{ url_for('edit_post', post_id=post.id) }}">Edit</a>
+            <a href="{{ url_for('edit_post', post_id=post.id).path }}">Edit</a>
         </div>
         {% if post.tags %}
             <div class="post-tags mono-label">
                 {% for tag in post.tags %}
-                    <a href="{{ url_for('get_tag', tag=tag.name) }}">#{{ tag.name }}</a>
+                    <a href="{{ url_for('get_tag', tag=tag.name).path }}">#{{ tag.name }}</a>
                 {% endfor %}
             </div>
         {% endif %}
@@ -45,7 +45,8 @@
             <div class="related-grid">
                 {% for item in related %}
                     {% set rp = item.post %}
-                    <a class="related-card" href="{{ url_for('post_page', post_id=rp.id) }}">
+                    <a class="related-card"
+                       href="{{ url_for('post_page', post_id=rp.id).path }}">
                         {% if item.shared %}
                             <span class="shared-tag mono-label">Also on {{ item.shared | join(", ") }}</span>
                         {% endif %}

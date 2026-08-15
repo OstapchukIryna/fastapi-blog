@@ -14,7 +14,7 @@
         <header class="hero">
             <div class="hero-identity">
                 <img class="avatar hero-avatar"
-                     src="{{ url_for('static', path='profile_pics/avatar-256.jpg') }}"
+                     src="{{ url_for('static', path='profile_pics/avatar-256.jpg').path }}"
                      alt=""
                      width="72"
                      height="72">
@@ -39,13 +39,13 @@
             </p>
             <h2>
                 <a class="post-title stretched"
-                   href="{{ url_for('post_page', post_id=lead.id) }}">{{ lead.title }}</a>
+                   href="{{ url_for('post_page', post_id=lead.id).path }}">{{ lead.title }}</a>
             </h2>
             <p class="post-excerpt">{{ lead.summary }}</p>
             {% if lead.tags %}
                 <div class="card-tags mono-label">
                     {% for tag in lead.tags %}
-                        <a href="{{ url_for('get_tag', tag=tag.name) }}">#{{ tag.name }}</a>
+                        <a href="{{ url_for('get_tag', tag=tag.name).path }}">#{{ tag.name }}</a>
                     {% endfor %}
                 </div>
             {% endif %}
@@ -67,7 +67,7 @@
             {% if feed and feed.total %}
                 <p class="mono-label mb-2">Nothing on this page</p>
                 <p class="mb-0">
-                    There are {{ feed.total }} posts — <a href="{{ url_for("home") }}">start from the top</a>.
+                    There are {{ feed.total }} posts — <a href="{{ url_for.path }}">start from the top</a>.
                 </p>
             {% else %}
                 <p class="mono-label mb-2">No posts yet</p>

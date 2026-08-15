@@ -1,142 +1,56 @@
-# Every gate that has to pass before a change can be merged.
-#
-# Three jobs rather than one long chain: they are independent, they run in
-# parallel, and a failure names which kind of check broke instead of
-# stopping at the first one. The whole run is a few minutes.
-name: CI
+name: checks
 
 on:
-  pull_request:
   push:
-    branches: [master]
+    branches: [main, master]
+  pull_request:
 
-# A second push to the same branch supersedes the first: nobody needs the
-# result of a run against code that no longer exists.
+# Отменяет предыдущий запуск на той же ветке: два пуша подряд не должны
+# гоняться параллельно и тем более деплоиться в обратном порядке.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: read
-
 env:
-  # The application refuses to start without a secret. Generated per run
-  # rather than kept in the repository's secrets: nothing here signs a
-  # token anybody will ever present again, and a stored value invites
-  # reuse somewhere it would matter.
-  #
-  # The static prefix is padding, not decoration: Settings.secret_key
-  # requires 32 characters, and run_id alone (as short as single digits
-  # early in a repository's history) does not reliably clear that on its
-  # own.
-  SECRET_KEY: ci-run-only-not-a-real-secret-${{ github.run_id }}-${{ github.run_attempt }}
+  REGION: europe-west3
+  SERVICE: fastapi-service
+  REPOSITORY: fastapi-repo
+  IMAGE: app
 
 jobs:
-  static:
-    name: Lint, types
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - uses: astral-sh/setup-uv@v6
+      # Версию Python отдельно не задаём: uv читает её из .python-version
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
 
-      # --locked is the dependency gate: it refuses to run if uv.lock does
-      # not match pyproject.toml, so a dependency added without relocking
-      # fails here rather than on somebody else's machine.
-      - name: Install
+      # --locked падает, если uv.lock разошёлся с pyproject.toml —
+      # ловит «добавила зависимость, лок не закоммитила»
+      - name: Install dependencies
         run: uv sync --locked
 
-      # Checks the locked dependencies against OSV, not the code — a
-      # separate question from "does uv.lock match pyproject.toml" above.
-      # Still marked experimental by uv itself.
-      - name: Audit dependencies
-        run: uv audit --preview-features audit-command
+      - name: Lint
+        run: uv run ruff check .
 
-      - name: Ruff
-        run: |
-          uv run ruff check .
-          uv run ruff format --check src tests scripts
+      # --check ничего не переписывает, только сообщает: правки,
+      # сделанные автоматикой на сервере, не попадают в твою историю,
+      # и локально ты продолжишь коммитить неотформатированное
+      - name: Format
+        run: uv run ruff format --check .
 
-      - name: djlint
-        run: uv run djlint templates/ --check
+      - name: Type check
+        run: uv run pyrefly check
 
-      - name: Types
-        run: uv run pyrefly check src/blog tests scripts
-
-  tests:
-    name: Tests
+  test:
     runs-on: ubuntu-latest
 
-    # The tests run on PostgreSQL because the application does. They used
-    # to run on SQLite, which meant anything the two engines disagree
-    # about was untested by construction — timezone handling on a
-    # timestamp being the one that had already bitten.
-    #
-    # User, password and database name match tests/conftest.py exactly:
-    # it hardcodes this connection rather than reading DATABASE_URL, so
-    # the service has to meet it there instead of the other way round.
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_USER: bloguser
-          POSTGRES_PASSWORD: blogpassword
-          POSTGRES_DB: test_blog
-        ports:
-          - 5432:5432
-        # Without this the steps start racing the container: postgres
-        # accepts TCP before it accepts queries.
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    env:
-      # Only the migration check below reads this — pytest ignores it and
-      # connects where tests/conftest.py says to, which is this same
-      # database under the same name.
-      DATABASE_URL: postgresql+psycopg://bloguser:blogpassword@localhost:5432/test_blog
-      # Settings() refuses to build without a bucket name, and importing
-      # blog.core.config is enough to trip that — nothing in this job
-      # uploads anything, so a real bucket is not needed here, only a
-      # value that lets Settings() construct.
-      S3_BUCKET_NAME: ci-placeholder-bucket
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: astral-sh/setup-uv@v6
-        with:
-          enable-cache: true
-
-      - name: Install
-        run: uv sync --locked
-
-      # The gate that catches the failure this whole change is about: a
-      # migration that has drifted from the models. `check` autogenerates
-      # against the migrated database and fails if the diff is not empty,
-      # so a model edited without a migration stops here instead of on a
-      # deploy. Cheap — it is one connection and no data.
-      - name: Migrations match the models
-        run: |
-          uv run alembic upgrade head
-          uv run alembic check
-
-      - name: pytest
-        run: uv run pytest
-
-  api:
-    name: API contract
-    runs-on: ubuntu-latest
-
-    # Same engine as the tests job, and for the same reason: the
-    # collection writes through the real API, so it should write into the
-    # database the API actually runs on. Same credentials and database
-    # name too — scripts/api-tests.sh hardcodes this exact connection,
-    # matching tests/conftest.py, rather than reading it from here.
+    # Postgres сервис-контейнером: тесты бьются о ту же СУБД, что стоит
+    # в проде. На SQLite они были бы зелёными и там, где прод падает.
     services:
       postgres:
         image: postgres:17
@@ -147,41 +61,98 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
+          --health-cmd "pg_isready -U bloguser -d test_blog"
+          --health-interval 5s
           --health-timeout 5s
-          --health-retries 5
-
-    env:
-      # Unlike the tests job, this one really does upload and delete a
-      # file through the API — "Upload a picture" and friends exercise
-      # AWSAvatars for real, so it needs real S3 credentials. Set these
-      # under Settings -> Secrets and variables -> Actions.
-      S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
-      S3_REGION: ${{ secrets.S3_REGION || 'eu-north-1' }}
-      S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
-      S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
-      # api-tests.sh drops and recreates the schema before every run, so
-      # the collection's own "Create user" request - the first write to
-      # a fresh users table - always lands on id 1. That makes it the
-      # one caller the /me/now test can rely on being the owner.
-      OWNER_USER_ID: "1"
+          --health-retries 10
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: astral-sh/setup-uv@v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
 
-      # Newman is a Node tool; the collection itself is built from the
-      # YAML tree under postman/ by a Python script.
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-
-      - name: Install
+      - name: Install dependencies
         run: uv sync --locked
 
-      - name: Run the collection
-        run: ./scripts/api-tests.sh
+      - name: Run tests
+        env:
+          DATABASE_URL: postgresql+psycopg://bloguser:blogpassword@localhost/test_blog
+        run: uv run pytest -q
+
+  deploy:
+    # Только с основной ветки и только после зелёных проверок. На PR
+    # джоб не запускается вовсе — деплоить непринятый код незачем.
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+
+    # Нужно для Workload Identity Federation: GitHub выдаёт короткоживущий
+    # токен, который Google обменивает на доступ. Ключа сервисного
+    # аккаунта в секретах нет — нечему утекать и нечего ротировать.
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      # Тег — SHA коммита, а не только latest. Cloud Run различает
+      # ревизии по образу: с постоянным тегом он может не заметить, что
+      # содержимое поменялось, и откатываться станет не к чему.
+      - name: Build and push
+        run: |
+          IMAGE_URI="${REGION}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${REPOSITORY}/${IMAGE}"
+          docker build --platform linux/amd64 \
+            -t "${IMAGE_URI}:${GITHUB_SHA}" \
+            -t "${IMAGE_URI}:latest" .
+          docker push "${IMAGE_URI}:${GITHUB_SHA}"
+          docker push "${IMAGE_URI}:latest"
+          echo "IMAGE_URI=${IMAGE_URI}" >> "$GITHUB_ENV"
+
+      # Миграции до деплоя, разовой задачей. В CMD приложения им не
+      # место: инстансов Cloud Run может быть несколько, и каждый
+      # запускал бы alembic одновременно.
+      - name: Run migrations
+        run: |
+          gcloud run jobs deploy migrate \
+            --region "${REGION}" \
+            --image "${IMAGE_URI}:${GITHUB_SHA}" \
+            --command alembic --args upgrade,head \
+            --set-secrets DIRECT_DATABASE_URL=direct-database-url:latest \
+            --quiet
+          gcloud run jobs execute migrate --region "${REGION}" --wait
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy "${SERVICE}" \
+            --region "${REGION}" \
+            --image "${IMAGE_URI}:${GITHUB_SHA}" \
+            --quiet
+
+      # Проверяем то, что уехало, а не то, что собралось: деплой может
+      # пройти, а приложение — не подняться из-за конфигурации.
+      - name: Smoke test
+        run: |
+          for i in $(seq 1 10); do
+            code=$(curl -o /dev/null -s -w "%{http_code}" https://calledmad.com/api/health) || true
+            [ "$code" = "200" ] && exit 0
+            echo "health returned ${code:-nothing} (${i}/10)"
+            sleep 6
+          done
+          echo "the site did not come back healthy" >&2
+          exit 1

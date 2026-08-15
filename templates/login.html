@@ -45,10 +45,10 @@
             </div>
             <button class="btn btn-light write-btn w-100" type="submit">Sign in</button>
             <p class="auth-note mono-label">
-                No account yet? <a href="{{ url_for("register") }}">Create one</a>
+                No account yet? <a href="{{ url_for("register").path }}">Create one</a>
             </p>
             <p class="auth-note mono-label">
-                <a href="{{ url_for("forgot_password_page") }}">Forgot your password?</a>
+                <a href="{{ url_for("forgot_password_page").path }}">Forgot your password?</a>
             </p>
         </form>
         <p class="mt-4">

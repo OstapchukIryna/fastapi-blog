@@ -18,20 +18,20 @@
         </p>
         <h2>
             <a class="post-title stretched"
-               href="{{ url_for('post_page', post_id=post.id) }}">{{ post.title }}</a>
+               href="{{ url_for('post_page', post_id=post.id).path }}">{{ post.title }}</a>
         </h2>
         <p class="post-excerpt">{{ post.summary }}</p>
         {% if post.tags %}
             <div class="card-tags mono-label">
                 {% for tag in post.tags %}
-                    <a href="{{ url_for('get_tag', tag=tag.name) }}">#{{ tag.name }}</a>
+                    <a href="{{ url_for('get_tag', tag=tag.name).path }}">#{{ tag.name }}</a>
                 {% endfor %}
             </div>
         {% endif %}
     </article>
 {% endmacro %}
 {% macro topic_row(name, count) %}
-    <a class="topic-row" href="{{ url_for('get_tag', tag=name) }}">
+    <a class="topic-row" href="{{ url_for('get_tag', tag=name).path }}">
         <span class="name">{{ name }}</span>
         <span class="count mono-label">{{ count }} post{{ '' if count == 1 else 's' }}</span>
     </a>

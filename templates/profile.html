@@ -377,7 +377,7 @@
         const toLogin = (reason) => {
             const next = encodeURIComponent(window.location.pathname);
             const why = reason ? `&reason=${reason}` : "";
-            window.location.replace(`{{ url_for('login') }}?next=${next}${why}`);
+            window.location.replace(`{{ url_for('login').path }}?next=${next}${why}`);
         };
 
         function fill(user) {

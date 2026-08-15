@@ -98,7 +98,7 @@ class Feed:
             Self: state the template hands to the "load more" button.
         """
         return cls(
-            url=str(request.url_for(route, **path_params)),
+            url=request.url_for(route, **path_params).path,
             shown=page.skip + len(items),
             limit=page.limit,
             total=total,
