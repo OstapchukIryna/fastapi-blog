@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "aiosmtplib>=5.1.2",
-    "alembic>=1.19.0",
+    "alembic>=1.19.1",
     "bleach>=6.4.0",
     "boto3>=1.43.65",
     "fastapi[standard]>=0.140.0",
